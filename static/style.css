@@ -68,6 +68,10 @@ body{
 }
 .titre-page h1{margin:0 0 .2rem; font-size:1.5rem;}
 .discret{color:var(--encre-douce); font-size:.85rem;}
+.provenance{
+  color:var(--encre-douce); font-size:.82rem; margin:.35rem 0 0;
+}
+.provenance a{color:var(--encre-douce);}
 
 /* ---------------- Messages ---------------- */
 .messages{margin-bottom:1.2rem; display:grid; gap:.5rem;}
@@ -155,6 +159,11 @@ label input,label select,label textarea{margin-top:.25rem; font-weight:400;
 .etiquette-attente{background:#fff4e0; color:#96601a;}
 .etiquette-ok{background:var(--succes-fond); color:var(--succes);}
 .etiquette-erreur{background:var(--erreur-fond); color:var(--erreur);}
+
+/* ---------------- Journal d'audit ---------------- */
+.detail-changements{margin:0; padding-left:1.1rem; font-size:.85rem;}
+.detail-changements li{margin-bottom:.2rem;}
+.detail-changements li:last-child{margin-bottom:0;}
 
 /* ---------------- Import Excel/CSV ---------------- */
 .bloc-import{

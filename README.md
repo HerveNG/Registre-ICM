@@ -54,12 +54,14 @@ mvp_registre_bapteme_mariage/
 ├── database/
 │   ├── schema_supabase.sql        ← à exécuter dans Supabase
 │   ├── migration_01_photo.sql     ← si la base existait AVANT les photos
+│   ├── migration_02_roles.sql     ← si la base existait AVANT les rôles
+│   ├── migration_03_journal.sql   ← si la base existait AVANT le journal d'audit
 │   └── schema_sqlite.sql          ← documentation du schéma local
 │
 ├── app.py                         ← APPLICATION FLASK
 ├── requirements.txt
 ├── .env.example                   ← à copier en « .env »
-├── templates/                     ← pages (connexion, liste, formulaire, carte, import)
+├── templates/                     ← pages (connexion, liste, formulaire, carte, import, journal)
 └── static/
     ├── style.css
     ├── photo.js                   ← recadrage et compression des photos
@@ -82,9 +84,10 @@ mvp_registre_bapteme_mariage/
    étape, un compte créé ne peut rien lire ni écrire.
 4. **Project Settings → API** : noter l'`URL` du projet et la clé `anon`.
 
-> **Vous aviez déjà créé la base avant les photos, ou avant les rôles ?**
-> Ne rejouez pas le script complet : exécutez, dans cet ordre,
-> `database/migration_01_photo.sql` puis `database/migration_02_roles.sql`
+> **Vous aviez déjà créé la base avant les photos, avant les rôles, ou
+> avant le journal d'audit ?** Ne rejouez pas le script complet : exécutez,
+> dans cet ordre, `database/migration_01_photo.sql` puis
+> `database/migration_02_roles.sql` puis `database/migration_03_journal.sql`
 > — chacun ajoute seulement ce qui manque, sans toucher à vos données.
 
 **b) Relier l'application**
@@ -198,7 +201,37 @@ créées avant l'ajout des rôles).
 
 ---
 
-## 6. Imprimer une carte en PDF
+## 6. Journal d'audit
+
+Chaque création, modification ou suppression de carte est enregistrée
+automatiquement dans un journal séparé, consultable par les trois rôles
+(bouton **Journal**, dans l'en-tête) : qui a fait quoi, et quand — avec,
+pour une modification, le détail des champs changés (valeur avant →
+valeur après).
+
+Une fiche supprimée reste traçable dans le journal (son nom y est
+conservé), même si elle n'existe plus dans le registre. Sur la fiche
+elle-même (formulaire de modification), une ligne discrète sous le titre
+rappelle qui l'a créée et, le cas échéant, qui l'a modifiée en dernier —
+avec un lien vers son historique complet dans le journal.
+
+Personne — pas même l'application — ne peut écrire directement dans le
+journal : il est alimenté automatiquement, jamais à la main.
+
+| Version | Comment |
+|---|---|
+| Flask | table `journal_audit`, remplie en Python à chaque écriture (`app.py`) |
+| En ligne (Supabase) | table `journal_audit` + trigger Postgres sur `registre` (`database/schema_supabase.sql` § 10, ou `database/migration_03_journal.sql` pour une base déjà créée) |
+
+> **Petite différence entre les deux versions.** Sur la version Flask, une
+> création issue d'un import en lot est repérable comme telle dans le
+> journal ; sur la version en ligne, le trigger ne voit que la ligne
+> insérée et ne distingue pas cette origine — le journal reste complet
+> (qui, quoi, quand), seule cette étiquette n'a pas d'équivalent.
+
+---
+
+## 7. Imprimer une carte en PDF
 
 Cliquer **Carte** sur une ligne du registre → **Imprimer / Enregistrer en PDF**
 → dans la fenêtre d'impression, choisir *Destination : Enregistrer au format PDF*.
@@ -215,7 +248,7 @@ image externe).
 
 ---
 
-## 7. Importer le registre papier existant
+## 8. Importer le registre papier existant
 
 Bouton **Importer**, en haut du registre. Le principe est le même sur les
 deux versions : rien n'est écrit tant que vous n'avez pas confirmé.
@@ -240,7 +273,7 @@ modifiant chaque fiche importée.
 
 ---
 
-## 8. Photos d'identité
+## 9. Photos d'identité
 
 Dans le formulaire, **Choisir une photo** ouvre une fenêtre de recadrage :
 faites glisser l'image pour centrer le visage, ajustez le zoom, validez.
@@ -278,7 +311,7 @@ fichier — le stockage ne se remplit pas d'images orphelines.
 
 ---
 
-## 9. Sauvegardes
+## 10. Sauvegardes
 
 Une fois par mois : bouton **Export Excel** → ranger le fichier
 `registre_icm_AAAA-MM-JJ.csv` en dehors de l'ordinateur (clé USB, Drive).
@@ -291,9 +324,8 @@ C'est la seule sauvegarde qui vous appartienne vraiment.
 
 ---
 
-## 10. Ce qui reste à faire pour une version 2
+## 11. Ce qui reste à faire pour une version 2
 
-- journal d'audit : qui a créé ou modifié quelle carte, et quand ;
 - signature scannée du célébrant sur la carte ;
 - séparation des personnes et des actes (un mariage = deux fidèles liés) ;
 - attestations et statistiques annuelles imprimables ;
@@ -301,7 +333,7 @@ C'est la seule sauvegarde qui vous appartienne vraiment.
 
 ---
 
-## 11. Modèle de données
+## 12. Modèle de données
 
 Un enregistrement = une carte = un fidèle. Le bloc mariage reste vide tant
 que la personne n'est pas mariée, exactement comme sur la carte papier.

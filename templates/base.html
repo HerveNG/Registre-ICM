@@ -25,6 +25,7 @@
         <a href="{{ url_for('importer') }}">Importer</a>
         <a href="{{ url_for('export_csv') }}">Export Excel</a>
       {% endif %}
+      <a href="{{ url_for('journal') }}">Journal</a>
       <span class="nav-compte">
         {{ session.get('utilisateur') }}
         <span class="etiquette-role">{{ {'secretaire':'Secrétaire','pasteur':'Pasteur','visiteur':'Visiteur'}[session.get('role')] }}</span>

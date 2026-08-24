@@ -222,6 +222,47 @@ class Registre(db.Model):
         return self.date_mariage is not None
 
 
+class JournalAudit(db.Model):
+    """Une ligne par création, modification ou suppression d'une carte.
+
+    registre_id n'est volontairement PAS une clé étrangère stricte : une
+    fiche supprimée doit rester traçable dans le journal, donc l'entrée
+    d'audit ne dépend pas de l'existence continue de la fiche. nom_complet
+    est un instantané pris au moment de l'action, pour rester lisible même
+    si la fiche a depuis été supprimée ou renommée.
+    """
+    __tablename__ = "journal_audit"
+
+    id = db.Column(db.Integer, primary_key=True)
+    horodatage = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    utilisateur = db.Column(db.String(80), nullable=False)
+    action = db.Column(db.String(20), nullable=False)   # creation | modification | suppression
+    registre_id = db.Column(db.Integer)
+    nom_complet = db.Column(db.String(250), nullable=False)
+    details = db.Column(db.Text)   # JSON : [{"champ","avant","apres"}, ...] ou {"origine":"import"}
+
+    @property
+    def changements(self):
+        """Liste des champs modifiés (pour l'affichage), ou None."""
+        if not self.details:
+            return None
+        try:
+            valeur = json.loads(self.details)
+        except ValueError:
+            return None
+        return valeur if isinstance(valeur, list) else None
+
+    @property
+    def vient_de_limport(self):
+        if not self.details:
+            return False
+        try:
+            valeur = json.loads(self.details)
+        except ValueError:
+            return False
+        return isinstance(valeur, dict) and valeur.get("origine") == "import"
+
+
 # ------------------------------------------------------------------
 #  Authentification
 # ------------------------------------------------------------------
@@ -470,6 +511,79 @@ def attribuer_numeros(donnees):
 
 
 # ------------------------------------------------------------------
+#  Journal d'audit
+# ------------------------------------------------------------------
+# Champs suivis par le journal : les mêmes que l'export/import, plus la
+# photo (dont l'export n'a besoin que du nom de fichier).
+CHAMPS_SUIVIS = CHAMPS_TEXTE + CHAMPS_DATE + ["photo"]
+LIBELLES_CHAMPS = dict(COLONNES_EXPORT)
+
+
+def _texte_valeur(valeur):
+    """Représentation lisible d'une valeur de champ pour le journal."""
+    if valeur is None or valeur == "":
+        return "—"
+    if isinstance(valeur, date):
+        return valeur.strftime("%d/%m/%Y")
+    return str(valeur)
+
+
+def journaliser(action, record, avant=None, origine=None):
+    """Ajoute une entrée au journal d'audit (dans la transaction en cours —
+    n'appelle pas commit() elle-même, pour rester atomique avec l'écriture
+    qu'elle journalise).
+
+    - action : "creation", "modification" ou "suppression".
+    - record : la fiche concernée, encore accessible (y compris juste
+      avant sa suppression).
+    - avant : pour une modification, dict {champ: valeur_avant} capturé
+      avant les setattr — sert à calculer le détail des champs changés.
+      Si aucun champ suivi n'a réellement changé, aucune entrée n'est créée.
+    - origine : par exemple "import", pour distinguer une création en lot
+      d'une saisie manuelle.
+    """
+    details = None
+
+    if action == "modification" and avant is not None:
+        changements = []
+        for champ, valeur_avant in avant.items():
+            valeur_apres = getattr(record, champ)
+            if valeur_avant != valeur_apres:
+                changements.append({
+                    "champ": LIBELLES_CHAMPS.get(champ, champ),
+                    "avant": _texte_valeur(valeur_avant),
+                    "apres": _texte_valeur(valeur_apres),
+                })
+        if not changements:
+            return
+        details = json.dumps(changements, ensure_ascii=False)
+    elif action == "creation" and origine:
+        details = json.dumps({"origine": origine}, ensure_ascii=False)
+
+    db.session.add(JournalAudit(
+        utilisateur=session.get("utilisateur", "?"),
+        action=action,
+        registre_id=record.id,
+        nom_complet=record.nom_complet,
+        details=details,
+    ))
+
+
+def historique_fiche(record_id):
+    """(entrée de création, dernière entrée de modification) d'une fiche —
+    pour afficher « Créée par … le … » sur le formulaire. L'un des deux
+    (ou les deux) peut être None : la création peut précéder l'existence
+    du journal, et une fiche n'a pas forcément été modifiée depuis."""
+    creation = (JournalAudit.query
+                .filter_by(registre_id=record_id, action="creation")
+                .order_by(JournalAudit.horodatage.asc()).first())
+    derniere_modif = (JournalAudit.query
+                       .filter_by(registre_id=record_id, action="modification")
+                       .order_by(JournalAudit.horodatage.desc()).first())
+    return creation, derniere_modif
+
+
+# ------------------------------------------------------------------
 #  Liste et recherche
 # ------------------------------------------------------------------
 @app.route("/")
@@ -536,6 +650,8 @@ def nouveau():
                                    valeurs=request.form, paroisse=PAROISSE)
 
         db.session.add(record)
+        db.session.flush()          # attribue record.id sans clôturer la transaction
+        journaliser("creation", record)
         db.session.commit()
         flash(f"Carte de {record.nom_complet} enregistrée "
               f"(N° {record.numero_registre_1 or '—'}).", "success")
@@ -550,6 +666,8 @@ def modifier(record_id):
     record = db.session.get(Registre, record_id) or abort(404)
 
     if request.method == "POST":
+        avant = {champ: getattr(record, champ) for champ in CHAMPS_SUIVIS}
+
         donnees, erreurs = collecter_formulaire(request.form)
         erreurs += verifier_unicite(donnees, id_courant=record.id)
         if erreurs:
@@ -567,11 +685,14 @@ def modifier(record_id):
 
         for champ, valeur in attribuer_numeros(donnees).items():
             setattr(record, champ, valeur)
+        journaliser("modification", record, avant=avant)
         db.session.commit()
         flash(f"Carte de {record.nom_complet} mise à jour.", "success")
         return redirect(url_for("index"))
 
-    return render_template("form.html", record=record, valeurs={}, paroisse=PAROISSE)
+    creation, derniere_modif = historique_fiche(record.id)
+    return render_template("form.html", record=record, valeurs={}, paroisse=PAROISSE,
+                           creation=creation, derniere_modif=derniere_modif)
 
 
 @app.post("/supprimer/<int:record_id>")
@@ -580,6 +701,7 @@ def supprimer(record_id):
     record = db.session.get(Registre, record_id) or abort(404)
     nom = record.nom_complet
     photo = record.photo
+    journaliser("suppression", record)
     db.session.delete(record)
     db.session.commit()
     supprimer_photo(photo)          # la fiche partie, l'image n'a plus de raison d'être
@@ -595,6 +717,29 @@ def supprimer(record_id):
 def carte(record_id):
     record = db.session.get(Registre, record_id) or abort(404)
     return render_template("carte.html", r=record, paroisse=PAROISSE)
+
+
+# ------------------------------------------------------------------
+#  Journal d'audit — qui a créé/modifié/supprimé quelle carte, et quand.
+#  Consultation ouverte aux trois rôles : c'est une lecture, pas une
+#  écriture (les entrées elles-mêmes ne sont jamais modifiables).
+# ------------------------------------------------------------------
+@app.route("/journal")
+@login_requis
+def journal():
+    q = request.args.get("q", "").strip()
+    page = max(request.args.get("page", 1, type=int), 1)
+    par_page = 30
+
+    requete = JournalAudit.query
+    if q:
+        requete = requete.filter(JournalAudit.nom_complet.ilike(f"%{q}%"))
+
+    pagination = requete.order_by(JournalAudit.horodatage.desc()) \
+                        .paginate(page=page, per_page=par_page, error_out=False)
+
+    return render_template("journal.html", pagination=pagination,
+                           entrees=pagination.items, q=q, paroisse=PAROISSE)
 
 
 # ------------------------------------------------------------------
@@ -838,8 +983,14 @@ def importer():
         resultats = analyser_lignes(paires)
         valides = [r for r in resultats if not r["erreurs"]]
 
+        nouvelles_fiches = []
         for r in valides:
-            db.session.add(Registre(**attribuer_numeros(r["donnees"])))
+            record = Registre(**attribuer_numeros(r["donnees"]))
+            db.session.add(record)
+            nouvelles_fiches.append(record)
+        db.session.flush()          # attribue un id à chaque fiche avant de journaliser
+        for record in nouvelles_fiches:
+            journaliser("creation", record, origine="import")
         db.session.commit()
 
         ignorees = len(resultats) - len(valides)
@@ -924,6 +1075,11 @@ def jj_mm_aaaa(valeur):
 @app.template_filter("iso")
 def iso(valeur):
     return valeur.strftime("%Y-%m-%d") if valeur else ""
+
+
+@app.template_filter("jj_mm_aaaa_hhmm")
+def jj_mm_aaaa_hhmm(valeur):
+    return valeur.strftime("%d/%m/%Y à %H:%M") if valeur else ""
 
 
 @app.errorhandler(404)

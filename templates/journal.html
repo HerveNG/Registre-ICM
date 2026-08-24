@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block titre %}Journal d'audit — ICM{% endblock %}
+
+{# --- Libellé et style d'une action --- #}
+{% macro etiquette_action(action) -%}
+{%- if action == 'creation' -%}<span class="etiquette etiquette-ok">Création</span>
+{%- elif action == 'modification' -%}<span class="etiquette etiquette-attente">Modification</span>
+{%- elif action == 'suppression' -%}<span class="etiquette etiquette-erreur">Suppression</span>
+{%- else -%}{{ action }}
+{%- endif -%}
+{%- endmacro %}
+
+{% block contenu %}
+
+<div class="titre-page">
+  <h1>Journal d'audit</h1>
+  <p class="discret">Qui a créé, modifié ou supprimé quelle carte, et quand.</p>
+</div>
+
+<form class="barre-recherche" method="get" action="{{ url_for('journal') }}">
+  <input type="search" name="q" value="{{ q }}" placeholder="Rechercher par nom de la fiche…">
+  <button type="submit" class="bouton">Rechercher</button>
+  {% if q %}<a class="bouton bouton-discret" href="{{ url_for('journal') }}">Réinitialiser</a>{% endif %}
+</form>
+
+{% if entrees %}
+<div class="tableau-enveloppe">
+<table class="tableau">
+  <thead>
+    <tr>
+      <th>Date &amp; heure</th>
+      <th>Carte</th>
+      <th>Action</th>
+      <th>Par</th>
+      <th>Détail</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for entree in entrees %}
+    <tr>
+      <td>{{ entree.horodatage | jj_mm_aaaa_hhmm }}</td>
+      <td>
+        {% if entree.action != 'suppression' %}
+          <a href="{{ url_for('carte', record_id=entree.registre_id) }}" target="_blank">{{ entree.nom_complet }}</a>
+        {% else %}
+          {{ entree.nom_complet }}
+        {% endif %}
+      </td>
+      <td>{{ etiquette_action(entree.action) }}</td>
+      <td>{{ entree.utilisateur }}</td>
+      <td>
+        {% if entree.action == 'creation' and entree.vient_de_limport %}
+          <span class="etiquette">import en lot</span>
+        {% elif entree.changements %}
+          <ul class="detail-changements">
+            {% for c in entree.changements %}
+              <li><strong>{{ c.champ }}</strong> : {{ c.avant }} → {{ c.apres }}</li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <span class="discret">—</span>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% if pagination.pages > 1 %}
+<nav class="pagination">
+  {% if pagination.has_prev %}
+    <a class="bouton bouton-petit" href="{{ url_for('journal', page=pagination.prev_num, q=q) }}">‹ Précédent</a>
+  {% endif %}
+  <span class="pagination-info">Page {{ pagination.page }} sur {{ pagination.pages }}</span>
+  {% if pagination.has_next %}
+    <a class="bouton bouton-petit" href="{{ url_for('journal', page=pagination.next_num, q=q) }}">Suivant ›</a>
+  {% endif %}
+</nav>
+{% endif %}
+
+{% else %}
+<div class="vide">
+  {% if q %}
+    <p>Aucune entrée ne correspond à cette recherche.</p>
+    <a class="bouton" href="{{ url_for('journal') }}">Voir tout le journal</a>
+  {% else %}
+    <p>Le journal est encore vide.</p>
+  {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}

@@ -128,6 +128,15 @@ code{font-size:.82rem;background:#eef1f6;padding:.1rem .4rem;border-radius:4px;}
 .etiquette-ok{background:var(--succes-fond);color:var(--succes);}
 .etiquette-erreur{background:var(--erreur-fond);color:var(--erreur);}
 
+/* ---------- Journal d'audit ---------- */
+.provenance{color:var(--encre-douce);font-size:.82rem;margin:-.6rem 0 1rem;}
+.provenance a{color:var(--encre-douce);}
+.detail-changements{margin:0;padding-left:1.1rem;font-size:.85rem;}
+.detail-changements li{margin-bottom:.2rem;}
+.detail-changements li:last-child{margin-bottom:0;}
+.lien-carte-journal{border:0;background:none;padding:0;font:inherit;
+  color:var(--encre);text-decoration:underline;cursor:pointer;}
+
 /* ---------- Import Excel/CSV ---------- */
 .bloc-import{background:var(--blanc);border:1px solid var(--trait);border-radius:var(--rayon);
   padding:1.4rem 1.6rem;margin-bottom:1.5rem;}
@@ -242,6 +251,7 @@ h1.titre{margin:0 0 1rem;font-size:1.5rem;}
       <button data-vue="formulaire" id="btn-nouveau">Nouvelle carte</button>
       <button data-vue="import" id="btn-import-nav">Importer</button>
       <button id="btn-export">Export Excel</button>
+      <button data-vue="journal">Journal</button>
       <button data-vue="reglages">Réglages</button>
       <span class="utilisateur" id="etiquette-utilisateur"></span>
       <button id="btn-deconnexion">Déconnexion</button>
@@ -337,9 +347,39 @@ h1.titre{margin:0 0 1rem;font-size:1.5rem;}
     </nav>
   </section>
 
+  <!-- ================= JOURNAL D'AUDIT ================= -->
+  <section id="vue-journal" hidden>
+    <h1 class="titre">Journal d'audit</h1>
+    <p class="discret" style="margin-top:-.8rem;margin-bottom:1.2rem">
+      Qui a créé, modifié ou supprimé quelle carte, et quand.</p>
+
+    <form class="barre-recherche" id="form-recherche-journal">
+      <input type="search" id="recherche-journal" placeholder="Rechercher par nom de la fiche…">
+      <button type="submit" class="bouton">Rechercher</button>
+      <button type="button" class="bouton bouton-discret" id="btn-reinit-journal">Réinitialiser</button>
+    </form>
+
+    <div class="tableau-enveloppe">
+      <table>
+        <thead><tr>
+          <th>Date &amp; heure</th><th>Carte</th><th>Action</th><th>Par</th><th>Détail</th>
+        </tr></thead>
+        <tbody id="corps-tableau-journal"></tbody>
+      </table>
+    </div>
+    <div id="zone-vide-journal"></div>
+
+    <nav class="pagination" id="pagination-journal" hidden>
+      <button class="bouton bouton-petit" id="btn-precedent-journal">‹ Précédent</button>
+      <span class="discret" id="info-page-journal"></span>
+      <button class="bouton bouton-petit" id="btn-suivant-journal">Suivant ›</button>
+    </nav>
+  </section>
+
   <!-- ================= FORMULAIRE ================= -->
   <section id="vue-formulaire" hidden>
     <h1 class="titre" id="titre-formulaire">Nouvelle carte</h1>
+    <p class="provenance" id="provenance-fiche" hidden></p>
     <form id="form-carte">
       <input type="hidden" id="champ-id">
 
@@ -816,12 +856,24 @@ const CHAMPS = ["nom","prenom","nom_pere","nom_mere","date_naissance","nationali
   "celebrant_mariage","signature_2","telephone","observations"];
 
 const PAR_PAGE = 20;
+const PAR_PAGE_JOURNAL = 30;
 const SEAU_PHOTOS = "photos";        // nom du bucket créé par le script SQL
 
 const etat = {
   config:null, session:null, role:null, page:1, total:0, q:"", filtre:"", lignes:[],
   // Photo en cours d'édition dans le formulaire
-  photo: { chemin:null, blob:null, retiree:false }
+  photo: { chemin:null, blob:null, retiree:false },
+  // Journal d'audit (page séparée du registre)
+  journal: { page:1, total:0, q:"", lignes:[] }
+};
+
+// Libellé + classe d'étiquette pour une ligne du journal d'audit —
+// mêmes couleurs que la version Flask (etiquette-ok = vert, etiquette-erreur
+// = rouge, .etiquette seule = ambre, déjà utilisée pour "à compléter").
+const LIBELLES_ACTIONS_JOURNAL = {
+  creation:     { texte:"Création",     classe:"etiquette-ok" },
+  modification: { texte:"Modification", classe:"" },
+  suppression:  { texte:"Suppression",  classe:"etiquette-erreur" }
 };
 
 // role vaut 'secretaire', 'pasteur' ou 'visiteur' (table "profils" côté
@@ -878,8 +930,20 @@ function dateFr(iso){
   return (a&&m&&j) ? `${j}/${m}/${a}` : "";
 }
 
+/* Date + heure UTC telles qu'enregistrées, sans conversion au fuseau
+   local — la version Flask affiche aussi l'heure UTC brute (elle
+   n'effectue aucune conversion de fuseau), pour rester cohérent entre
+   les deux versions de l'application. */
+function dateHeureFr(iso){
+  if(!iso) return "";
+  const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+  if(!m) return "";
+  const [, a, mo, j, h, mi] = m;
+  return `${j}/${mo}/${a} à ${h}:${mi}`;
+}
+
 function afficherVue(nom){
-  ["reglages","connexion","liste","formulaire","import"].forEach(v=>{
+  ["reglages","connexion","liste","formulaire","import","journal"].forEach(v=>{
     $("vue-"+v).hidden = (v !== nom);
   });
   const connecte = !!etat.session;
@@ -1216,6 +1280,127 @@ async function chargerVignettes(){
 }
 
 /* ==========================================================
+   4 bis. JOURNAL D'AUDIT
+   ----------------------------------------------------------
+   Alimenté automatiquement côté base par un trigger Postgres
+   (database/migration_03_journal.sql) : rien n'est écrit ici, cette
+   page ne fait que lire la table "journal_audit" (lecture ouverte
+   aux trois rôles, RLS oblige).
+   ========================================================== */
+function construireRequeteJournal(){
+  const params = new URLSearchParams();
+  params.set("select", "*");
+  params.set("order", "horodatage.desc");
+  if (etat.journal.q){
+    const motif = "*" + etat.journal.q.replace(/[,()*"\\]/g, " ").trim() + "*";
+    params.set("nom_complet", `ilike.${motif}`);
+  }
+  return params;
+}
+
+async function chargerJournal(){
+  const params = construireRequeteJournal();
+  const debut = (etat.journal.page - 1) * PAR_PAGE_JOURNAL;
+  const fin   = debut + PAR_PAGE_JOURNAL - 1;
+
+  try{
+    const { donnees, total } = await api(`journal_audit?${params}`, {
+      headers:{ "Range-Unit":"items", "Range":`${debut}-${fin}`, "Prefer":"count=exact" }
+    });
+    etat.journal.lignes = donnees || [];
+    etat.journal.total  = total ?? etat.journal.lignes.length;
+    dessinerJournal();
+  }catch(e){ message(e.message, "erreur"); }
+}
+
+function dessinerJournal(){
+  const corps = $("corps-tableau-journal");
+  const pages = Math.max(Math.ceil(etat.journal.total / PAR_PAGE_JOURNAL), 1);
+
+  if (!etat.journal.lignes.length){
+    corps.innerHTML = "";
+    document.querySelector("#vue-journal .tableau-enveloppe").hidden = true;
+    $("pagination-journal").hidden = true;
+    $("zone-vide-journal").innerHTML = etat.journal.q
+      ? `<div class="vide"><p>Aucune entrée ne correspond à cette recherche.</p></div>`
+      : `<div class="vide"><p>Le journal est encore vide.</p></div>`;
+    return;
+  }
+
+  document.querySelector("#vue-journal .tableau-enveloppe").hidden = false;
+  $("zone-vide-journal").innerHTML = "";
+
+  corps.innerHTML = etat.journal.lignes.map(entree=>{
+    const action = LIBELLES_ACTIONS_JOURNAL[entree.action] || { texte:entree.action, classe:"" };
+    const carte = entree.action !== "suppression"
+      ? `<button type="button" class="lien-carte-journal" data-action="voir-carte-journal"
+          data-id="${echapper(entree.registre_id || "")}">${echapper(entree.nom_complet)}</button>`
+      : echapper(entree.nom_complet);
+
+    let detail = `<span class="discret">—</span>`;
+    if (Array.isArray(entree.details) && entree.details.length){
+      detail = `<ul class="detail-changements">` + entree.details.map(c=>
+        `<li><strong>${echapper(c.champ)}</strong> : ${echapper(c.avant)} → ${echapper(c.apres)}</li>`
+      ).join("") + `</ul>`;
+    }
+
+    return `<tr>
+      <td>${dateHeureFr(entree.horodatage)}</td>
+      <td>${carte}</td>
+      <td><span class="etiquette ${action.classe}">${action.texte}</span></td>
+      <td>${echapper(entree.utilisateur)}</td>
+      <td>${detail}</td>
+    </tr>`;
+  }).join("");
+
+  $("pagination-journal").hidden = pages <= 1;
+  $("info-page-journal").textContent = `Page ${etat.journal.page} sur ${pages}`;
+  $("btn-precedent-journal").disabled = etat.journal.page <= 1;
+  $("btn-suivant-journal").disabled   = etat.journal.page >= pages;
+}
+
+function ouvrirJournal(q){
+  $("recherche-journal").value = q || "";
+  etat.journal.q = q || "";
+  etat.journal.page = 1;
+  afficherVue("journal");
+  chargerJournal();
+}
+
+/* Affiche "Créée par … le … · Dernière modification par … le …" sous le
+   titre du formulaire — purement informatif (aucune incidence sur les
+   droits d'accès, qui restent gérés par les policies RLS). */
+async function afficherProvenance(record){
+  const zone = $("provenance-fiche");
+  zone.hidden = true;
+  zone.innerHTML = "";
+  if (!record) return;
+
+  try{
+    const [creation, modification] = await Promise.all([
+      api(`journal_audit?select=utilisateur,horodatage&registre_id=eq.${record.id}`
+        + `&action=eq.creation&order=horodatage.asc&limit=1`),
+      api(`journal_audit?select=utilisateur,horodatage&registre_id=eq.${record.id}`
+        + `&action=eq.modification&order=horodatage.desc&limit=1`)
+    ]);
+    const c = creation.donnees && creation.donnees[0];
+    const m = modification.donnees && modification.donnees[0];
+    if (!c && !m) return;
+
+    const morceaux = [];
+    if (c) morceaux.push(`Créée par <strong>${echapper(c.utilisateur)}</strong> le ${dateHeureFr(c.horodatage)}`);
+    if (m) morceaux.push(`Dernière modification par <strong>${echapper(m.utilisateur)}</strong> le ${dateHeureFr(m.horodatage)}`);
+
+    zone.innerHTML = morceaux.join(" · ") + ` · <a href="#" id="lien-historique-fiche">voir l'historique</a>`;
+    zone.hidden = false;
+    $("lien-historique-fiche").addEventListener("click", (e)=>{
+      e.preventDefault();
+      ouvrirJournal(record.nom);
+    });
+  }catch(e){ /* purement informatif : une erreur ici ne bloque pas le formulaire */ }
+}
+
+/* ==========================================================
    5. FORMULAIRE
    ========================================================== */
 function ouvrirFormulaire(record){
@@ -1231,6 +1416,7 @@ function ouvrirFormulaire(record){
     ? "Enregistrer les modifications" : "Enregistrer la carte";
 
   reinitialiserPhoto(record ? record.photo : null);
+  afficherProvenance(record);
   afficherVue("formulaire");
 }
 
@@ -1779,6 +1965,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         if (!peutEcrire()){ message("Accès réservé au secrétariat et au pasteur.", "erreur"); return; }
         reinitialiserImport(); afficherVue("import");
       }
+      else if (vue === "journal"){ ouvrirJournal(""); }
       else { afficherVue(vue); chargerListe(); }
     });
   });
@@ -1833,6 +2020,26 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     if (b.dataset.action === "carte")     afficherCarte(r);
     if (b.dataset.action === "modifier")  ouvrirFormulaire(r);
     if (b.dataset.action === "supprimer") supprimer(r.id);
+  });
+
+  // --- Journal d'audit
+  $("form-recherche-journal").addEventListener("submit", (e)=>{
+    e.preventDefault();
+    etat.journal.q = $("recherche-journal").value.trim();
+    etat.journal.page = 1;
+    chargerJournal();
+  });
+  $("btn-reinit-journal").addEventListener("click", ()=>ouvrirJournal(""));
+  $("btn-precedent-journal").addEventListener("click", ()=>{ etat.journal.page--; chargerJournal(); });
+  $("btn-suivant-journal").addEventListener("click",   ()=>{ etat.journal.page++; chargerJournal(); });
+  $("corps-tableau-journal").addEventListener("click", async (e)=>{
+    const b = e.target.closest("button[data-action=voir-carte-journal]");
+    if (!b || !b.dataset.id) return;
+    try{
+      const { donnees } = await api(`registre?id=eq.${encodeURIComponent(b.dataset.id)}`);
+      if (donnees && donnees[0]) afficherCarte(donnees[0]);
+      else message("Cette fiche n'existe plus — elle a peut-être été supprimée depuis.", "info");
+    }catch(err){ message(err.message, "erreur"); }
   });
 
   // --- Volet photo

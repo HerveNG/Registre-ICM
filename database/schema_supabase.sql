@@ -320,7 +320,181 @@ from public.registre;
 
 
 -- ------------------------------------------------------------
--- 10. JEU D'ESSAI (à supprimer avant la mise en service réelle)
+-- 10. JOURNAL D'AUDIT
+-- ------------------------------------------------------------
+-- Une ligne par création, modification ou suppression d'une carte —
+-- qui a fait quoi, et quand. Alimenté automatiquement par un trigger
+-- sur "registre" : ni l'application ni aucun compte connecté ne peut
+-- y écrire directement (voir la policy RLS plus bas) — seul le
+-- trigger, exécuté avec les droits de son propriétaire, le peut.
+--
+-- registre_id n'est volontairement PAS une clé étrangère stricte :
+-- une fiche supprimée doit rester traçable dans le journal, sans
+-- dépendre de l'existence continue de la fiche. nom_complet est un
+-- instantané pris au moment de l'action, pour rester lisible même
+-- après une suppression ou un changement de nom.
+--
+-- Le détail des champs modifiés (details, pour une "modification")
+-- s'appuie sur l'extension hstore, qui transforme une ligne en un
+-- ensemble clé/valeur et permet de calculer simplement la différence
+-- entre l'ancienne et la nouvelle version d'une fiche.
+--
+-- Différence avec la version Flask : une création issue d'un import
+-- en lot n'est pas distinguée ici d'une saisie manuelle (le trigger
+-- ne voit que la ligne insérée, pas l'origine de l'appel) — le
+-- journal reste complet (qui, quoi, quand), seule l'étiquette
+-- « import » de la version Flask n'a pas d'équivalent ici.
+
+create extension if not exists hstore;
+
+create table if not exists public.journal_audit (
+    id           bigint generated always as identity primary key,
+    horodatage   timestamptz not null default now(),
+    utilisateur  text not null,
+    action       text not null check (action in ('creation', 'modification', 'suppression')),
+    registre_id  uuid,
+    nom_complet  text not null,
+    details      jsonb    -- [{"champ","avant","apres"}, ...] pour une modification
+);
+
+comment on table public.journal_audit is
+  'Journal d''audit du registre ICM : qui a créé, modifié ou supprimé quelle fiche, et quand.';
+
+create index if not exists journal_audit_registre_id_idx on public.journal_audit (registre_id);
+create index if not exists journal_audit_horodatage_idx  on public.journal_audit (horodatage desc);
+create index if not exists journal_audit_nom_complet_idx on public.journal_audit (lower(nom_complet));
+
+alter table public.journal_audit enable row level security;
+
+drop policy if exists "lecture du journal pour comptes avec un role" on public.journal_audit;
+create policy "lecture du journal pour comptes avec un role"
+    on public.journal_audit for select
+    to authenticated
+    using (public.role_utilisateur() is not null);
+
+-- Volontairement, aucune policy insert/update/delete pour "authenticated" :
+-- seul le trigger ci-dessous (exécuté avec les droits de son propriétaire,
+-- via security definer) écrit dans le journal — jamais l'application
+-- directement — et personne ne peut modifier une entrée après coup.
+
+
+-- Libellé lisible d'un champ du registre (mêmes libellés que
+-- l'export/import Excel-CSV côté Flask, pour rester cohérent d'une
+-- version de l'application à l'autre).
+create or replace function public.libelle_champ_registre(p_champ text)
+returns text
+language sql
+immutable
+as $$
+    select case p_champ
+        when 'nom'               then 'Nom'
+        when 'prenom'            then 'Prénom'
+        when 'nom_pere'          then 'Fils/Fille de'
+        when 'nom_mere'          then 'Et de'
+        when 'date_naissance'    then 'Date de naissance'
+        when 'nationalite'       then 'Nationalité'
+        when 'originaire_de'     then 'Originaire de'
+        when 'date_bapteme'      then 'Date de baptême'
+        when 'lieu_bapteme'      then 'Lieu du baptême'
+        when 'numero_registre_1' then 'N° Registre (1)'
+        when 'celebrant_bapteme' then 'Célébrant baptême'
+        when 'signature_1'       then 'Signature (1)'
+        when 'lieu_mariage'      then 'Lieu du mariage'
+        when 'date_mariage'      then 'Date du mariage'
+        when 'conjoint'          then 'Conjoint'
+        when 'numero_registre_2' then 'N° Registre (2)'
+        when 'celebrant_mariage' then 'Célébrant mariage'
+        when 'signature_2'       then 'Signature (2)'
+        when 'telephone'         then 'Téléphone'
+        when 'observations'      then 'Observations'
+        when 'photo'             then 'Photo'
+        else p_champ
+    end;
+$$;
+
+-- Représentation lisible d'une valeur de champ pour le journal : les
+-- dates suivent le format jj/mm/aaaa, une valeur vide devient "—"
+-- (mêmes règles que _texte_valeur() côté Flask).
+create or replace function public.texte_valeur_champ(p_champ text, p_valeur text)
+returns text
+language sql
+immutable
+as $$
+    select case
+        when p_valeur is null or p_valeur = '' then '—'
+        when p_champ in ('date_naissance', 'date_bapteme', 'date_mariage')
+            then to_char(p_valeur::date, 'DD/MM/YYYY')
+        else p_valeur
+    end;
+$$;
+
+
+create or replace function public.journaliser_registre()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_utilisateur text;
+    v_diff        hstore;
+    v_changements jsonb := '[]'::jsonb;
+    v_cle         text;
+    v_apres       text;
+begin
+    -- Résout l'email du compte connecté : auth.users n'est pas exposé
+    -- via l'API REST, mais security definer permet de le lire ici.
+    select email into v_utilisateur from auth.users where id = auth.uid();
+    v_utilisateur := coalesce(v_utilisateur, auth.uid()::text, 'inconnu');
+
+    if tg_op = 'INSERT' then
+        insert into public.journal_audit (utilisateur, action, registre_id, nom_complet)
+        values (v_utilisateur, 'creation', new.id, new.nom || ' ' || new.prenom);
+        return new;
+
+    elsif tg_op = 'UPDATE' then
+        -- Ne garde que les champs qui ont réellement changé, en excluant
+        -- les colonnes techniques (id, created_at/by, updated_at) qui ne
+        -- font pas partie de la fiche elle-même.
+        v_diff := (hstore(new) - hstore(old))
+                    - array['id', 'created_at', 'created_by', 'updated_at']::text[];
+
+        if v_diff = ''::hstore then
+            return new;   -- rien de suivi n'a changé (ex. seul updated_at a bougé)
+        end if;
+
+        for v_cle, v_apres in select key, value from each(v_diff) loop
+            v_changements := v_changements || jsonb_build_object(
+                'champ', public.libelle_champ_registre(v_cle),
+                'avant', public.texte_valeur_champ(v_cle, hstore(old) -> v_cle),
+                'apres', public.texte_valeur_champ(v_cle, v_apres)
+            );
+        end loop;
+
+        insert into public.journal_audit (utilisateur, action, registre_id, nom_complet, details)
+        values (v_utilisateur, 'modification', new.id, new.nom || ' ' || new.prenom, v_changements);
+        return new;
+
+    elsif tg_op = 'DELETE' then
+        insert into public.journal_audit (utilisateur, action, registre_id, nom_complet)
+        values (v_utilisateur, 'suppression', old.id, old.nom || ' ' || old.prenom);
+        return old;
+    end if;
+
+    return null;
+end;
+$$;
+
+revoke all on function public.journaliser_registre() from public;
+
+drop trigger if exists registre_journaliser on public.registre;
+create trigger registre_journaliser
+    after insert or update or delete on public.registre
+    for each row execute function public.journaliser_registre();
+
+
+-- ------------------------------------------------------------
+-- 11. JEU D'ESSAI (à supprimer avant la mise en service réelle)
 -- ------------------------------------------------------------
 -- insert into public.registre
 --   (nom, prenom, nom_pere, nom_mere, date_naissance, nationalite,

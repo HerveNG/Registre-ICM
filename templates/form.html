@@ -21,6 +21,16 @@
   <h1>{{ 'Modifier la carte' if record else 'Nouvelle carte' }}</h1>
   {% if record %}<p class="discret">{{ record.nom }} {{ record.prenom }}
     {% if record.numero_registre_1 %}· N° {{ record.numero_registre_1 }}{% endif %}</p>{% endif %}
+  {% if record and (creation or derniere_modif) %}
+  <p class="provenance">
+    {% if creation %}Créée par <strong>{{ creation.utilisateur }}</strong>
+      le {{ creation.horodatage | jj_mm_aaaa_hhmm }}{% endif %}
+    {% if derniere_modif %}{% if creation %} · {% endif %}Dernière modification par
+      <strong>{{ derniere_modif.utilisateur }}</strong>
+      le {{ derniere_modif.horodatage | jj_mm_aaaa_hhmm }}{% endif %}
+    · <a href="{{ url_for('journal', q=record.nom) }}">voir l'historique</a>
+  </p>
+  {% endif %}
 </div>
 
 <form method="post" class="formulaire formulaire-large">
