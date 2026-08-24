@@ -73,15 +73,21 @@ PAROISSE = os.getenv("PAROISSE", "In Christ Ministries")
 # Dossier des photos d'identité (les images ne vont pas dans la base)
 DOSSIER_PHOTOS = os.path.join(app.static_folder, "photos")
 os.makedirs(DOSSIER_PHOTOS, exist_ok=True)
-PHOTO_TAILLE_MAX = 3 * 1024 * 1024      # 3 Mo après recadrage : très large
 
-# La photo recadrée arrive dans un champ de formulaire (texte base64).
-# Sans ces deux réglages, Flask coupe les envois volumineux avec une page
-# d'erreur brute : on fixe des limites nettes, bien au-dessus d'une photo
-# d'identité (≈ 60 à 120 Ko), pour que ce soit le contrôle ci-dessus qui
-# réponde, avec un message compréhensible.
-app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024
-app.config["MAX_FORM_MEMORY_SIZE"] = 6 * 1024 * 1024
+# 500 Ko : plafond imposé à chaque photo. Le navigateur (static/photo.js)
+# compresse déjà l'image sous ce seuil avant de l'envoyer — ce contrôle est
+# la seconde ligne de défense, côté serveur, au cas où l'envoi ne passerait
+# pas par ce chemin normal (ancien navigateur, appel direct, etc.).
+PHOTO_TAILLE_MAX = 500 * 1024
+
+# La photo recadrée arrive dans un champ de formulaire (texte base64, environ
+# 1,33 fois plus lourd que l'image d'origine). Sans ces deux réglages, Flask
+# coupe les envois volumineux avec une page d'erreur brute avant même que le
+# contrôle ci-dessus s'exécute : on fixe des limites nettes, larges par
+# rapport aux ~665 Ko qu'occupe une photo de 500 Ko une fois encodée, pour
+# que ce soit PHOTO_TAILLE_MAX qui réponde, avec un message compréhensible.
+app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024
+app.config["MAX_FORM_MEMORY_SIZE"] = 2 * 1024 * 1024
 
 db = SQLAlchemy(app)
 
@@ -256,7 +262,11 @@ def enregistrer_photo(data_url):
         return None, "La photo n'a pas pu être décodée."
 
     if len(binaire) > PHOTO_TAILLE_MAX:
-        return None, "Photo trop lourde."
+        return None, (
+            f"Photo trop lourde ({len(binaire) // 1024} Ko) : le maximum "
+            f"autorisé est {PHOTO_TAILLE_MAX // 1024} Ko. Réessayez avec "
+            f"une image plus simple, ou reprenez le recadrage."
+        )
     if len(binaire) < 100:
         return None, "Photo vide ou illisible."
 
@@ -545,8 +555,9 @@ def page_introuvable(_):
 def envoi_trop_gros(_):
     return render_template(
         "erreur.html", code=413,
-        message="L'envoi est trop volumineux. La photo doit peser moins de "
-                "3 Mo une fois recadrée — reprenez-la avec une image plus petite."
+        message="L'envoi est trop volumineux. La photo dépasse la limite de "
+                "500 Ko même après compression automatique — revenez en "
+                "arrière et reprenez le recadrage avec une image plus simple."
     ), 413
 
 

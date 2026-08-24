@@ -204,9 +204,13 @@ create policy "suppression pour utilisateurs connectes"
 -- simple adresse web. L'application demande un lien temporaire
 -- (valable 1 h) à chaque affichage, et seuls les comptes connectés
 -- peuvent en obtenir un.
+--
+-- Limite fixée à 512 000 octets (500 Ko) : l'application compresse déjà
+-- chaque photo sous ce seuil avant l'envoi (static/photo.js) — cette
+-- limite est la seconde ligne de défense, imposée par la base elle-même.
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('photos', 'photos', false, 5242880, array['image/jpeg','image/png','image/webp'])
+values ('photos', 'photos', false, 512000, array['image/jpeg','image/png','image/webp'])
 on conflict (id) do update
   set file_size_limit    = excluded.file_size_limit,
       allowed_mime_types = excluded.allowed_mime_types;
@@ -240,6 +244,8 @@ create policy "photos suppression connectes"
 -- Si cette section renvoie une erreur de permission (« must be owner
 -- of table objects »), créez le bucket à la main :
 --   Storage > New bucket > nom « photos » > décocher « Public »
+--   > Additional configuration > File size limit > 500 KB (ou 0.5 MB
+--   selon l'unité proposée par l'écran)
 -- puis, dans l'onglet Policies du bucket, autorisez SELECT, INSERT,
 -- UPDATE et DELETE pour le rôle « authenticated ».
 

@@ -8,16 +8,26 @@
      const blob = await PhotoICM.recadrer(fichier);   // null si annulé
      const apercu = URL.createObjectURL(blob);
 
-   Le résultat est toujours un JPEG 600 × 800 (format identité 3/4),
-   d'environ 40 à 90 Ko, quelle que soit la taille de l'original.
+   Le résultat est un JPEG au format identité 3/4, d'environ 40 à 120 Ko
+   pour une photo ordinaire — et JAMAIS plus de 500 Ko, quelle que soit
+   la taille ou la complexité de l'original : si le premier essai dépasse
+   ce plafond, le composant baisse automatiquement la qualité JPEG, puis
+   au besoin réduit aussi les dimensions, jusqu'à repasser en dessous.
    ============================================================ */
 
 const PhotoICM = (function(){
   "use strict";
 
-  const LARGEUR = 600, HAUTEUR = 800, QUALITE = 0.85;   // sortie
-  const VUE_L = 276, VUE_H = 368;                        // aperçu à l'écran
-  const TAILLE_MAX = 12 * 1024 * 1024;                   // 12 Mo à l'entrée
+  const LARGEUR = 600, HAUTEUR = 800, QUALITE = 0.85;    // sortie de départ
+  const VUE_L = 276, VUE_H = 368;                         // aperçu à l'écran
+  const TAILLE_MAX = 12 * 1024 * 1024;                    // 12 Mo à l'entrée
+
+  // Plafond imposé au fichier produit, et paramètres de la compression
+  // de secours qui s'enclenche automatiquement si on le dépasse.
+  const TAILLE_CIBLE   = 500 * 1024;   // 500 Ko — jamais dépassé
+  const QUALITE_MIN    = 0.35;         // en dessous, l'image devient inexploitable
+  const LARGEUR_MIN    = 240;          // en dessous, la photo n'est plus reconnaissable
+  const PALIERS_TAILLE = 6;            // nombre de réductions de dimensions tentées
 
   let modale = null, canvas = null, ctx = null, curseurZoom = null;
   let image = null, base = 1, zoom = 1, tx = 0, ty = 0;
@@ -60,7 +70,8 @@ const PhotoICM = (function(){
       <div class="icm-photo-boite" role="dialog" aria-modal="true">
         <h2>Recadrer la photo</h2>
         <p class="aide">Faites glisser l'image pour centrer le visage,
-          puis ajustez le zoom.</p>
+          puis ajustez le zoom. La photo est allégée automatiquement
+          sous 500 Ko avant l'enregistrement.</p>
         <div class="icm-photo-vue"><canvas width="${VUE_L}" height="${VUE_H}"></canvas></div>
         <div class="icm-photo-zoom">
           <span>Zoom</span>
@@ -150,18 +161,67 @@ const PhotoICM = (function(){
     });
   }
 
-  /* ---------- Production du JPEG final ---------- */
-  function produire(){
+  /* ---------- Production du JPEG final, sous 500 Ko garanti ---------- */
+
+  /* Dessine le cadrage choisi par l'utilisateur sur un canevas de la
+     taille demandée : seules les dimensions de sortie changent, le
+     cadrage (zone visible, centrage, zoom) reste toujours le même. */
+  function dessinerSortie(largeur, hauteur){
     const echelle = base * zoom;
     const sortie = document.createElement("canvas");
-    sortie.width = LARGEUR; sortie.height = HAUTEUR;
+    sortie.width = largeur; sortie.height = hauteur;
     const c = sortie.getContext("2d");
-    c.fillStyle = "#fff"; c.fillRect(0, 0, LARGEUR, HAUTEUR);
+    c.fillStyle = "#fff"; c.fillRect(0, 0, largeur, hauteur);
     c.imageSmoothingQuality = "high";
     c.drawImage(image,
       -tx / echelle, -ty / echelle, VUE_L / echelle, VUE_H / echelle,
-      0, 0, LARGEUR, HAUTEUR);
-    sortie.toBlob((blob)=>fermer(blob), "image/jpeg", QUALITE);
+      0, 0, largeur, hauteur);
+    return sortie;
+  }
+
+  function versBlob(canevas, qualite){
+    return new Promise((resoudre)=>canevas.toBlob(resoudre, "image/jpeg", qualite));
+  }
+
+  async function produire(){
+    const boutonValider = modale.querySelector(".valider");
+    const boutonAnnuler = modale.querySelector(".annuler");
+    const texteInitial = boutonValider.textContent;
+    boutonValider.disabled = true;
+    boutonAnnuler.disabled = true;
+    boutonValider.textContent = "Compression…";
+
+    try{
+      let largeur = LARGEUR, hauteur = HAUTEUR, qualite = QUALITE;
+      let canevas = dessinerSortie(largeur, hauteur);
+      let blob = await versBlob(canevas, qualite);
+
+      // 1) La photo dépasse 500 Ko : on baisse la qualité JPEG par paliers,
+      //    sans retoucher les dimensions ni redessiner (rapide).
+      while (blob.size > TAILLE_CIBLE && qualite > QUALITE_MIN){
+        qualite = Math.max(QUALITE_MIN, qualite - 0.1);
+        blob = await versBlob(canevas, qualite);
+      }
+
+      // 2) Même à qualité minimale ça dépasse encore (photo très chargée
+      //    en détails) : on réduit aussi les dimensions, par paliers,
+      //    en conservant toujours le même cadrage et le format 3/4.
+      let paliers = 0;
+      while (blob.size > TAILLE_CIBLE && paliers < PALIERS_TAILLE && largeur > LARGEUR_MIN){
+        largeur = Math.max(LARGEUR_MIN, Math.round(largeur * 0.85));
+        hauteur = Math.round(largeur * HAUTEUR / LARGEUR);
+        qualite = 0.7;
+        canevas = dessinerSortie(largeur, hauteur);
+        blob = await versBlob(canevas, qualite);
+        paliers++;
+      }
+
+      fermer(blob);
+    } finally {
+      boutonValider.disabled = false;
+      boutonAnnuler.disabled = false;
+      boutonValider.textContent = texteInitial;
+    }
   }
 
   function fermer(resultat){
@@ -205,5 +265,5 @@ const PhotoICM = (function(){
     });
   }
 
-  return { recadrer, versDataUrl, LARGEUR, HAUTEUR };
+  return { recadrer, versDataUrl, LARGEUR, HAUTEUR, TAILLE_CIBLE };
 })();

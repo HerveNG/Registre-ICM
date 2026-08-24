@@ -16,20 +16,25 @@ solution confortable : **le texte va dans la base, les photos vont dans un
 espace fichiers**. Une carte complète (nom, parents, dates, nationalité,
 origine, numéros de registre, conjoint, signatures, observations) pèse
 environ **600 octets**. Une photo d'identité recadrée par l'application
-pèse environ **90 Ko**, soit 150 fois plus — d'où l'intérêt de ne pas la
-mettre dans la base.
+pèse en pratique **40 à 120 Ko**, et ne dépasse jamais **500 Ko** — une
+limite garantie par une compression automatique côté application, et
+imposée en plus par la base elle-même (le bucket Supabase des photos
+refuse tout fichier plus lourd).
 
-| Nombre de cartes | Base (500 Mo gratuits) | Photos (1 Go gratuit) |
-|---|---|---|
-| 500 | ≈ 0,3 Mo — **0,06 %** | ≈ 45 Mo — **4,5 %** |
-| 5 000 | ≈ 3 Mo — 0,6 % | ≈ 450 Mo — 45 % |
-| 11 000 | ≈ 7 Mo — 1,3 % | ≈ 1 Go — **100 %** |
+| Nombre de cartes | Base (500 Mo gratuits) | Photos, cas courant ~90 Ko (1 Go gratuit) | Photos, pire cas 500 Ko |
+|---|---|---|---|
+| 500 | ≈ 0,3 Mo — **0,06 %** | ≈ 45 Mo — **4,5 %** | ≈ 250 Mo — 25 % |
+| 5 000 | ≈ 3 Mo — 0,6 % | ≈ 450 Mo — 45 % | ≈ 2,4 Go — au-delà du gratuit |
+| 11 000 | ≈ 7 Mo — 1,3 % | ≈ 1 Go — **100 %** | — |
 
-**Pour 500 fidèles, vous utilisez moins de 5 % de l'espace gratuit.**
+**Pour 500 fidèles, vous utilisez entre 4,5 % et 25 % de l'espace photos
+gratuit selon la netteté des images — jamais plus, grâce au plafond.**
 Ce sont les photos, et non le registre, qui fixeront un jour la limite :
-il faudrait dépasser une dizaine de milliers de fidèles photographiés
-avant de devoir payer. Vous ne paierez jamais pour la volumétrie du texte.
-La vraie question est celle de la fiabilité et de la pérennité.
+même dans le pire des cas (toutes les photos à 500 Ko), il faudrait
+dépasser 2 000 fidèles photographiés avant d'y songer ; dans le cas
+courant, on tient plusieurs milliers de fidèles. Vous ne paierez jamais
+pour la volumétrie du texte. La vraie question est celle de la fiabilité
+et de la pérennité.
 
 ---
 

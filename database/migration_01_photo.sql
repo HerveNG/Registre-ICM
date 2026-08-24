@@ -21,8 +21,10 @@ comment on column public.registre.photo is
 
 
 -- 2. L'espace de stockage des photos ------------------------------
+-- Limite fixée à 512 000 octets (500 Ko), en double des contrôles déjà
+-- faits par l'application avant l'envoi.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('photos', 'photos', false, 5242880, array['image/jpeg','image/png','image/webp'])
+values ('photos', 'photos', false, 512000, array['image/jpeg','image/png','image/webp'])
 on conflict (id) do update
   set file_size_limit    = excluded.file_size_limit,
       allowed_mime_types = excluded.allowed_mime_types;

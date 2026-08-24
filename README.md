@@ -166,9 +166,20 @@ le bloc `<div class="sigle-carte">ICM</div>` par
 
 Dans le formulaire, **Choisir une photo** ouvre une fenêtre de recadrage :
 faites glisser l'image pour centrer le visage, ajustez le zoom, validez.
-L'application produit alors un JPEG 600 × 800 (format identité 3/4)
-d'environ 60 à 120 Ko, quelle que soit la taille de l'original — une photo
-de téléphone de 5 Mo est ramenée à moins de 100 Ko.
+L'application produit alors un JPEG au format identité 3/4, d'environ
+40 à 120 Ko pour une photo ordinaire — une photo de téléphone de 5 Mo est
+ramenée à moins de 100 Ko.
+
+**500 Ko : un plafond garanti, jamais un simple objectif.** Si la première
+compression dépasse encore ce seuil (photo très détaillée, forte texture),
+l'application baisse automatiquement la qualité JPEG par paliers, puis, en
+dernier recours, réduit aussi les dimensions — jusqu'à repasser sous la
+limite. Testé avec une image de bruit aléatoire (le cas le plus défavorable
+pour un JPEG, quasiment incompressible) : 256 Ko en sortie. Cette limite est
+appliquée trois fois — dans le navigateur avant l'envoi, par l'application
+au moment de l'enregistrement, et par la base elle-même (bucket Supabase
+limité à 500 Ko, ou contrôle serveur en version Flask) — pour qu'aucun
+chemin ne puisse la contourner.
 
 La photo apparaît ensuite en vignette dans le registre et dans le cadre
 en haut à droite de la carte imprimée.
