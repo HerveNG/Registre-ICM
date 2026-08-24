@@ -20,9 +20,15 @@
     {% if session.get('utilisateur') %}
     <nav class="nav">
       <a href="{{ url_for('index') }}">Registre</a>
-      <a href="{{ url_for('nouveau') }}">Nouvelle carte</a>
-      <a href="{{ url_for('importer') }}">Importer</a>
-      <a href="{{ url_for('export_csv') }}">Export Excel</a>
+      {% if session.get('role') in ('secretaire', 'pasteur') %}
+        <a href="{{ url_for('nouveau') }}">Nouvelle carte</a>
+        <a href="{{ url_for('importer') }}">Importer</a>
+        <a href="{{ url_for('export_csv') }}">Export Excel</a>
+      {% endif %}
+      <span class="nav-compte">
+        {{ session.get('utilisateur') }}
+        <span class="etiquette-role">{{ {'secretaire':'Secrétaire','pasteur':'Pasteur','visiteur':'Visiteur'}[session.get('role')] }}</span>
+      </span>
       <a class="nav-sortie" href="{{ url_for('deconnexion') }}">Déconnexion</a>
     </nav>
     {% endif %}

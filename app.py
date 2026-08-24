@@ -62,11 +62,55 @@ except ImportError:
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "changez-moi-en-production")
 
-# Identifiants du secrétariat (à changer dans le fichier .env)
-ADMIN_USER = os.getenv("ADMIN_USER", "admin")
-ADMIN_PASSWORD_HASH = os.getenv("ADMIN_PASSWORD_HASH") or generate_password_hash(
-    os.getenv("ADMIN_PASSWORD", "icm2026")
-)
+# ------------------------------------------------------------------
+#  Comptes et rôles (à changer dans le fichier .env)
+# ------------------------------------------------------------------
+# Trois rôles possibles :
+#   - secretaire : accès complet — saisie, modification, suppression,
+#                  import, export (comme le compte unique d'avant).
+#   - pasteur    : accès complet également, exactement comme secrétaire —
+#                  un compte séparé sert surtout à savoir qui a fait quoi.
+#   - visiteur   : consultation seule — recherche, fiche, carte imprimable,
+#                  sans pouvoir rien modifier, importer ni exporter.
+ROLE_SECRETAIRE = "secretaire"
+ROLE_PASTEUR = "pasteur"
+ROLE_VISITEUR = "visiteur"
+ROLES_ECRITURE = {ROLE_SECRETAIRE, ROLE_PASTEUR}
+LIBELLES_ROLES = {
+    ROLE_SECRETAIRE: "Secrétaire",
+    ROLE_PASTEUR: "Pasteur",
+    ROLE_VISITEUR: "Visiteur",
+}
+
+
+def _compte_depuis_env(prefixe, role, identifiant_defaut=None, mot_de_passe_defaut=None):
+    """Construit un compte {identifiant, hash, role} à partir des variables
+    PREFIXE_USER / PREFIXE_PASSWORD_HASH / PREFIXE_PASSWORD. Le compte
+    secrétaire a toujours une valeur (identifiant_defaut/mot_de_passe_defaut
+    assurent la compatibilité avec les installations existantes) ; les
+    comptes pasteur et visiteur sont facultatifs et renvoient None tant
+    qu'ils ne sont pas renseignés dans .env."""
+    identifiant = os.getenv(f"{prefixe}_USER", identifiant_defaut or "").strip()
+    if not identifiant:
+        return None
+    hash_ = os.getenv(f"{prefixe}_PASSWORD_HASH")
+    if not hash_:
+        mot_de_passe = os.getenv(f"{prefixe}_PASSWORD", mot_de_passe_defaut)
+        if not mot_de_passe:
+            return None
+        hash_ = generate_password_hash(mot_de_passe)
+    return {"identifiant": identifiant, "hash": hash_, "role": role}
+
+
+COMPTES = {
+    c["identifiant"]: c
+    for c in (
+        _compte_depuis_env("ADMIN", ROLE_SECRETAIRE, "admin", "icm2026"),
+        _compte_depuis_env("PASTEUR", ROLE_PASTEUR),
+        _compte_depuis_env("VISITEUR", ROLE_VISITEUR),
+    )
+    if c
+}
 
 # Base de données : SQLite par défaut, PostgreSQL/Supabase si DATABASE_URL
 database_url = os.getenv("DATABASE_URL", "").strip() or "sqlite:///registre.db"
@@ -182,10 +226,30 @@ class Registre(db.Model):
 #  Authentification
 # ------------------------------------------------------------------
 def login_requis(vue):
+    """Vue accessible à tout compte connecté, quel que soit son rôle
+    (secrétaire, pasteur ou visiteur) : consultation du registre, carte
+    imprimable."""
     @wraps(vue)
     def wrapper(*args, **kwargs):
         if not session.get("utilisateur"):
             return redirect(url_for("connexion", suivant=request.path))
+        return vue(*args, **kwargs)
+    return wrapper
+
+
+def ecriture_requise(vue):
+    """Comme @login_requis, mais réserve la vue aux rôles secrétaire et
+    pasteur. Un visiteur connecté qui tente d'y accéder — même par une
+    URL tapée directement — est renvoyé vers le registre avec un message,
+    sans que rien ne soit modifié : le contrôle est fait ici, côté
+    serveur, pas seulement en cachant les boutons dans les pages."""
+    @wraps(vue)
+    def wrapper(*args, **kwargs):
+        if not session.get("utilisateur"):
+            return redirect(url_for("connexion", suivant=request.path))
+        if session.get("role") not in ROLES_ECRITURE:
+            flash("Accès réservé au secrétariat et au pasteur.", "error")
+            return redirect(url_for("index"))
         return vue(*args, **kwargs)
     return wrapper
 
@@ -195,10 +259,10 @@ def connexion():
     if request.method == "POST":
         utilisateur = request.form.get("utilisateur", "").strip()
         mot_de_passe = request.form.get("mot_de_passe", "")
-        if utilisateur == ADMIN_USER and check_password_hash(
-            ADMIN_PASSWORD_HASH, mot_de_passe
-        ):
+        compte = COMPTES.get(utilisateur)
+        if compte and check_password_hash(compte["hash"], mot_de_passe):
             session["utilisateur"] = utilisateur
+            session["role"] = compte["role"]
             return redirect(request.args.get("suivant") or url_for("index"))
         flash("Identifiant ou mot de passe incorrect.", "error")
     return render_template("connexion.html", paroisse=PAROISSE)
@@ -452,7 +516,7 @@ def index():
 #  Création / modification / suppression
 # ------------------------------------------------------------------
 @app.route("/nouveau", methods=["GET", "POST"])
-@login_requis
+@ecriture_requise
 def nouveau():
     if request.method == "POST":
         donnees, erreurs = collecter_formulaire(request.form)
@@ -481,7 +545,7 @@ def nouveau():
 
 
 @app.route("/modifier/<int:record_id>", methods=["GET", "POST"])
-@login_requis
+@ecriture_requise
 def modifier(record_id):
     record = db.session.get(Registre, record_id) or abort(404)
 
@@ -511,7 +575,7 @@ def modifier(record_id):
 
 
 @app.post("/supprimer/<int:record_id>")
-@login_requis
+@ecriture_requise
 def supprimer(record_id):
     record = db.session.get(Registre, record_id) or abort(404)
     nom = record.nom_complet
@@ -537,7 +601,7 @@ def carte(record_id):
 #  Export CSV (ouvrable directement dans Excel)
 # ------------------------------------------------------------------
 @app.route("/export.csv")
-@login_requis
+@ecriture_requise
 def export_csv():
     colonnes = COLONNES_EXPORT
 
@@ -749,7 +813,7 @@ def analyser_lignes(paires):
 
 
 @app.route("/importer", methods=["GET", "POST"])
-@login_requis
+@ecriture_requise
 def importer():
     if request.method == "GET":
         return render_template("importer.html", resultats=None, paroisse=PAROISSE)
@@ -823,7 +887,7 @@ def importer():
 
 
 @app.route("/importer/modele.csv")
-@login_requis
+@ecriture_requise
 def importer_modele():
     exemple = {
         "nom": "NGOOH", "prenom": "Hervé", "nom_pere": "NGOOH Paul",
@@ -888,5 +952,7 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", 5000))
     debug = os.getenv("FLASK_DEBUG", "1") == "1"
     print(f"\n  Registre ICM  →  http://127.0.0.1:{port}")
-    print(f"  Identifiant : {ADMIN_USER}\n")
-    app.run(debug=debug, host="0.0.0.0", port=port)
+    for identifiant, compte in COMPTES.items():
+        print(f"  Identifiant : {identifiant}  ({LIBELLES_ROLES[compte['role']]})")
+    print()
+    app.run(debug=debug, host="0.0.0.0", port=port)

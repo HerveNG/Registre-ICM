@@ -147,7 +147,34 @@ toute utilisation réelle.* La base `registre.db` est créée automatiquement.
 
 ---
 
-## 5. Imprimer une carte en PDF
+## 5. Comptes et rôles
+
+Trois rôles, définis dans `.env` :
+
+| Rôle | Variables | Droits |
+|---|---|---|
+| **Secrétaire** | `ADMIN_USER` / `ADMIN_PASSWORD` (toujours actif) | Accès complet : saisie, modification, suppression, import, export. |
+| **Pasteur** | `PASTEUR_USER` / `PASTEUR_PASSWORD` (facultatif) | Accès complet également, exactement comme le secrétariat — un compte séparé pour savoir qui a fait quoi. |
+| **Visiteur** | `VISITEUR_USER` / `VISITEUR_PASSWORD` (facultatif) | Consultation seule : recherche, fiche, carte imprimable. Aucune modification, import ni export. |
+
+Pour activer le compte pasteur ou visiteur, renseignez son identifiant et
+son mot de passe dans `.env` puis redémarrez l'application ; laissez les
+deux champs vides pour ne pas créer le compte. Le rôle connecté s'affiche
+dans l'en-tête, à côté du bouton **Déconnexion**.
+
+La restriction est appliquée côté serveur (pas seulement en cachant les
+boutons) : un visiteur qui ouvrirait directement l'URL d'une page réservée
+au secrétariat est renvoyé vers le registre avec un message, sans que rien
+ne soit modifié.
+
+*Note : la version en ligne (`web/index.html`, connectée directement à
+Supabase) ne gère pas encore ces rôles — elle utilise l'authentification
+Supabase décrite dans `CHOIX_BASE_DE_DONNEES.md`. Seule la version Flask
+ci-dessus applique cette distinction secrétaire / pasteur / visiteur.*
+
+---
+
+## 6. Imprimer une carte en PDF
 
 Cliquer **Carte** sur une ligne du registre → **Imprimer / Enregistrer en PDF**
 → dans la fenêtre d'impression, choisir *Destination : Enregistrer au format PDF*.
@@ -164,7 +191,7 @@ image externe).
 
 ---
 
-## 6. Importer le registre papier existant
+## 7. Importer le registre papier existant
 
 Bouton **Importer**, en haut du registre. Le principe est le même sur les
 deux versions : rien n'est écrit tant que vous n'avez pas confirmé.
@@ -189,7 +216,7 @@ modifiant chaque fiche importée.
 
 ---
 
-## 7. Photos d'identité
+## 8. Photos d'identité
 
 Dans le formulaire, **Choisir une photo** ouvre une fenêtre de recadrage :
 faites glisser l'image pour centrer le visage, ajustez le zoom, validez.
@@ -227,7 +254,7 @@ fichier — le stockage ne se remplit pas d'images orphelines.
 
 ---
 
-## 8. Sauvegardes
+## 9. Sauvegardes
 
 Une fois par mois : bouton **Export Excel** → ranger le fichier
 `registre_icm_AAAA-MM-JJ.csv` en dehors de l'ordinateur (clé USB, Drive).
@@ -240,9 +267,9 @@ C'est la seule sauvegarde qui vous appartienne vraiment.
 
 ---
 
-## 9. Ce qui reste à faire pour une version 2
+## 10. Ce qui reste à faire pour une version 2
 
-- comptes différenciés (secrétaire / pasteur / lecture seule) ;
+- comptes différenciés côté version en ligne (Supabase) — fait côté Flask ;
 - journal d'audit : qui a créé ou modifié quelle carte, et quand ;
 - signature scannée du célébrant sur la carte ;
 - séparation des personnes et des actes (un mariage = deux fidèles liés) ;
@@ -251,7 +278,7 @@ C'est la seule sauvegarde qui vous appartienne vraiment.
 
 ---
 
-## 10. Modèle de données
+## 11. Modèle de données
 
 Un enregistrement = une carte = un fidèle. Le bloc mariage reste vide tant
 que la personne n'est pas mariée, exactement comme sur la carte papier.

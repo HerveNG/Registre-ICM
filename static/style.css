@@ -51,6 +51,14 @@ body{
 }
 .nav a:hover{background:rgba(255,255,255,.12);}
 .nav-sortie{opacity:.7;}
+.nav-compte{
+  color:#fff; font-size:.85rem; opacity:.85; padding:.45rem .3rem;
+  display:flex; align-items:center; gap:.4rem;
+}
+.etiquette-role{
+  font-size:.68rem; text-transform:uppercase; letter-spacing:.03em;
+  background:rgba(255,255,255,.18); padding:.15rem .5rem; border-radius:999px;
+}
 
 /* ---------------- Structure ---------------- */
 .conteneur{max-width:1180px; margin:0 auto; padding:1.8rem 1.5rem 3rem;}

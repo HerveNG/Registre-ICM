@@ -2,6 +2,7 @@
 {% block titre %}Registre — ICM{% endblock %}
 
 {% block contenu %}
+{% set peut_ecrire = session.get('role') in ('secretaire', 'pasteur') %}
 
 <div class="stats">
   <div class="stat"><span class="stat-nombre">{{ stats.total }}</span><span class="stat-libelle">fidèles enregistrés</span></div>
@@ -20,8 +21,10 @@
   </select>
   <button type="submit" class="bouton">Rechercher</button>
   {% if q or filtre %}<a class="bouton bouton-discret" href="{{ url_for('index') }}">Réinitialiser</a>{% endif %}
-  <a class="bouton bouton-discret" href="{{ url_for('importer') }}">Importer un fichier</a>
-  <a class="bouton bouton-principal" href="{{ url_for('nouveau') }}">+ Nouvelle carte</a>
+  {% if peut_ecrire %}
+    <a class="bouton bouton-discret" href="{{ url_for('importer') }}">Importer un fichier</a>
+    <a class="bouton bouton-principal" href="{{ url_for('nouveau') }}">+ Nouvelle carte</a>
+  {% endif %}
 </form>
 
 {% if records %}
@@ -72,11 +75,13 @@
       <td>{{ r.conjoint or '—' }}</td>
       <td class="col-actions">
         <a class="bouton bouton-petit" href="{{ url_for('carte', record_id=r.id) }}" target="_blank">Carte</a>
-        <a class="bouton bouton-petit" href="{{ url_for('modifier', record_id=r.id) }}">Modifier</a>
-        <form method="post" action="{{ url_for('supprimer', record_id=r.id) }}"
-              onsubmit="return confirm('Supprimer définitivement la carte de {{ r.nom }} {{ r.prenom }} ?');">
-          <button type="submit" class="bouton bouton-petit bouton-danger">Supprimer</button>
-        </form>
+        {% if peut_ecrire %}
+          <a class="bouton bouton-petit" href="{{ url_for('modifier', record_id=r.id) }}">Modifier</a>
+          <form method="post" action="{{ url_for('supprimer', record_id=r.id) }}"
+                onsubmit="return confirm('Supprimer définitivement la carte de {{ r.nom }} {{ r.prenom }} ?');">
+            <button type="submit" class="bouton bouton-petit bouton-danger">Supprimer</button>
+          </form>
+        {% endif %}
       </td>
     </tr>
     {% endfor %}
@@ -101,10 +106,12 @@
   {% if q or filtre %}
     <p>Aucun enregistrement ne correspond à cette recherche.</p>
     <a class="bouton" href="{{ url_for('index') }}">Voir tout le registre</a>
-  {% else %}
+  {% elif peut_ecrire %}
     <p>Le registre est encore vide.</p>
     <a class="bouton bouton-principal" href="{{ url_for('nouveau') }}">Enregistrer la première carte</a>
     <a class="bouton bouton-discret" href="{{ url_for('importer') }}">ou importer le registre papier existant</a>
+  {% else %}
+    <p>Le registre est encore vide.</p>
   {% endif %}
 </div>
 {% endif %}
