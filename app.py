@@ -955,4 +955,4 @@ if __name__ == "__main__":
     for identifiant, compte in COMPTES.items():
         print(f"  Identifiant : {identifiant}  ({LIBELLES_ROLES[compte['role']]})")
     print()
-    app.run(debug=debug, host="0.0.0.0", port=port)
+    app.run(debug=debug, host="0.0.0.0", port=port)
