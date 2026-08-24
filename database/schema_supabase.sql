@@ -7,8 +7,11 @@
 --   1. Créer un projet sur https://supabase.com (plan gratuit)
 --   2. Ouvrir "SQL Editor" > "New query"
 --   3. Coller TOUT ce fichier puis cliquer "Run"
---   4. Créer ensuite le compte du secrétariat dans
+--   4. Créer ensuite chaque compte (secrétariat, pasteur…) dans
 --      "Authentication" > "Users" > "Add user"
+--   5. Attribuer son rôle à chaque compte : voir la section 6
+--      ci-dessous (COMPTES ET RÔLES) — sans cette étape, un compte
+--      créé ne peut rien lire ni écrire dans le registre.
 -- ============================================================
 
 
@@ -48,7 +51,7 @@ create table if not exists public.registre (
 
     -- Photo d'identité ------------------------------------------
     -- L'image n'est PAS stockée ici : seulement son chemin dans le
-    -- bucket « photos » (section 9). Exemple : "fideles/ab12cd34.jpg"
+    -- bucket « photos » (section 8). Exemple : "fideles/ab12cd34.jpg"
     photo               text,
 
     -- Divers ----------------------------------------------------
@@ -158,43 +161,93 @@ create trigger registre_attribuer_numeros
 
 
 -- ------------------------------------------------------------
--- 6. SÉCURITÉ (RLS) — indispensable
+-- 6. COMPTES ET RÔLES
 -- ------------------------------------------------------------
--- Sans ces règles, la clé publique de l'application donnerait
--- accès au registre à n'importe qui. Ici, SEULES les personnes
--- connectées (comptes créés par vous dans Authentication) peuvent
--- lire et écrire.
+-- Une ligne par compte Supabase autorisé à utiliser le registre.
+-- role vaut 'secretaire', 'pasteur' ou 'visiteur' :
+--   - secretaire / pasteur : accès complet (saisie, modification,
+--     suppression, import, export) — mêmes droits pour les deux,
+--     seul le compte diffère (savoir qui a fait quoi).
+--   - visiteur : consultation seule (recherche, fiche, carte
+--     imprimable), aucune écriture.
+-- Un compte Authentication sans ligne ici ne peut rien lire ni
+-- écrire : voir l'étape 5 du mode d'emploi, en haut de ce fichier.
+
+create table if not exists public.profils (
+    id       uuid primary key references auth.users (id) on delete cascade,
+    role     text not null check (role in ('secretaire', 'pasteur', 'visiteur')),
+    cree_le  timestamptz not null default now()
+);
+
+comment on table public.profils is
+  'Rôle de chaque compte Supabase autorisé à utiliser le registre ICM.';
+
+alter table public.profils enable row level security;
+
+drop policy if exists "chacun lit son propre profil" on public.profils;
+create policy "chacun lit son propre profil"
+    on public.profils for select
+    to authenticated
+    using (auth.uid() = id);
+
+-- Volontairement, aucune policy insert/update/delete pour les comptes
+-- "authenticated" : un rôle s'attribue à la main (étape 5, en haut de
+-- ce fichier), depuis le SQL Editor ou le Table Editor de Supabase —
+-- jamais depuis l'application elle-même.
+
+create or replace function public.role_utilisateur()
+returns text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+    select role from public.profils where id = auth.uid();
+$$;
+
+revoke all on function public.role_utilisateur() from public;
+grant execute on function public.role_utilisateur() to authenticated;
+
+
+-- ------------------------------------------------------------
+-- 7. SÉCURITÉ (RLS) — indispensable
+-- ------------------------------------------------------------
+-- Sans ces règles, la clé publique de l'application donnerait accès
+-- au registre à n'importe qui. Ici, la lecture demande un compte
+-- muni d'un rôle (section 6) ; l'écriture (ajout, modification,
+-- suppression) est réservée aux rôles secretaire et pasteur.
 
 alter table public.registre enable row level security;
 
-drop policy if exists "lecture pour utilisateurs connectes"     on public.registre;
-drop policy if exists "insertion pour utilisateurs connectes"   on public.registre;
+drop policy if exists "lecture pour utilisateurs connectes"      on public.registre;
+drop policy if exists "insertion pour utilisateurs connectes"    on public.registre;
 drop policy if exists "modification pour utilisateurs connectes" on public.registre;
-drop policy if exists "suppression pour utilisateurs connectes" on public.registre;
+drop policy if exists "suppression pour utilisateurs connectes"  on public.registre;
 
-create policy "lecture pour utilisateurs connectes"
+create policy "lecture pour comptes avec un role"
     on public.registre for select
     to authenticated
-    using (true);
+    using (public.role_utilisateur() is not null);
 
-create policy "insertion pour utilisateurs connectes"
+create policy "ecriture secretaire ou pasteur - insertion"
     on public.registre for insert
     to authenticated
-    with check (true);
+    with check (public.role_utilisateur() in ('secretaire', 'pasteur'));
 
-create policy "modification pour utilisateurs connectes"
+create policy "ecriture secretaire ou pasteur - modification"
     on public.registre for update
     to authenticated
-    using (true) with check (true);
+    using      (public.role_utilisateur() in ('secretaire', 'pasteur'))
+    with check (public.role_utilisateur() in ('secretaire', 'pasteur'));
 
-create policy "suppression pour utilisateurs connectes"
+create policy "ecriture secretaire ou pasteur - suppression"
     on public.registre for delete
     to authenticated
-    using (true);
+    using (public.role_utilisateur() in ('secretaire', 'pasteur'));
 
 
 -- ------------------------------------------------------------
--- 7. PHOTOS D'IDENTITÉ — espace de stockage
+-- 8. PHOTOS D'IDENTITÉ — espace de stockage
 -- ------------------------------------------------------------
 -- Les photos ne sont pas mises dans la table : elles vont dans un
 -- « bucket » de fichiers, et la colonne registre.photo garde
@@ -220,38 +273,39 @@ drop policy if exists "photos insertion connectes"    on storage.objects;
 drop policy if exists "photos modification connectes" on storage.objects;
 drop policy if exists "photos suppression connectes"  on storage.objects;
 
-create policy "photos lecture connectes"
+create policy "photos lecture pour comptes avec un role"
     on storage.objects for select
     to authenticated
-    using (bucket_id = 'photos');
+    using (bucket_id = 'photos' and public.role_utilisateur() is not null);
 
-create policy "photos insertion connectes"
+create policy "photos ecriture secretaire ou pasteur - insertion"
     on storage.objects for insert
     to authenticated
-    with check (bucket_id = 'photos');
+    with check (bucket_id = 'photos' and public.role_utilisateur() in ('secretaire', 'pasteur'));
 
-create policy "photos modification connectes"
+create policy "photos ecriture secretaire ou pasteur - modification"
     on storage.objects for update
     to authenticated
-    using (bucket_id = 'photos')
-    with check (bucket_id = 'photos');
+    using      (bucket_id = 'photos' and public.role_utilisateur() in ('secretaire', 'pasteur'))
+    with check (bucket_id = 'photos' and public.role_utilisateur() in ('secretaire', 'pasteur'));
 
-create policy "photos suppression connectes"
+create policy "photos ecriture secretaire ou pasteur - suppression"
     on storage.objects for delete
     to authenticated
-    using (bucket_id = 'photos');
+    using (bucket_id = 'photos' and public.role_utilisateur() in ('secretaire', 'pasteur'));
 
 -- Si cette section renvoie une erreur de permission (« must be owner
 -- of table objects »), créez le bucket à la main :
 --   Storage > New bucket > nom « photos » > décocher « Public »
 --   > Additional configuration > File size limit > 500 KB (ou 0.5 MB
 --   selon l'unité proposée par l'écran)
--- puis, dans l'onglet Policies du bucket, autorisez SELECT, INSERT,
--- UPDATE et DELETE pour le rôle « authenticated ».
+-- puis, dans l'onglet Policies du bucket, autorisez SELECT pour tout
+-- compte muni d'un rôle, et INSERT/UPDATE/DELETE pour secretaire et
+-- pasteur uniquement (mêmes conditions que ci-dessus).
 
 
 -- ------------------------------------------------------------
--- 8. VUE STATISTIQUES (facultatif, pratique pour le tableau de bord)
+-- 9. VUE STATISTIQUES (facultatif, pratique pour le tableau de bord)
 -- ------------------------------------------------------------
 create or replace view public.v_statistiques as
 select
@@ -266,7 +320,7 @@ from public.registre;
 
 
 -- ------------------------------------------------------------
--- 9. JEU D'ESSAI (à supprimer avant la mise en service réelle)
+-- 10. JEU D'ESSAI (à supprimer avant la mise en service réelle)
 -- ------------------------------------------------------------
 -- insert into public.registre
 --   (nom, prenom, nom_pere, nom_mere, date_naissance, nationalite,

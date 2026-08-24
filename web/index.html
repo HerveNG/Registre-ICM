@@ -281,7 +281,7 @@ h1.titre{margin:0 0 1rem;font-size:1.5rem;}
     <div class="carte-centre">
       <div class="sigle-rond" role="img" aria-label="Logo ICM"></div>
       <h1 id="titre-connexion">Registre des baptêmes &amp; mariages</h1>
-      <p class="sous-titre">Accès réservé au secrétariat</p>
+      <p class="sous-titre">Accès réservé aux comptes autorisés</p>
       <form id="form-connexion" class="pile">
         <label>Adresse e-mail
           <input type="email" id="login-email" required autocomplete="username">
@@ -819,10 +819,16 @@ const PAR_PAGE = 20;
 const SEAU_PHOTOS = "photos";        // nom du bucket créé par le script SQL
 
 const etat = {
-  config:null, session:null, page:1, total:0, q:"", filtre:"", lignes:[],
+  config:null, session:null, role:null, page:1, total:0, q:"", filtre:"", lignes:[],
   // Photo en cours d'édition dans le formulaire
   photo: { chemin:null, blob:null, retiree:false }
 };
+
+// role vaut 'secretaire', 'pasteur' ou 'visiteur' (table "profils" côté
+// Supabase). secretaire et pasteur ont exactement les mêmes droits —
+// seul visiteur est restreint à la consultation.
+const LIBELLES_ROLES = { secretaire:"Secrétaire", pasteur:"Pasteur", visiteur:"Visiteur" };
+function peutEcrire(){ return etat.role === "secretaire" || etat.role === "pasteur"; }
 
 /* Stockage local : entouré de try/catch (navigation privée, fichier local…) */
 const stockage = {
@@ -879,6 +885,15 @@ function afficherVue(nom){
   const connecte = !!etat.session;
   $("entete").hidden = !connecte;
   $("pied").hidden   = !connecte;
+
+  // Un visiteur connecté ne voit pas les actions d'écriture dans
+  // l'en-tête — le contrôle réel se fait côté base (RLS Supabase),
+  // ceci n'est qu'un confort d'affichage.
+  const ecriture = connecte && peutEcrire();
+  $("btn-nouveau").hidden     = !ecriture;
+  $("btn-import-nav").hidden  = !ecriture;
+  $("btn-export").hidden      = !ecriture;
+
   effacerMessage();
 }
 
@@ -922,6 +937,31 @@ async function rafraichirSession(){
   }catch(e){ return false; }
 }
 
+/* Récupère le rôle du compte connecté (table "profils"). Un compte
+   Supabase valide mais sans ligne dans "profils" n'a accès à rien —
+   la base (RLS) refusera tout, ceci ne fait qu'en informer clairement
+   la personne plutôt que de la laisser devant un registre vide. */
+async function chargerRole(){
+  try{
+    const { donnees } = await api(`profils?select=role&id=eq.${etat.session.user.id}`);
+    etat.role = (donnees && donnees[0] && donnees[0].role) || null;
+  }catch(e){
+    etat.role = null;
+  }
+  if (!etat.role){
+    message("Ce compte n'a pas encore de rôle attribué (secrétaire / pasteur / "
+      + "visiteur). Demandez à la personne qui gère la base Supabase de "
+      + "l'ajouter dans la table « profils ».", "erreur");
+  }
+  return etat.role;
+}
+
+function etiquetteCompte(){
+  const email = (etat.session && etat.session.user && etat.session.user.email) || "";
+  const libelle = LIBELLES_ROLES[etat.role];
+  return libelle ? `${email} · ${libelle}` : email;
+}
+
 /* Appel générique à la table registre. Réessaie une fois après
    rafraîchissement du jeton si celui-ci a expiré. */
 async function api(chemin, options={}, deuxiemeEssai=false){
@@ -944,8 +984,9 @@ async function api(chemin, options={}, deuxiemeEssai=false){
     if (/violates check constraint/i.test(detail))
       throw new Error("Dates incohérentes : le baptême ou le mariage précède la naissance.");
     if (/row-level security/i.test(detail))
-      throw new Error("Accès refusé par la base. Vérifiez que le script SQL "
-        + "(politiques RLS) a bien été exécuté dans Supabase.");
+      throw new Error("Accès refusé par la base : votre compte n'a peut-être "
+        + "pas le rôle nécessaire (secrétaire ou pasteur), ou le script SQL "
+        + "(politiques RLS) n'a pas encore été exécuté dans Supabase.");
     throw new Error(detail || `Erreur ${r.status}.`);
   }
 
@@ -994,8 +1035,10 @@ async function envoyerPhoto(blob){
         + "automatique s'en charge déjà. Réessayez le recadrage ; si le "
         + "problème persiste, contactez le responsable technique.");
     if (/row-level security|policy|unauthorized/i.test(detail) || r.status === 403)
-      throw new Error("Envoi de la photo refusé par la base. Vérifiez les "
-        + "règles d'accès du bucket « photos » (script SQL de migration).");
+      throw new Error("Envoi de la photo refusé par la base : votre compte "
+        + "n'a peut-être pas le rôle nécessaire (secrétaire ou pasteur), ou "
+        + "les règles d'accès du bucket « photos » (script SQL de migration) "
+        + "n'ont pas encore été mises à jour.");
     throw new Error(detail || `Envoi de la photo impossible (erreur ${r.status}).`);
   }
   return chemin;
@@ -1116,8 +1159,10 @@ function dessinerTableau(){
     $("zone-vide").innerHTML = (etat.q || etat.filtre)
       ? `<div class="vide"><p>Aucun enregistrement ne correspond à cette recherche.</p></div>`
       : `<div class="vide"><p>Le registre est encore vide.</p>
-          <button class="bouton bouton-discret" onclick="reinitialiserImport();afficherVue('import');">
-            ou importer le registre papier existant</button></div>`;
+          ${ peutEcrire()
+              ? `<button class="bouton bouton-discret" onclick="reinitialiserImport();afficherVue('import');">
+                  ou importer le registre papier existant</button>`
+              : "" }</div>`;
     return;
   }
 
@@ -1145,9 +1190,11 @@ function dessinerTableau(){
               : "—" }</td>
       <td>${echapper(r.conjoint || "—")}</td>
       <td class="col-actions">
-        <button class="bouton bouton-petit" data-action="carte"     data-id="${r.id}">Carte</button>
+        <button class="bouton bouton-petit" data-action="carte" data-id="${r.id}">Carte</button>
+        ${ peutEcrire() ? `
         <button class="bouton bouton-petit" data-action="modifier"  data-id="${r.id}">Modifier</button>
         <button class="bouton bouton-petit bouton-danger" data-action="supprimer" data-id="${r.id}">Supprimer</button>
+        ` : "" }
       </td>
     </tr>`).join("");
 
@@ -1172,6 +1219,10 @@ async function chargerVignettes(){
    5. FORMULAIRE
    ========================================================== */
 function ouvrirFormulaire(record){
+  if (!peutEcrire()){
+    message("Accès réservé au secrétariat et au pasteur.", "erreur");
+    return;
+  }
   $("champ-id").value = record ? record.id : "";
   CHAMPS.forEach(c=>{ $("f-"+c).value = record ? (record[c] ?? "") : ""; });
   $("titre-formulaire").textContent = record
@@ -1290,6 +1341,10 @@ async function soumettreFormulaire(evt){
 }
 
 async function supprimer(id){
+  if (!peutEcrire()){
+    message("Accès réservé au secrétariat et au pasteur.", "erreur");
+    return;
+  }
   const r = etat.lignes.find(x=>x.id===id);
   if (!confirm(`Supprimer définitivement la carte de ${r.nom} ${r.prenom} ?`)) return;
   try{
@@ -1349,6 +1404,10 @@ const COLONNES_EXPORT = [
 ];
 
 async function exporterCsv(){
+  if (!peutEcrire()){
+    message("Accès réservé au secrétariat et au pasteur.", "erreur");
+    return;
+  }
   try{
     message("Préparation de l'export…", "info");
     const { donnees } = await api("registre?select=*&order=nom.asc,prenom.asc", {
@@ -1586,6 +1645,10 @@ function reinitialiserImport(){
 }
 
 async function confirmerImport(){
+  if (!peutEcrire()){
+    message("Accès réservé au secrétariat et au pasteur.", "erreur");
+    return;
+  }
   if (!etatImport.lignesValides.length) return;
   if (!confirm(`Importer ${etatImport.lignesValides.length} fiche(s) dans le registre ?`)) return;
 
@@ -1647,6 +1710,7 @@ function telechargerModeleImport(){
    ========================================================== */
 function deconnexion(raison){
   etat.session = null;
+  etat.role = null;
   stockage.effacer("icm_session");
   afficherVue("connexion");
   if (raison) message(raison, "info");
@@ -1662,7 +1726,7 @@ function appliquerNomEglise(){
 /* ==========================================================
    9. ÉVÉNEMENTS
    ========================================================== */
-document.addEventListener("DOMContentLoaded", ()=>{
+document.addEventListener("DOMContentLoaded", async ()=>{
 
   // --- Réglages
   $("form-reglages").addEventListener("submit", (e)=>{
@@ -1695,8 +1759,8 @@ document.addEventListener("DOMContentLoaded", ()=>{
     try{
       etat.session = await seConnecter($("login-email").value.trim(), $("login-mdp").value);
       stockage.ecrire("icm_session", JSON.stringify(etat.session));
-      $("etiquette-utilisateur").textContent =
-        (etat.session.user && etat.session.user.email) || "";
+      await chargerRole();
+      $("etiquette-utilisateur").textContent = etiquetteCompte();
       $("login-mdp").value = "";
       afficherVue("liste");
       await chargerListe();
@@ -1711,12 +1775,18 @@ document.addEventListener("DOMContentLoaded", ()=>{
       const vue = b.dataset.vue;
       if (vue === "formulaire") ouvrirFormulaire(null);
       else if (vue === "reglages"){ $("lien-reglages").click(); }
-      else if (vue === "import"){ reinitialiserImport(); afficherVue("import"); }
+      else if (vue === "import"){
+        if (!peutEcrire()){ message("Accès réservé au secrétariat et au pasteur.", "erreur"); return; }
+        reinitialiserImport(); afficherVue("import");
+      }
       else { afficherVue(vue); chargerListe(); }
     });
   });
   $("btn-nouveau-2").addEventListener("click", ()=>ouvrirFormulaire(null));
-  $("btn-import-2").addEventListener("click", ()=>{ reinitialiserImport(); afficherVue("import"); });
+  $("btn-import-2").addEventListener("click", ()=>{
+    if (!peutEcrire()){ message("Accès réservé au secrétariat et au pasteur.", "erreur"); return; }
+    reinitialiserImport(); afficherVue("import");
+  });
   $("btn-annuler").addEventListener("click", ()=>{ afficherVue("liste"); chargerListe(); });
   $("btn-export").addEventListener("click", exporterCsv);
 
@@ -1816,8 +1886,8 @@ document.addEventListener("DOMContentLoaded", ()=>{
   if (sessionSauvee){
     try{
       etat.session = JSON.parse(sessionSauvee);
-      $("etiquette-utilisateur").textContent =
-        (etat.session.user && etat.session.user.email) || "";
+      await chargerRole();
+      $("etiquette-utilisateur").textContent = etiquetteCompte();
       afficherVue("liste");
       chargerListe();
       return;

@@ -76,13 +76,16 @@ mvp_registre_bapteme_mariage/
    (région conseillée : *eu-west-3 / Paris*).
 2. **SQL Editor → New query** : coller tout `database/schema_supabase.sql`, **Run**.
    Ce script crée la table **et** l'espace de stockage des photos.
-3. **Authentication → Users → Add user** : créer un compte e-mail + mot de passe
-   par personne du secrétariat.
+3. **Authentication → Users → Add user** : créer un compte e-mail + mot de
+   passe pour chaque personne (secrétariat, pasteur…), puis lui attribuer
+   son rôle — voir **§ 5. Comptes et rôles** plus bas. Sans cette dernière
+   étape, un compte créé ne peut rien lire ni écrire.
 4. **Project Settings → API** : noter l'`URL` du projet et la clé `anon`.
 
-> **Vous aviez déjà créé la base avant les photos ?** Ne rejouez pas le
-> script complet : exécutez `database/migration_01_photo.sql`, qui ajoute
-> seulement la colonne `photo` et le bucket, sans toucher à vos données.
+> **Vous aviez déjà créé la base avant les photos, ou avant les rôles ?**
+> Ne rejouez pas le script complet : exécutez, dans cet ordre,
+> `database/migration_01_photo.sql` puis `database/migration_02_roles.sql`
+> — chacun ajoute seulement ce qui manque, sans toucher à vos données.
 
 **b) Relier l'application**
 
@@ -149,28 +152,49 @@ toute utilisation réelle.* La base `registre.db` est créée automatiquement.
 
 ## 5. Comptes et rôles
 
-Trois rôles, définis dans `.env` :
+Trois rôles, sur les deux versions de l'application :
 
-| Rôle | Variables | Droits |
-|---|---|---|
-| **Secrétaire** | `ADMIN_USER` / `ADMIN_PASSWORD` (toujours actif) | Accès complet : saisie, modification, suppression, import, export. |
-| **Pasteur** | `PASTEUR_USER` / `PASTEUR_PASSWORD` (facultatif) | Accès complet également, exactement comme le secrétariat — un compte séparé pour savoir qui a fait quoi. |
-| **Visiteur** | `VISITEUR_USER` / `VISITEUR_PASSWORD` (facultatif) | Consultation seule : recherche, fiche, carte imprimable. Aucune modification, import ni export. |
+| Rôle | Droits |
+|---|---|
+| **Secrétaire** | Accès complet : saisie, modification, suppression, import, export. |
+| **Pasteur** | Accès complet également, exactement comme le secrétariat — un compte séparé pour savoir qui a fait quoi. |
+| **Visiteur** | Consultation seule : recherche, fiche, carte imprimable. Aucune modification, import ni export. |
+
+Dans les deux versions, la restriction est appliquée côté serveur (pas
+seulement en cachant les boutons à l'écran) : un visiteur qui contournerait
+l'affichage ou ouvrirait directement une action réservée est bloqué avec un
+message, sans que rien ne soit modifié.
+
+**Version Flask** — les comptes sont définis dans `.env` :
+
+| Rôle | Variables |
+|---|---|
+| Secrétaire | `ADMIN_USER` / `ADMIN_PASSWORD` (toujours actif) |
+| Pasteur | `PASTEUR_USER` / `PASTEUR_PASSWORD` (facultatif) |
+| Visiteur | `VISITEUR_USER` / `VISITEUR_PASSWORD` (facultatif) |
 
 Pour activer le compte pasteur ou visiteur, renseignez son identifiant et
 son mot de passe dans `.env` puis redémarrez l'application ; laissez les
 deux champs vides pour ne pas créer le compte. Le rôle connecté s'affiche
 dans l'en-tête, à côté du bouton **Déconnexion**.
 
-La restriction est appliquée côté serveur (pas seulement en cachant les
-boutons) : un visiteur qui ouvrirait directement l'URL d'une page réservée
-au secrétariat est renvoyé vers le registre avec un message, sans que rien
-ne soit modifié.
+**Version en ligne (Supabase)** — chaque compte Supabase reçoit son rôle
+dans une table dédiée :
 
-*Note : la version en ligne (`web/index.html`, connectée directement à
-Supabase) ne gère pas encore ces rôles — elle utilise l'authentification
-Supabase décrite dans `CHOIX_BASE_DE_DONNEES.md`. Seule la version Flask
-ci-dessus applique cette distinction secrétaire / pasteur / visiteur.*
+1. **Authentication → Users → Add user** : créer le compte (e-mail + mot
+   de passe), comme pour le secrétariat.
+2. Copier son **UID** (visible en cliquant sur le compte), puis, dans
+   **SQL Editor**, exécuter :
+   ```sql
+   insert into public.profils (id, role) values
+     ('<uid-du-compte>', 'secretaire');  -- ou 'pasteur' / 'visiteur'
+   ```
+
+Sans cette seconde étape, un compte Supabase valide ne peut **rien** lire
+ni écrire — la base (RLS) refuse tout tant qu'aucun rôle ne lui est
+attribué. Le détail du schéma est dans `database/schema_supabase.sql`
+(nouvelles bases) et `database/migration_02_roles.sql` (bases déjà
+créées avant l'ajout des rôles).
 
 ---
 
@@ -269,7 +293,6 @@ C'est la seule sauvegarde qui vous appartienne vraiment.
 
 ## 10. Ce qui reste à faire pour une version 2
 
-- comptes différenciés côté version en ligne (Supabase) — fait côté Flask ;
 - journal d'audit : qui a créé ou modifié quelle carte, et quand ;
 - signature scannée du célébrant sur la carte ;
 - séparation des personnes et des actes (un mariage = deux fidèles liés) ;
