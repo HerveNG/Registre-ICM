@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carte — {{ r.nom }} {{ r.prenom }}</title>
+<style>
+  :root{
+    --or:#b8912f; --or-clair:#e2c96b; --encre:#12203a; --trait:#9fb3cc;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:#eef1f5; color:var(--encre);
+    font-family:"Segoe UI",Calibri,system-ui,sans-serif;
+  }
+
+  /* ---------- Barre d'action (invisible à l'impression) ---------- */
+  .barre{
+    position:sticky; top:0; z-index:5; display:flex; gap:.6rem; align-items:center;
+    padding:.9rem 1.2rem; background:var(--encre); color:#fff;
+  }
+  .barre p{margin:0 auto 0 0; font-size:.9rem;}
+  .barre button,.barre a{
+    font:inherit; font-size:.85rem; padding:.5rem .9rem; border-radius:6px;
+    border:1px solid rgba(255,255,255,.35); background:transparent; color:#fff;
+    text-decoration:none; cursor:pointer;
+  }
+  .barre .principal{background:var(--or); border-color:var(--or); font-weight:600;}
+
+  /* ---------- Feuille ---------- */
+  .feuille{
+    width:210mm; min-height:148mm; margin:1.2rem auto; padding:9mm;
+    background:#fff; box-shadow:0 6px 24px rgba(18,32,58,.15);
+    display:flex; gap:0;
+  }
+  .volet{flex:1; padding:6mm 7mm; position:relative;}
+  .volet + .volet{border-left:1px dashed var(--trait);}
+
+  /* ---------- Page 1 : couverture ---------- */
+  .cadre{
+    border:2px solid var(--or); outline:1px solid var(--or-clair); outline-offset:3px;
+    height:100%; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; text-align:center; padding:8mm 6mm;
+  }
+  .sigle{
+    width:26mm; height:26mm; border-radius:50%; background:var(--encre); color:var(--or-clair);
+    display:flex; align-items:center; justify-content:center;
+    font-weight:700; letter-spacing:.08em; font-size:1.5rem; margin-bottom:6mm;
+  }
+  .titre-carte{
+    font-family:Georgia,"Times New Roman",serif; font-weight:700;
+    font-size:2rem; line-height:1.15; letter-spacing:.06em; margin:0;
+  }
+  .croix{font-size:2.6rem; color:var(--encre); margin-top:auto; padding-top:8mm;}
+  /* Filet décoratif doré : losange central + traits dégradés */
+  .ornement{
+    display:flex; align-items:center; justify-content:center; gap:.5rem;
+    width:70%; margin:5mm auto; color:var(--or);
+  }
+  .ornement::before,.ornement::after{
+    content:""; flex:1; height:1px;
+    background:linear-gradient(90deg,transparent,var(--or),transparent);
+  }
+  .ornement i{
+    width:6px; height:6px; background:var(--or); transform:rotate(45deg);
+    display:block; flex:none;
+  }
+  .verset{
+    font-size:1rem; line-height:1.65; text-align:center; margin:auto 0;
+  }
+  .reference{font-style:italic; font-size:.85rem; margin-top:3mm;}
+
+  /* ---------- Page 2 : intérieur ---------- */
+  .ligne{
+    display:flex; align-items:baseline; gap:.4rem; margin-bottom:5.2mm;
+    font-size:.95rem;
+  }
+  .ligne .etiquette{white-space:nowrap;}
+  .ligne .valeur{
+    flex:1; border-bottom:1px dotted var(--trait); min-height:1.25em;
+    font-weight:600; padding:0 .3rem 1px;
+  }
+  /* ---------- Cadre photo (haut à droite de l'intérieur) ---------- */
+  .zone-photo{display:flex; justify-content:center; margin-bottom:6mm;}
+  .photo-carte{
+    width:30mm; height:40mm;                    /* format identité 3/4 */
+    border:1px solid var(--encre); background:#fff;
+    display:flex; align-items:center; justify-content:center;
+    overflow:hidden;
+  }
+  .photo-carte img{width:100%; height:100%; object-fit:cover; display:block;}
+  .photo-carte span{font-size:.7rem; color:#9aa7b8; text-align:center; padding:2mm;}
+
+  .badge-mariage{
+    display:inline-block; border:1.5px solid var(--encre); border-radius:999px;
+    padding:.3rem 1.6rem; font-variant:small-caps; letter-spacing:.12em;
+    font-weight:700; font-size:1rem; margin-bottom:7mm;
+    background:#f2f5f9;
+  }
+  .certifie{font-style:italic; font-weight:700; margin-top:8mm;}
+  .signature{font-style:italic; font-weight:700; font-size:.9rem; margin-top:10mm;}
+  .signature span{
+    display:block; font-style:normal; font-weight:600;
+    border-bottom:1px solid var(--trait); min-height:1.4em; margin-top:2mm;
+  }
+  .centre{text-align:center;}
+  .vide{color:#9aa7b8; font-weight:400;}
+
+  /* ---------- Impression ---------- */
+  @page{ size:A5 landscape; margin:6mm; }
+  @media print{
+    body{background:#fff;}
+    .barre{display:none;}
+    .feuille{
+      width:auto; min-height:auto; margin:0; padding:0; box-shadow:none;
+      page-break-after:always; break-after:page;
+    }
+    .feuille:last-of-type{page-break-after:auto; break-after:auto;}
+  }
+</style>
+</head>
+<body>
+
+<div class="barre">
+  <p><strong>{{ r.nom }} {{ r.prenom }}</strong> — aperçu de la carte</p>
+  <a href="{{ url_for('index') }}">Retour au registre</a>
+  <button class="principal" onclick="window.print()">Imprimer / Enregistrer en PDF</button>
+</div>
+
+<!-- ======== Page 1 : couverture ======== -->
+<section class="feuille">
+  <div class="volet">
+    <div class="cadre" style="border:none;outline:none;">
+      <div class="ornement"><i></i></div>
+      <p class="verset">
+        Car vous êtes tous fils de Dieu<br>
+        par la foi en Jésus-Christ.<br>
+        Tous ceux qui avez été baptisés<br>
+        en Christ, vous avez revêtu<br>
+        Christ
+      </p>
+      <p class="reference">Galates 3 : 26 - 27</p>
+      <div class="ornement"><i></i></div>
+    </div>
+  </div>
+
+  <div class="volet">
+    <div class="cadre">
+      <div class="sigle">ICM</div>
+      <h1 class="titre-carte">
+        CARTE<br>DE<br>{% if r.est_marie %}BAPTÊME<br>&amp; MARIAGE{% else %}BAPTÊME{% endif %}
+      </h1>
+      <div class="ornement"><i></i></div>
+      <div class="croix">&#10013;</div>
+    </div>
+  </div>
+</section>
+
+<!-- ======== Page 2 : intérieur ======== -->
+<section class="feuille">
+  <div class="volet">
+    <div class="ligne"><span class="etiquette">Nom :</span>
+      <span class="valeur">{{ r.nom }}</span></div>
+    <div class="ligne"><span class="etiquette">Prénom :</span>
+      <span class="valeur">{{ r.prenom }}</span></div>
+    <div class="ligne"><span class="etiquette">Fils de :</span>
+      <span class="valeur">{{ r.nom_pere or '' }}</span></div>
+    <div class="ligne"><span class="etiquette">Et de :</span>
+      <span class="valeur">{{ r.nom_mere or '' }}</span></div>
+    <div class="ligne"><span class="etiquette">Né(e) le :</span>
+      <span class="valeur">{{ r.date_naissance | jj_mm_aaaa }}</span></div>
+    <div class="ligne"><span class="etiquette">Baptisé(e) le :</span>
+      <span class="valeur">{{ r.date_bapteme | jj_mm_aaaa }}</span></div>
+    <div class="ligne"><span class="etiquette">N° du Registre <em>(1)</em> :</span>
+      <span class="valeur">{{ r.numero_registre_1 or '' }}</span></div>
+    <div class="ligne"><span class="etiquette">Nationalité :</span>
+      <span class="valeur">{{ r.nationalite or '' }}</span></div>
+    <div class="ligne"><span class="etiquette">Originaire de :</span>
+      <span class="valeur">{{ r.originaire_de or '' }}</span></div>
+
+    <p class="certifie centre">certifié exact.</p>
+    <p class="signature">Signature (1)<span>{{ r.signature_1 or r.celebrant_bapteme or '' }}</span></p>
+  </div>
+
+  <div class="volet">
+    <div class="zone-photo">
+      <div class="photo-carte">
+        {% if r.photo %}
+          <img src="{{ url_for('static', filename='photos/' ~ r.photo) }}"
+               alt="Photo de {{ r.nom }} {{ r.prenom }}">
+        {% else %}
+          <span>Photo</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="centre"><span class="badge-mariage">Mariage</span></div>
+
+    <div class="ligne"><span class="etiquette">A :</span>
+      <span class="valeur">{{ r.lieu_mariage or '' }}</span></div>
+    <div class="ligne"><span class="etiquette">Le :</span>
+      <span class="valeur">{{ r.date_mariage | jj_mm_aaaa }}</span></div>
+    <div class="ligne"><span class="etiquette">Avec :</span>
+      <span class="valeur">{{ r.conjoint or '' }}</span></div>
+    <div class="ligne"><span class="etiquette">N° du Registre <em>(2)</em> :</span>
+      <span class="valeur">{{ r.numero_registre_2 or '' }}</span></div>
+
+    {% if not r.est_marie %}
+      <p class="vide centre" style="margin-top:6mm;font-size:.85rem;">
+        (partie à compléter le jour du mariage)</p>
+    {% endif %}
+
+    <p class="signature">Signature (2)<span>{{ r.signature_2 or r.celebrant_mariage or '' }}</span></p>
+  </div>
+</section>
+
+</body>
+</html>

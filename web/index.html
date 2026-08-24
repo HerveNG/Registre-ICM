@@ -1,0 +1,1407 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Registre ICM — Baptêmes &amp; Mariages</title>
+
+<!-- ==========================================================
+     IN CHRIST MINISTRIES — Registre numérique
+     Application autonome : un seul fichier, aucune installation.
+     Elle se connecte directement à votre base Supabase.
+
+     >>> À FAIRE UNE SEULE FOIS : renseignez les deux valeurs
+         ci-dessous (Supabase > Project Settings > API).
+         Vous pouvez aussi les saisir dans l'écran de réglages
+         de l'application si vous préférez ne rien modifier ici.
+     ========================================================== -->
+<script>
+  const CONFIG_PAR_DEFAUT = {
+    url:  "",   // ex. https://abcdefghijkl.supabase.co
+    cle:  "",   // clé « anon / publishable » (jamais la clé service_role !)
+    eglise: "In Christ Ministries"
+  };
+</script>
+
+<style>
+:root{
+  --encre:#12203a; --encre-douce:#41526e; --or:#b8912f; --or-clair:#e2c96b;
+  --fond:#f4f6f9; --blanc:#fff; --trait:#dde3ec;
+  --succes:#1c7a4d; --succes-fond:#e6f5ed;
+  --erreur:#b3261e; --erreur-fond:#fdeceb;
+  --rayon:10px;
+}
+*{box-sizing:border-box;}
+body{margin:0;font-family:"Segoe UI",Calibri,system-ui,-apple-system,sans-serif;
+  background:var(--fond);color:var(--encre);line-height:1.55;}
+[hidden]{display:none !important;}
+
+/* ---------- En-tête ---------- */
+.entete{background:var(--encre);color:#fff;}
+.entete-inner{max-width:1180px;margin:0 auto;padding:.9rem 1.5rem;
+  display:flex;align-items:center;gap:1.2rem;flex-wrap:wrap;}
+.marque{display:flex;align-items:center;gap:.85rem;}
+.marque-sigle{width:42px;height:42px;border-radius:50%;background:var(--or);
+  color:var(--encre);display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:.95rem;}
+.marque strong{display:block;font-size:1rem;}
+.marque small{display:block;font-size:.78rem;opacity:.75;}
+.nav{margin-left:auto;display:flex;gap:.35rem;flex-wrap:wrap;align-items:center;}
+.nav button{background:transparent;border:0;color:#fff;font:inherit;font-size:.9rem;
+  padding:.45rem .8rem;border-radius:6px;cursor:pointer;}
+.nav button:hover{background:rgba(255,255,255,.12);}
+.nav .utilisateur{font-size:.8rem;opacity:.65;margin-right:.3rem;}
+
+.conteneur{max-width:1180px;margin:0 auto;padding:1.8rem 1.5rem 3rem;}
+.pied{text-align:center;padding:1.5rem;font-size:.8rem;color:var(--encre-douce);
+  border-top:1px solid var(--trait);}
+
+/* ---------- Messages ---------- */
+.message{padding:.7rem 1rem;border-radius:var(--rayon);font-size:.92rem;margin-bottom:1rem;}
+.message-succes{background:var(--succes-fond);color:var(--succes);border-left:4px solid var(--succes);}
+.message-erreur{background:var(--erreur-fond);color:var(--erreur);border-left:4px solid var(--erreur);}
+.message-info{background:#eef4fb;color:#1d4a80;border-left:4px solid #1d4a80;}
+
+/* ---------- Champs & boutons ---------- */
+input,select,textarea{font:inherit;color:var(--encre);width:100%;padding:.55rem .7rem;
+  border:1px solid var(--trait);border-radius:8px;background:var(--blanc);}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--or-clair);
+  outline-offset:1px;border-color:var(--or);}
+select{max-width:230px;}
+label{display:block;font-size:.85rem;font-weight:600;color:var(--encre-douce);}
+label small{font-weight:400;}
+label input,label select,label textarea{margin-top:.25rem;font-weight:400;}
+.obligatoire::after{content:" *";color:var(--erreur);}
+.bouton{display:inline-block;font:inherit;font-size:.88rem;font-weight:600;
+  padding:.55rem 1rem;border-radius:8px;cursor:pointer;text-decoration:none;
+  border:1px solid var(--trait);background:var(--blanc);color:var(--encre);white-space:nowrap;}
+.bouton:hover{border-color:var(--encre-douce);}
+.bouton:disabled{opacity:.5;cursor:progress;}
+.bouton-principal{background:var(--encre);border-color:var(--encre);color:#fff;}
+.bouton-principal:hover{background:#1d3057;}
+.bouton-discret{background:transparent;color:var(--encre-douce);}
+.bouton-danger{color:var(--erreur);border-color:#f0c6c3;}
+.bouton-danger:hover{background:var(--erreur-fond);border-color:var(--erreur);}
+.bouton-petit{font-size:.8rem;padding:.35rem .65rem;}
+.bouton-large{width:100%;text-align:center;padding:.7rem;}
+
+/* ---------- Connexion / réglages ---------- */
+.carte-centre{max-width:420px;margin:3rem auto;background:var(--blanc);
+  border:1px solid var(--trait);border-radius:var(--rayon);padding:2.2rem 2rem;}
+.carte-centre h1{font-size:1.15rem;margin:0 0 .2rem;text-align:center;}
+.carte-centre .sous-titre{color:var(--encre-douce);font-size:.85rem;
+  margin:0 0 1.5rem;text-align:center;}
+.sigle-rond{width:60px;height:60px;margin:0 auto 1rem;border-radius:50%;
+  background:var(--encre);color:var(--or-clair);display:flex;align-items:center;
+  justify-content:center;font-weight:700;}
+.pile{display:grid;gap:1rem;}
+
+/* ---------- Statistiques ---------- */
+.stats{display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1.4rem;}
+.stat{background:var(--blanc);border:1px solid var(--trait);border-radius:var(--rayon);
+  padding:.9rem 1.4rem;min-width:150px;}
+.stat b{display:block;font-size:1.6rem;}
+.stat span{font-size:.8rem;color:var(--encre-douce);text-transform:uppercase;letter-spacing:.05em;}
+
+/* ---------- Recherche ---------- */
+.barre-recherche{display:flex;gap:.55rem;flex-wrap:wrap;align-items:center;
+  background:var(--blanc);border:1px solid var(--trait);border-radius:var(--rayon);
+  padding:.8rem;margin-bottom:1.2rem;}
+.barre-recherche input[type=search]{flex:1;min-width:240px;}
+.barre-recherche .bouton-principal{margin-left:auto;}
+
+/* ---------- Tableau ---------- */
+.tableau-enveloppe{background:var(--blanc);border:1px solid var(--trait);
+  border-radius:var(--rayon);overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:.9rem;}
+th{text-align:left;padding:.7rem .9rem;background:#eef1f6;font-size:.75rem;
+  text-transform:uppercase;letter-spacing:.05em;color:var(--encre-douce);
+  border-bottom:1px solid var(--trait);white-space:nowrap;}
+td{padding:.7rem .9rem;border-bottom:1px solid var(--trait);vertical-align:top;}
+tr:last-child td{border-bottom:none;}
+tbody tr:hover{background:#fafbfd;}
+code{font-size:.82rem;background:#eef1f6;padding:.1rem .4rem;border-radius:4px;}
+.col-actions{white-space:nowrap;}
+.col-actions .bouton{margin:1px;}
+.discret{color:var(--encre-douce);font-size:.85rem;}
+.etiquette{display:inline-block;font-size:.72rem;padding:.15rem .5rem;border-radius:999px;
+  background:#fff4e0;color:#96601a;}
+
+/* ---------- Photo d'identité ---------- */
+.bloc-photo{display:flex;gap:1.4rem;align-items:flex-start;flex-wrap:wrap;}
+.photo-cadre{width:132px;height:176px;flex:none;border:2px solid var(--or);
+  border-radius:4px;background:#eef1f6;display:flex;align-items:center;
+  justify-content:center;overflow:hidden;}
+.photo-cadre img{width:100%;height:100%;object-fit:cover;display:block;}
+.photo-vide{font-size:.78rem;color:var(--encre-douce);text-align:center;padding:.5rem;}
+.photo-commandes{flex:1;min-width:220px;display:flex;flex-direction:column;
+  align-items:flex-start;gap:.5rem;}
+.photo-commandes .aide{margin:0;}
+.vignette{width:38px;height:50px;border-radius:3px;object-fit:cover;
+  border:1px solid var(--trait);background:#eef1f6;display:block;}
+.vignette-absente{width:38px;height:50px;border-radius:3px;
+  border:1px dashed var(--trait);background:#f7f9fc;display:block;}
+.cellule-identite{display:flex;gap:.7rem;align-items:flex-start;}
+.pagination{display:flex;align-items:center;justify-content:center;gap:1rem;margin-top:1.2rem;}
+.vide{background:var(--blanc);border:1px dashed var(--trait);border-radius:var(--rayon);
+  padding:3rem 1.5rem;text-align:center;color:var(--encre-douce);}
+
+/* ---------- Formulaire ---------- */
+fieldset{background:var(--blanc);border:1px solid var(--trait);border-radius:var(--rayon);
+  padding:1.2rem 1.4rem 1.4rem;margin:0 0 1rem;}
+legend{font-weight:700;font-size:.95rem;padding:0 .5rem;}
+legend small{font-weight:400;color:var(--encre-douce);}
+.grille{display:grid;gap:.9rem 1.2rem;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));}
+.aide{font-size:.8rem;color:var(--encre-douce);margin:.9rem 0 0;}
+.actions-formulaire{display:flex;gap:.6rem;flex-wrap:wrap;}
+h1.titre{margin:0 0 1rem;font-size:1.5rem;}
+
+/* ==========================================================
+   CARTE IMPRIMABLE
+   ========================================================== */
+.zone-carte{position:fixed;inset:0;background:#eef1f5;overflow:auto;z-index:50;}
+.barre-carte{position:sticky;top:0;z-index:5;display:flex;gap:.6rem;align-items:center;
+  padding:.9rem 1.2rem;background:var(--encre);color:#fff;}
+.barre-carte p{margin:0 auto 0 0;font-size:.9rem;}
+.barre-carte button{font:inherit;font-size:.85rem;padding:.5rem .9rem;border-radius:6px;
+  border:1px solid rgba(255,255,255,.35);background:transparent;color:#fff;cursor:pointer;}
+.barre-carte .principal{background:var(--or);border-color:var(--or);font-weight:600;}
+.feuille{width:210mm;min-height:148mm;margin:1.2rem auto;padding:9mm;background:#fff;
+  box-shadow:0 6px 24px rgba(18,32,58,.15);display:flex;}
+.volet{flex:1;padding:6mm 7mm;}
+.volet + .volet{border-left:1px dashed #9fb3cc;}
+.cadre{border:2px solid var(--or);outline:1px solid var(--or-clair);outline-offset:3px;
+  height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:8mm 6mm;}
+.cadre-nu{border:none;outline:none;}
+.sigle-carte{width:26mm;height:26mm;border-radius:50%;background:var(--encre);
+  color:var(--or-clair);display:flex;align-items:center;justify-content:center;
+  font-weight:700;letter-spacing:.08em;font-size:1.5rem;margin-bottom:6mm;}
+.titre-carte{font-family:Georgia,"Times New Roman",serif;font-weight:700;font-size:2rem;
+  line-height:1.15;letter-spacing:.06em;margin:0;}
+.croix{font-size:2.6rem;margin-top:auto;padding-top:8mm;}
+.ornement{display:flex;align-items:center;justify-content:center;gap:.5rem;
+  width:70%;margin:5mm auto;}
+.ornement::before,.ornement::after{content:"";flex:1;height:1px;
+  background:linear-gradient(90deg,transparent,var(--or),transparent);}
+.ornement i{width:6px;height:6px;background:var(--or);transform:rotate(45deg);flex:none;}
+.verset{font-size:1rem;line-height:1.65;margin:auto 0;}
+.reference{font-style:italic;font-size:.85rem;margin-top:3mm;}
+.ligne{display:flex;align-items:baseline;gap:.4rem;margin-bottom:5.2mm;font-size:.95rem;}
+.ligne .valeur{flex:1;border-bottom:1px dotted #9fb3cc;min-height:1.25em;
+  font-weight:600;padding:0 .3rem 1px;}
+.zone-photo{display:flex;justify-content:center;margin-bottom:6mm;}
+.photo-carte{width:30mm;height:40mm;border:1px solid var(--encre);background:#fff;
+  display:flex;align-items:center;justify-content:center;overflow:hidden;}
+.photo-carte img{width:100%;height:100%;object-fit:cover;display:block;}
+.photo-carte span{font-size:.7rem;color:#9aa7b8;}
+.badge-mariage{display:inline-block;border:1.5px solid var(--encre);border-radius:999px;
+  padding:.3rem 1.6rem;font-variant:small-caps;letter-spacing:.12em;font-weight:700;
+  margin-bottom:7mm;background:#f2f5f9;}
+.certifie{font-style:italic;font-weight:700;margin-top:8mm;text-align:center;}
+.signature{font-style:italic;font-weight:700;font-size:.9rem;margin-top:10mm;}
+.signature span{display:block;font-style:normal;font-weight:600;
+  border-bottom:1px solid #9fb3cc;min-height:1.4em;margin-top:2mm;}
+.centre{text-align:center;}
+
+@page{size:A5 landscape;margin:6mm;}
+@media print{
+  body{background:#fff;}
+  .entete,.conteneur,.pied,.barre-carte{display:none !important;}
+  .zone-carte{position:static;overflow:visible;background:#fff;}
+  .feuille{width:auto;min-height:auto;margin:0;padding:0;box-shadow:none;
+    page-break-after:always;break-after:page;}
+  .feuille:last-of-type{page-break-after:auto;break-after:auto;}
+}
+</style>
+</head>
+
+<body>
+
+<!-- ================= EN-TÊTE ================= -->
+<header class="entete" id="entete" hidden>
+  <div class="entete-inner">
+    <div class="marque">
+      <div class="marque-sigle">ICM</div>
+      <div><strong id="nom-eglise">In Christ Ministries</strong>
+        <small>Registre des baptêmes &amp; mariages</small></div>
+    </div>
+    <nav class="nav">
+      <button data-vue="liste">Registre</button>
+      <button data-vue="formulaire" id="btn-nouveau">Nouvelle carte</button>
+      <button id="btn-export">Export Excel</button>
+      <button data-vue="reglages">Réglages</button>
+      <span class="utilisateur" id="etiquette-utilisateur"></span>
+      <button id="btn-deconnexion">Déconnexion</button>
+    </nav>
+  </div>
+</header>
+
+<main class="conteneur">
+  <div id="zone-message"></div>
+
+  <!-- ================= RÉGLAGES (1re utilisation) ================= -->
+  <section id="vue-reglages" hidden>
+    <div class="carte-centre">
+      <div class="sigle-rond">ICM</div>
+      <h1>Connexion à la base de données</h1>
+      <p class="sous-titre">Informations trouvées dans Supabase →<br>
+        Project Settings → API</p>
+      <form id="form-reglages" class="pile">
+        <label>Nom de l'église
+          <input type="text" id="cfg-eglise" placeholder="In Christ Ministries">
+        </label>
+        <label class="obligatoire">URL du projet Supabase
+          <input type="url" id="cfg-url" placeholder="https://xxxxxxxx.supabase.co" required>
+        </label>
+        <label class="obligatoire">Clé publique <small>(anon / publishable)</small>
+          <input type="text" id="cfg-cle" placeholder="eyJhbGciOi..." required>
+        </label>
+        <button type="submit" class="bouton bouton-principal bouton-large">Enregistrer</button>
+        <p class="aide">Ces informations restent dans ce navigateur. N'utilisez jamais
+          la clé <code>service_role</code> ici.</p>
+      </form>
+    </div>
+  </section>
+
+  <!-- ================= CONNEXION ================= -->
+  <section id="vue-connexion" hidden>
+    <div class="carte-centre">
+      <div class="sigle-rond">ICM</div>
+      <h1 id="titre-connexion">Registre des baptêmes &amp; mariages</h1>
+      <p class="sous-titre">Accès réservé au secrétariat</p>
+      <form id="form-connexion" class="pile">
+        <label>Adresse e-mail
+          <input type="email" id="login-email" required autocomplete="username">
+        </label>
+        <label>Mot de passe
+          <input type="password" id="login-mdp" required autocomplete="current-password">
+        </label>
+        <button type="submit" class="bouton bouton-principal bouton-large">Se connecter</button>
+      </form>
+      <p class="aide centre" style="margin-top:1.2rem">
+        <a href="#" id="lien-reglages">Modifier la connexion à la base</a></p>
+    </div>
+  </section>
+
+  <!-- ================= LISTE ================= -->
+  <section id="vue-liste" hidden>
+    <div class="stats">
+      <div class="stat"><b id="stat-total">—</b><span>fidèles enregistrés</span></div>
+      <div class="stat"><b id="stat-baptemes">—</b><span>baptêmes</span></div>
+      <div class="stat"><b id="stat-mariages">—</b><span>mariages</span></div>
+    </div>
+
+    <form class="barre-recherche" id="form-recherche">
+      <input type="search" id="recherche" placeholder="Rechercher un nom, un prénom, un n° de registre, un conjoint…">
+      <select id="filtre">
+        <option value="">Tous</option>
+        <option value="bapteme">Baptisés</option>
+        <option value="mariage">Mariés</option>
+        <option value="incomplet">Baptême non renseigné</option>
+      </select>
+      <button type="submit" class="bouton">Rechercher</button>
+      <button type="button" class="bouton bouton-discret" id="btn-reinit">Réinitialiser</button>
+      <button type="button" class="bouton bouton-principal" id="btn-nouveau-2">+ Nouvelle carte</button>
+    </form>
+
+    <div class="tableau-enveloppe">
+      <table>
+        <thead><tr>
+          <th>Nom &amp; prénom</th><th>Né(e) le</th><th>Baptême</th>
+          <th>N° Registre (1)</th><th>Mariage</th><th>Conjoint</th>
+          <th class="col-actions">Actions</th>
+        </tr></thead>
+        <tbody id="corps-tableau"></tbody>
+      </table>
+    </div>
+    <div id="zone-vide"></div>
+
+    <nav class="pagination" id="pagination" hidden>
+      <button class="bouton bouton-petit" id="btn-precedent">‹ Précédent</button>
+      <span class="discret" id="info-page"></span>
+      <button class="bouton bouton-petit" id="btn-suivant">Suivant ›</button>
+    </nav>
+  </section>
+
+  <!-- ================= FORMULAIRE ================= -->
+  <section id="vue-formulaire" hidden>
+    <h1 class="titre" id="titre-formulaire">Nouvelle carte</h1>
+    <form id="form-carte">
+      <input type="hidden" id="champ-id">
+
+      <fieldset><legend>Photo d'identité</legend>
+        <div class="bloc-photo">
+          <div class="photo-cadre">
+            <img id="photo-apercu" hidden alt="">
+            <span class="photo-vide" id="photo-vide">Aucune photo</span>
+          </div>
+          <div class="photo-commandes">
+            <p class="aide">Format identité (3/4). L'image est recadrée puis
+              allégée automatiquement avant d'être envoyée.</p>
+            <input type="file" id="photo-fichier" accept="image/*" hidden>
+            <button type="button" class="bouton" id="photo-choisir">Choisir une photo</button>
+            <button type="button" class="bouton bouton-danger" id="photo-retirer" hidden>Retirer</button>
+            <p class="aide" id="photo-etat"></p>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset><legend>Identité</legend>
+        <div class="grille">
+          <label class="obligatoire">Nom<input type="text" id="f-nom" required maxlength="120"></label>
+          <label class="obligatoire">Prénom<input type="text" id="f-prenom" required maxlength="120"></label>
+          <label>Fils / Fille de <small>(père)</small><input type="text" id="f-nom_pere" maxlength="200"></label>
+          <label>Et de <small>(mère)</small><input type="text" id="f-nom_mere" maxlength="200"></label>
+          <label>Né(e) le<input type="date" id="f-date_naissance"></label>
+          <label>Nationalité<input type="text" id="f-nationalite" maxlength="100"></label>
+          <label>Originaire de<input type="text" id="f-originaire_de" maxlength="150"></label>
+          <label>Téléphone<input type="text" id="f-telephone" maxlength="50"></label>
+        </div>
+      </fieldset>
+
+      <fieldset><legend>Baptême</legend>
+        <div class="grille">
+          <label>Baptisé(e) le<input type="date" id="f-date_bapteme"></label>
+          <label>Lieu du baptême<input type="text" id="f-lieu_bapteme" maxlength="200"></label>
+          <label>N° du Registre (1)<input type="text" id="f-numero_registre_1" maxlength="80"
+            placeholder="Laisser vide → attribué automatiquement"></label>
+          <label>Célébrant<input type="text" id="f-celebrant_bapteme" maxlength="150"></label>
+          <label>Signature (1) — certifié exact<input type="text" id="f-signature_1" maxlength="150"></label>
+        </div>
+        <p class="aide">Numéro laissé vide → la base attribue automatiquement
+          le suivant (<code>ICM-B-AAAA-0001</code>).</p>
+      </fieldset>
+
+      <fieldset><legend>Mariage <small>(à remplir le jour venu)</small></legend>
+        <div class="grille">
+          <label>À <small>(lieu)</small><input type="text" id="f-lieu_mariage" maxlength="200"></label>
+          <label>Le<input type="date" id="f-date_mariage"></label>
+          <label>Avec <small>(conjoint)</small><input type="text" id="f-conjoint" maxlength="250"></label>
+          <label>N° du Registre (2)<input type="text" id="f-numero_registre_2" maxlength="80"
+            placeholder="Laisser vide → attribué automatiquement"></label>
+          <label>Célébrant<input type="text" id="f-celebrant_mariage" maxlength="150"></label>
+          <label>Signature (2)<input type="text" id="f-signature_2" maxlength="150"></label>
+        </div>
+      </fieldset>
+
+      <fieldset><legend>Observations</legend>
+        <label>Notes internes<textarea id="f-observations" rows="3"></textarea></label>
+      </fieldset>
+
+      <div class="actions-formulaire">
+        <button type="submit" class="bouton bouton-principal" id="btn-enregistrer">Enregistrer la carte</button>
+        <button type="button" class="bouton bouton-discret" id="btn-annuler">Annuler</button>
+      </div>
+    </form>
+  </section>
+</main>
+
+<footer class="pied" id="pied" hidden>
+  <span id="pied-eglise">In Christ Ministries</span> — Registre numérique · MVP
+</footer>
+
+<!-- ================= CARTE IMPRIMABLE ================= -->
+<div class="zone-carte" id="zone-carte" hidden>
+  <div class="barre-carte">
+    <p id="carte-titre"></p>
+    <button id="btn-fermer-carte">Retour au registre</button>
+    <button class="principal" onclick="window.print()">Imprimer / Enregistrer en PDF</button>
+  </div>
+
+  <section class="feuille">
+    <div class="volet"><div class="cadre cadre-nu">
+      <div class="ornement"><i></i></div>
+      <p class="verset">Car vous êtes tous fils de Dieu<br>par la foi en Jésus-Christ.<br>
+        Tous ceux qui avez été baptisés<br>en Christ, vous avez revêtu<br>Christ</p>
+      <p class="reference">Galates 3 : 26 - 27</p>
+      <div class="ornement"><i></i></div>
+    </div></div>
+    <div class="volet"><div class="cadre">
+      <div class="sigle-carte">ICM</div>
+      <h1 class="titre-carte" id="carte-intitule">CARTE<br>DE<br>BAPTÊME</h1>
+      <div class="ornement"><i></i></div>
+      <div class="croix">&#10013;</div>
+    </div></div>
+  </section>
+
+  <section class="feuille">
+    <div class="volet">
+      <div class="ligne"><span>Nom :</span><span class="valeur" id="c-nom"></span></div>
+      <div class="ligne"><span>Prénom :</span><span class="valeur" id="c-prenom"></span></div>
+      <div class="ligne"><span>Fils de :</span><span class="valeur" id="c-pere"></span></div>
+      <div class="ligne"><span>Et de :</span><span class="valeur" id="c-mere"></span></div>
+      <div class="ligne"><span>Né(e) le :</span><span class="valeur" id="c-naissance"></span></div>
+      <div class="ligne"><span>Baptisé(e) le :</span><span class="valeur" id="c-bapteme"></span></div>
+      <div class="ligne"><span>N° du Registre <em>(1)</em> :</span><span class="valeur" id="c-reg1"></span></div>
+      <div class="ligne"><span>Nationalité :</span><span class="valeur" id="c-nationalite"></span></div>
+      <div class="ligne"><span>Originaire de :</span><span class="valeur" id="c-origine"></span></div>
+      <p class="certifie">certifié exact.</p>
+      <p class="signature">Signature (1)<span id="c-sign1"></span></p>
+    </div>
+    <div class="volet">
+      <div class="zone-photo">
+        <div class="photo-carte">
+          <img id="c-photo" hidden alt="">
+          <span id="c-photo-vide">Photo</span>
+        </div>
+      </div>
+
+      <div class="centre"><span class="badge-mariage">Mariage</span></div>
+      <div class="ligne"><span>A :</span><span class="valeur" id="c-lieu-mariage"></span></div>
+      <div class="ligne"><span>Le :</span><span class="valeur" id="c-date-mariage"></span></div>
+      <div class="ligne"><span>Avec :</span><span class="valeur" id="c-conjoint"></span></div>
+      <div class="ligne"><span>N° du Registre <em>(2)</em> :</span><span class="valeur" id="c-reg2"></span></div>
+      <p class="signature">Signature (2)<span id="c-sign2"></span></p>
+    </div>
+  </section>
+</div>
+
+<!-- ==========================================================
+     Composant photo (identique a static/photo.js de la version Flask)
+     ========================================================== -->
+<script>
+/* ============================================================
+   ICM — Composant photo d'identité
+   Choix du fichier → recadrage manuel → compression automatique.
+
+   Aucune librairie externe. Fonctionne à la souris et au doigt.
+
+   Utilisation :
+     const blob = await PhotoICM.recadrer(fichier);   // null si annulé
+     const apercu = URL.createObjectURL(blob);
+
+   Le résultat est toujours un JPEG 600 × 800 (format identité 3/4),
+   d'environ 40 à 90 Ko, quelle que soit la taille de l'original.
+   ============================================================ */
+
+const PhotoICM = (function(){
+  "use strict";
+
+  const LARGEUR = 600, HAUTEUR = 800, QUALITE = 0.85;   // sortie
+  const VUE_L = 276, VUE_H = 368;                        // aperçu à l'écran
+  const TAILLE_MAX = 12 * 1024 * 1024;                   // 12 Mo à l'entrée
+
+  let modale = null, canvas = null, ctx = null, curseurZoom = null;
+  let image = null, base = 1, zoom = 1, tx = 0, ty = 0;
+  let resoudre = null;
+
+  /* ---------- Construction de la fenêtre (une seule fois) ---------- */
+  function construireModale(){
+    if (modale) return;
+
+    const style = document.createElement("style");
+    style.textContent = `
+      .icm-photo-fond{position:fixed;inset:0;background:rgba(18,32,58,.72);
+        display:flex;align-items:center;justify-content:center;z-index:200;padding:1rem;}
+      /* Sans cette règle, « display:flex » l'emporte sur l'attribut hidden
+         et la fenêtre fermée continue de couvrir la page. */
+      .icm-photo-fond[hidden]{display:none;}
+      .icm-photo-boite{background:#fff;border-radius:12px;padding:1.4rem;max-width:340px;
+        width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);font-family:inherit;}
+      .icm-photo-boite h2{margin:0 0 .3rem;font-size:1.05rem;color:#12203a;}
+      .icm-photo-boite p.aide{margin:0 0 1rem;font-size:.8rem;color:#41526e;}
+      .icm-photo-vue{width:${VUE_L}px;height:${VUE_H}px;margin:0 auto;border:2px solid #b8912f;
+        border-radius:4px;overflow:hidden;background:#eef1f6;cursor:grab;touch-action:none;}
+      .icm-photo-vue.attrape{cursor:grabbing;}
+      .icm-photo-vue canvas{display:block;}
+      .icm-photo-zoom{display:flex;align-items:center;gap:.6rem;margin:1rem 0 1.2rem;
+        font-size:.8rem;color:#41526e;}
+      .icm-photo-zoom input{flex:1;padding:0;border:0;background:transparent;}
+      .icm-photo-actions{display:flex;gap:.6rem;}
+      .icm-photo-actions button{flex:1;font:inherit;font-size:.88rem;font-weight:600;
+        padding:.6rem 1rem;border-radius:8px;cursor:pointer;border:1px solid #dde3ec;
+        background:#fff;color:#12203a;}
+      .icm-photo-actions .valider{background:#12203a;border-color:#12203a;color:#fff;}
+    `;
+    document.head.appendChild(style);
+
+    modale = document.createElement("div");
+    modale.className = "icm-photo-fond";
+    modale.hidden = true;
+    modale.innerHTML = `
+      <div class="icm-photo-boite" role="dialog" aria-modal="true">
+        <h2>Recadrer la photo</h2>
+        <p class="aide">Faites glisser l'image pour centrer le visage,
+          puis ajustez le zoom.</p>
+        <div class="icm-photo-vue"><canvas width="${VUE_L}" height="${VUE_H}"></canvas></div>
+        <div class="icm-photo-zoom">
+          <span>Zoom</span>
+          <input type="range" min="100" max="400" value="100" step="1">
+        </div>
+        <div class="icm-photo-actions">
+          <button type="button" class="annuler">Annuler</button>
+          <button type="button" class="valider">Valider la photo</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modale);
+
+    canvas      = modale.querySelector("canvas");
+    ctx         = canvas.getContext("2d");
+    curseurZoom = modale.querySelector('input[type=range]');
+    const vue   = modale.querySelector(".icm-photo-vue");
+
+    /* --- Zoom --- */
+    curseurZoom.addEventListener("input", ()=>{
+      const centreX = (VUE_L/2 - tx) / zoom;      // garder le centre de la vue
+      const centreY = (VUE_H/2 - ty) / zoom;
+      zoom = curseurZoom.value / 100;
+      tx = VUE_L/2 - centreX * zoom;
+      ty = VUE_H/2 - centreY * zoom;
+      contraindre(); dessiner();
+    });
+    vue.addEventListener("wheel", (e)=>{
+      e.preventDefault();
+      const pas = e.deltaY < 0 ? 8 : -8;
+      curseurZoom.value = Math.min(400, Math.max(100, Number(curseurZoom.value) + pas));
+      curseurZoom.dispatchEvent(new Event("input"));
+    }, { passive:false });
+
+    /* --- Déplacement (souris et doigt) --- */
+    let attrape = false, departX = 0, departY = 0;
+    vue.addEventListener("pointerdown", (e)=>{
+      attrape = true; departX = e.clientX - tx; departY = e.clientY - ty;
+      vue.classList.add("attrape"); vue.setPointerCapture(e.pointerId);
+    });
+    vue.addEventListener("pointermove", (e)=>{
+      if(!attrape) return;
+      tx = e.clientX - departX; ty = e.clientY - departY;
+      contraindre(); dessiner();
+    });
+    const relacher = (e)=>{
+      attrape = false; vue.classList.remove("attrape");
+      try{ vue.releasePointerCapture(e.pointerId); }catch(err){}
+    };
+    vue.addEventListener("pointerup", relacher);
+    vue.addEventListener("pointercancel", relacher);
+
+    /* --- Boutons --- */
+    modale.querySelector(".annuler").addEventListener("click", ()=>fermer(null));
+    modale.querySelector(".valider").addEventListener("click", produire);
+    modale.addEventListener("click", (e)=>{ if(e.target === modale) fermer(null); });
+    document.addEventListener("keydown", (e)=>{
+      if(!modale.hidden && e.key === "Escape") fermer(null);
+    });
+  }
+
+  /* ---------- Affichage ---------- */
+  function contraindre(){
+    const l = image.width * base * zoom, h = image.height * base * zoom;
+    tx = Math.min(0, Math.max(VUE_L - l, tx));
+    ty = Math.min(0, Math.max(VUE_H - h, ty));
+  }
+
+  function dessiner(){
+    ctx.fillStyle = "#eef1f6";
+    ctx.fillRect(0, 0, VUE_L, VUE_H);
+    ctx.drawImage(image, tx, ty,
+      image.width * base * zoom, image.height * base * zoom);
+  }
+
+  /* ---------- Lecture du fichier (orientation EXIF respectée) ---------- */
+  async function lireImage(fichier){
+    if (typeof createImageBitmap === "function"){
+      try{ return await createImageBitmap(fichier, { imageOrientation:"from-image" }); }
+      catch(e){ /* navigateur ancien : on retombe sur <img> */ }
+    }
+    return await new Promise((ok, ko)=>{
+      const url = URL.createObjectURL(fichier);
+      const img = new Image();
+      img.onload  = ()=>{ URL.revokeObjectURL(url); ok(img); };
+      img.onerror = ()=>{ URL.revokeObjectURL(url); ko(new Error("Image illisible.")); };
+      img.src = url;
+    });
+  }
+
+  /* ---------- Production du JPEG final ---------- */
+  function produire(){
+    const echelle = base * zoom;
+    const sortie = document.createElement("canvas");
+    sortie.width = LARGEUR; sortie.height = HAUTEUR;
+    const c = sortie.getContext("2d");
+    c.fillStyle = "#fff"; c.fillRect(0, 0, LARGEUR, HAUTEUR);
+    c.imageSmoothingQuality = "high";
+    c.drawImage(image,
+      -tx / echelle, -ty / echelle, VUE_L / echelle, VUE_H / echelle,
+      0, 0, LARGEUR, HAUTEUR);
+    sortie.toBlob((blob)=>fermer(blob), "image/jpeg", QUALITE);
+  }
+
+  function fermer(resultat){
+    modale.hidden = true;
+    if (image && image.close) { try{ image.close(); }catch(e){} }
+    image = null;
+    const f = resoudre; resoudre = null;
+    if (f) f(resultat);
+  }
+
+  /* ---------- Point d'entrée ---------- */
+  async function recadrer(fichier){
+    if (!fichier) return null;
+    if (!/^image\//.test(fichier.type))
+      throw new Error("Ce fichier n'est pas une image.");
+    if (fichier.size > TAILLE_MAX)
+      throw new Error("Image trop lourde (maximum 12 Mo). Réduisez-la avant de l'envoyer.");
+
+    construireModale();
+    image = await lireImage(fichier);
+
+    base = Math.max(VUE_L / image.width, VUE_H / image.height);
+    zoom = 1;
+    tx = (VUE_L - image.width  * base) / 2;
+    ty = (VUE_H - image.height * base) / 2;
+    curseurZoom.value = 100;
+
+    contraindre(); dessiner();
+    modale.hidden = false;
+
+    return new Promise((ok)=>{ resoudre = ok; });
+  }
+
+  /* Convertit un blob en « data URL » (utilisé par la version Flask) */
+  function versDataUrl(blob){
+    return new Promise((ok, ko)=>{
+      const lecteur = new FileReader();
+      lecteur.onload  = ()=>ok(lecteur.result);
+      lecteur.onerror = ()=>ko(new Error("Lecture impossible."));
+      lecteur.readAsDataURL(blob);
+    });
+  }
+
+  return { recadrer, versDataUrl, LARGEUR, HAUTEUR };
+})();
+</script>
+
+<script>
+"use strict";
+
+/* ==========================================================
+   1. ÉTAT ET RÉGLAGES
+   ========================================================== */
+const CHAMPS = ["nom","prenom","nom_pere","nom_mere","date_naissance","nationalite",
+  "originaire_de","date_bapteme","lieu_bapteme","numero_registre_1","celebrant_bapteme",
+  "signature_1","lieu_mariage","date_mariage","conjoint","numero_registre_2",
+  "celebrant_mariage","signature_2","telephone","observations"];
+
+const PAR_PAGE = 20;
+const SEAU_PHOTOS = "photos";        // nom du bucket créé par le script SQL
+
+const etat = {
+  config:null, session:null, page:1, total:0, q:"", filtre:"", lignes:[],
+  // Photo en cours d'édition dans le formulaire
+  photo: { chemin:null, blob:null, retiree:false }
+};
+
+/* Stockage local : entouré de try/catch (navigation privée, fichier local…) */
+const stockage = {
+  lire(cle){ try{ return localStorage.getItem(cle); }catch(e){ return null; } },
+  ecrire(cle,val){ try{ localStorage.setItem(cle,val); }catch(e){} },
+  effacer(cle){ try{ localStorage.removeItem(cle); }catch(e){} }
+};
+
+function chargerConfig(){
+  if (CONFIG_PAR_DEFAUT.url && CONFIG_PAR_DEFAUT.cle) return {...CONFIG_PAR_DEFAUT};
+  const brut = stockage.lire("icm_config");
+  if (brut){ try{ return JSON.parse(brut); }catch(e){} }
+  return null;
+}
+function enregistrerConfig(cfg){
+  etat.config = cfg;
+  stockage.ecrire("icm_config", JSON.stringify(cfg));
+}
+
+/* ==========================================================
+   2. OUTILS D'AFFICHAGE
+   ========================================================== */
+const $ = (id)=>document.getElementById(id);
+
+/* Un jeton évite qu'un ancien message de succès, effacé après 4 s,
+   ne fasse disparaître un message plus récent affiché entre-temps. */
+let jetonMessage = 0;
+
+function message(texte, type="info"){
+  const jeton = ++jetonMessage;
+  $("zone-message").innerHTML =
+    `<div class="message message-${type}">${echapper(texte)}</div>`;
+  if (type === "succes"){
+    setTimeout(()=>{ if (jeton === jetonMessage) $("zone-message").innerHTML=""; }, 4000);
+  }
+  window.scrollTo({top:0, behavior:"smooth"});
+}
+function effacerMessage(){ jetonMessage++; $("zone-message").innerHTML=""; }
+
+function echapper(s){
+  return String(s ?? "").replace(/[&<>"']/g,
+    c=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+}
+function dateFr(iso){
+  if(!iso) return "";
+  const [a,m,j] = String(iso).slice(0,10).split("-");
+  return (a&&m&&j) ? `${j}/${m}/${a}` : "";
+}
+
+function afficherVue(nom){
+  ["reglages","connexion","liste","formulaire"].forEach(v=>{
+    $("vue-"+v).hidden = (v !== nom);
+  });
+  const connecte = !!etat.session;
+  $("entete").hidden = !connecte;
+  $("pied").hidden   = !connecte;
+  effacerMessage();
+}
+
+/* ==========================================================
+   3. APPELS À SUPABASE (API REST — aucune librairie externe)
+   ========================================================== */
+function enteteAuth(extra={}){
+  return Object.assign({
+    "apikey": etat.config.cle,
+    "Authorization": "Bearer " + (etat.session ? etat.session.access_token : etat.config.cle),
+    "Content-Type": "application/json"
+  }, extra);
+}
+
+async function seConnecter(email, motDePasse){
+  const r = await fetch(`${etat.config.url}/auth/v1/token?grant_type=password`, {
+    method:"POST",
+    headers:{ "apikey":etat.config.cle, "Content-Type":"application/json" },
+    body: JSON.stringify({ email, password: motDePasse })
+  });
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error_description || data.msg || data.message
+      || "Identifiants refusés.");
+  return data;
+}
+
+async function rafraichirSession(){
+  const refresh = etat.session && etat.session.refresh_token;
+  if (!refresh) return false;
+  try{
+    const r = await fetch(`${etat.config.url}/auth/v1/token?grant_type=refresh_token`, {
+      method:"POST",
+      headers:{ "apikey":etat.config.cle, "Content-Type":"application/json" },
+      body: JSON.stringify({ refresh_token: refresh })
+    });
+    if(!r.ok) return false;
+    const data = await r.json();
+    etat.session = data;
+    stockage.ecrire("icm_session", JSON.stringify(data));
+    return true;
+  }catch(e){ return false; }
+}
+
+/* Appel générique à la table registre. Réessaie une fois après
+   rafraîchissement du jeton si celui-ci a expiré. */
+async function api(chemin, options={}, deuxiemeEssai=false){
+  const r = await fetch(`${etat.config.url}/rest/v1/${chemin}`, {
+    method: options.method || "GET",
+    headers: enteteAuth(options.headers || {}),
+    body: options.body ? JSON.stringify(options.body) : undefined
+  });
+
+  if (r.status === 401 && !deuxiemeEssai && await rafraichirSession())
+    return api(chemin, options, true);
+
+  if (r.status === 401){ deconnexion("Session expirée, reconnectez-vous."); throw new Error("401"); }
+
+  if (!r.ok){
+    let detail = "";
+    try{ const j = await r.json(); detail = j.message || j.hint || j.details || ""; }catch(e){}
+    if (/duplicate key|unique/i.test(detail))
+      throw new Error("Ce numéro de registre est déjà utilisé par une autre carte.");
+    if (/violates check constraint/i.test(detail))
+      throw new Error("Dates incohérentes : le baptême ou le mariage précède la naissance.");
+    if (/row-level security/i.test(detail))
+      throw new Error("Accès refusé par la base. Vérifiez que le script SQL "
+        + "(politiques RLS) a bien été exécuté dans Supabase.");
+    throw new Error(detail || `Erreur ${r.status}.`);
+  }
+
+  const intervalle = r.headers.get("content-range");   // ex. "0-19/143"
+  const total = intervalle ? parseInt(intervalle.split("/")[1], 10) : null;
+  const texte = await r.text();
+  return { donnees: texte ? JSON.parse(texte) : null, total: isNaN(total) ? null : total };
+}
+
+/* ==========================================================
+   3 bis. PHOTOS — espace de stockage Supabase
+   ----------------------------------------------------------
+   La base ne contient que le chemin du fichier. L'image vit dans
+   le bucket « photos », qui est privé : on demande un lien
+   temporaire (1 h) à chaque affichage.
+   ========================================================== */
+const cachePhotos = new Map();       // chemin -> { url, expire }
+
+async function envoyerPhoto(blob){
+  const chemin = `fideles/${(crypto.randomUUID
+      ? crypto.randomUUID()
+      : Date.now() + "-" + Math.random().toString(16).slice(2))}.jpg`;
+
+  const r = await fetch(
+    `${etat.config.url}/storage/v1/object/${SEAU_PHOTOS}/${chemin}`, {
+      method:"POST",
+      headers:{
+        "apikey": etat.config.cle,
+        "Authorization": "Bearer " + etat.session.access_token,
+        "Content-Type": "image/jpeg",
+        "x-upsert": "true"
+      },
+      body: blob
+    });
+
+  if (!r.ok){
+    let detail = "";
+    try{ const j = await r.json(); detail = j.message || j.error || ""; }catch(e){}
+    if (r.status === 404 || /not.*found|bucket/i.test(detail))
+      throw new Error("L'espace de stockage « photos » est introuvable. "
+        + "Exécutez database/migration_01_photo.sql dans Supabase, "
+        + "ou créez le bucket « photos » dans l'onglet Storage.");
+    if (/row-level security|policy|unauthorized/i.test(detail) || r.status === 403)
+      throw new Error("Envoi de la photo refusé par la base. Vérifiez les "
+        + "règles d'accès du bucket « photos » (script SQL de migration).");
+    throw new Error(detail || `Envoi de la photo impossible (erreur ${r.status}).`);
+  }
+  return chemin;
+}
+
+async function supprimerPhoto(chemin){
+  if (!chemin) return;
+  cachePhotos.delete(chemin);
+  try{
+    await fetch(`${etat.config.url}/storage/v1/object/${SEAU_PHOTOS}/${chemin}`, {
+      method:"DELETE",
+      headers:{ "apikey":etat.config.cle,
+                "Authorization":"Bearer " + etat.session.access_token }
+    });
+  }catch(e){ /* une image orpheline n'empêche pas de travailler */ }
+}
+
+/* Demande en une seule fois les liens temporaires de plusieurs photos. */
+async function liensPhotos(chemins){
+  const maintenant = Date.now();
+  const manquants = chemins.filter(c=>{
+    const e = cachePhotos.get(c);
+    return !e || e.expire < maintenant;
+  });
+
+  if (manquants.length){
+    try{
+      const r = await fetch(
+        `${etat.config.url}/storage/v1/object/sign/${SEAU_PHOTOS}`, {
+          method:"POST",
+          headers:{ "apikey":etat.config.cle,
+                    "Authorization":"Bearer " + etat.session.access_token,
+                    "Content-Type":"application/json" },
+          body: JSON.stringify({ expiresIn: 3600, paths: manquants })
+        });
+      if (r.ok){
+        const liste = await r.json();
+        (Array.isArray(liste) ? liste : []).forEach(item=>{
+          if (item && item.signedURL && !item.error){
+            cachePhotos.set(item.path, {
+              url: etat.config.url + "/storage/v1" + item.signedURL,
+              expire: maintenant + 55 * 60 * 1000     // marge avant expiration
+            });
+          }
+        });
+      }
+    }catch(e){ /* les vignettes manquantes ne bloquent rien */ }
+  }
+
+  const resultat = {};
+  chemins.forEach(c=>{
+    const e = cachePhotos.get(c);
+    if (e) resultat[c] = e.url;
+  });
+  return resultat;
+}
+
+/* ==========================================================
+   4. LISTE, RECHERCHE, STATISTIQUES
+   ========================================================== */
+function construireRequete(){
+  const params = new URLSearchParams();
+  params.set("select", "*");
+  params.set("order", "nom.asc,prenom.asc");
+
+  if (etat.q){
+    // les caractères , ( ) * cassent la syntaxe PostgREST : on les retire
+    const motif = "*" + etat.q.replace(/[,()*"\\]/g, " ").trim() + "*";
+    params.set("or",
+      `(nom.ilike.${motif},prenom.ilike.${motif},numero_registre_1.ilike.${motif},`
+      + `numero_registre_2.ilike.${motif},conjoint.ilike.${motif})`);
+  }
+  if (etat.filtre === "bapteme")   params.set("date_bapteme", "not.is.null");
+  if (etat.filtre === "mariage")   params.set("date_mariage", "not.is.null");
+  if (etat.filtre === "incomplet") params.set("date_bapteme", "is.null");
+
+  return params;
+}
+
+async function chargerListe(){
+  const params = construireRequete();
+  const debut = (etat.page - 1) * PAR_PAGE;
+  const fin   = debut + PAR_PAGE - 1;
+
+  try{
+    const { donnees, total } = await api(`registre?${params}`, {
+      headers:{ "Range-Unit":"items", "Range":`${debut}-${fin}`, "Prefer":"count=exact" }
+    });
+    etat.lignes = donnees || [];
+    etat.total  = total ?? etat.lignes.length;
+    dessinerTableau();
+    chargerStatistiques();
+  }catch(e){ message(e.message, "erreur"); }
+}
+
+async function chargerStatistiques(){
+  try{
+    const compter = async (filtre)=>{
+      const { total } = await api(`registre?select=id${filtre}`, {
+        headers:{ "Range-Unit":"items", "Range":"0-0", "Prefer":"count=exact" }
+      });
+      return total ?? 0;
+    };
+    $("stat-total").textContent    = await compter("");
+    $("stat-baptemes").textContent = await compter("&date_bapteme=not.is.null");
+    $("stat-mariages").textContent = await compter("&date_mariage=not.is.null");
+  }catch(e){ /* statistiques non bloquantes */ }
+}
+
+function dessinerTableau(){
+  const corps = $("corps-tableau");
+  const pages = Math.max(Math.ceil(etat.total / PAR_PAGE), 1);
+
+  if (!etat.lignes.length){
+    corps.innerHTML = "";
+    document.querySelector(".tableau-enveloppe").hidden = true;
+    $("pagination").hidden = true;
+    $("zone-vide").innerHTML = (etat.q || etat.filtre)
+      ? `<div class="vide"><p>Aucun enregistrement ne correspond à cette recherche.</p></div>`
+      : `<div class="vide"><p>Le registre est encore vide.</p></div>`;
+    return;
+  }
+
+  document.querySelector(".tableau-enveloppe").hidden = false;
+  $("zone-vide").innerHTML = "";
+
+  corps.innerHTML = etat.lignes.map(r=>`
+    <tr>
+      <td><div class="cellule-identite">
+        ${ r.photo
+            ? `<img class="vignette" data-photo="${echapper(r.photo)}" alt="">`
+            : `<span class="vignette-absente" title="Aucune photo"></span>` }
+        <div><strong>${echapper(r.nom)}</strong> ${echapper(r.prenom)}
+          ${r.originaire_de ? `<br><small class="discret">${echapper(r.originaire_de)}</small>` : ""}
+        </div></div></td>
+      <td>${dateFr(r.date_naissance) || "—"}</td>
+      <td>${ r.date_bapteme
+              ? dateFr(r.date_bapteme) + (r.lieu_bapteme
+                  ? `<br><small class="discret">${echapper(r.lieu_bapteme)}</small>` : "")
+              : `<span class="etiquette">à compléter</span>` }</td>
+      <td><code>${echapper(r.numero_registre_1 || "—")}</code></td>
+      <td>${ r.date_mariage
+              ? dateFr(r.date_mariage)
+                + `<br><small class="discret"><code>${echapper(r.numero_registre_2||"—")}</code></small>`
+              : "—" }</td>
+      <td>${echapper(r.conjoint || "—")}</td>
+      <td class="col-actions">
+        <button class="bouton bouton-petit" data-action="carte"     data-id="${r.id}">Carte</button>
+        <button class="bouton bouton-petit" data-action="modifier"  data-id="${r.id}">Modifier</button>
+        <button class="bouton bouton-petit bouton-danger" data-action="supprimer" data-id="${r.id}">Supprimer</button>
+      </td>
+    </tr>`).join("");
+
+  $("pagination").hidden = pages <= 1;
+  $("info-page").textContent = `Page ${etat.page} sur ${pages}`;
+  $("btn-precedent").disabled = etat.page <= 1;
+  $("btn-suivant").disabled   = etat.page >= pages;
+
+  chargerVignettes();
+}
+
+/* Les vignettes arrivent après le tableau : elles ne doivent pas
+   retarder l'affichage du registre. */
+async function chargerVignettes(){
+  const images = Array.from(document.querySelectorAll("#corps-tableau img[data-photo]"));
+  if (!images.length) return;
+  const liens = await liensPhotos([...new Set(images.map(i=>i.dataset.photo))]);
+  images.forEach(i=>{ if (liens[i.dataset.photo]) i.src = liens[i.dataset.photo]; });
+}
+
+/* ==========================================================
+   5. FORMULAIRE
+   ========================================================== */
+function ouvrirFormulaire(record){
+  $("champ-id").value = record ? record.id : "";
+  CHAMPS.forEach(c=>{ $("f-"+c).value = record ? (record[c] ?? "") : ""; });
+  $("titre-formulaire").textContent = record
+    ? `Modifier la carte — ${record.nom} ${record.prenom}` : "Nouvelle carte";
+  $("btn-enregistrer").textContent = record
+    ? "Enregistrer les modifications" : "Enregistrer la carte";
+
+  reinitialiserPhoto(record ? record.photo : null);
+  afficherVue("formulaire");
+}
+
+/* ---------- Volet photo du formulaire ---------- */
+function reinitialiserPhoto(chemin){
+  etat.photo = { chemin: chemin || null, blob:null, retiree:false };
+  const apercu = $("photo-apercu");
+  if (apercu.dataset.objectUrl){
+    URL.revokeObjectURL(apercu.dataset.objectUrl);
+    delete apercu.dataset.objectUrl;
+  }
+  apercu.hidden = true; apercu.removeAttribute("src");
+  $("photo-vide").hidden = false;
+  $("photo-retirer").hidden = true;
+  $("photo-choisir").textContent = "Choisir une photo";
+  $("photo-etat").textContent = "";
+
+  if (chemin){
+    $("photo-etat").textContent = "Chargement de la photo…";
+    liensPhotos([chemin]).then(liens=>{
+      // la fiche a pu changer entre-temps
+      if (etat.photo.chemin !== chemin || etat.photo.blob) return;
+      if (liens[chemin]) montrerPhoto(liens[chemin], "Photo enregistrée.");
+      else $("photo-etat").textContent = "Photo introuvable dans le stockage.";
+    });
+  }
+}
+
+function montrerPhoto(source, texte){
+  const apercu = $("photo-apercu");
+  apercu.src = source; apercu.hidden = false;
+  $("photo-vide").hidden = true;
+  $("photo-retirer").hidden = false;
+  $("photo-choisir").textContent = "Remplacer la photo";
+  $("photo-etat").textContent = texte || "";
+}
+
+function lireFormulaire(){
+  const d = {};
+  CHAMPS.forEach(c=>{ d[c] = $("f-"+c).value.trim() || null; });
+  return d;
+}
+
+function validerFormulaire(d){
+  const erreurs = [];
+  if (!d.nom)    erreurs.push("Le nom est obligatoire.");
+  if (!d.prenom) erreurs.push("Le prénom est obligatoire.");
+  const aujourdhui = new Date().toISOString().slice(0,10);
+  [["naissance","date_naissance"],["baptême","date_bapteme"],["mariage","date_mariage"]]
+    .forEach(([libelle,champ])=>{
+      if (d[champ] && d[champ] > aujourdhui)
+        erreurs.push(`La date de ${libelle} ne peut pas être dans le futur.`);
+    });
+  if (d.date_naissance && d.date_bapteme && d.date_bapteme < d.date_naissance)
+    erreurs.push("Le baptême ne peut pas précéder la naissance.");
+  if (d.date_naissance && d.date_mariage && d.date_mariage < d.date_naissance)
+    erreurs.push("Le mariage ne peut pas précéder la naissance.");
+  return erreurs;
+}
+
+async function soumettreFormulaire(evt){
+  evt.preventDefault();
+  const donnees = lireFormulaire();
+  const erreurs = validerFormulaire(donnees);
+  if (erreurs.length){ message(erreurs.join(" "), "erreur"); return; }
+
+  const id = $("champ-id").value;
+  const bouton = $("btn-enregistrer");
+  bouton.disabled = true;
+
+  const ancienneP = etat.photo.chemin;
+  let nouvelleP = null;              // à effacer si l'enregistrement échoue
+
+  try{
+    // 1. La photo part en premier : inutile d'écrire la fiche si l'envoi échoue.
+    if (etat.photo.blob){
+      $("photo-etat").textContent = "Envoi de la photo…";
+      nouvelleP = await envoyerPhoto(etat.photo.blob);
+      donnees.photo = nouvelleP;
+    }else if (etat.photo.retiree){
+      donnees.photo = null;
+    }else{
+      donnees.photo = ancienneP || null;
+    }
+
+    // 2. Puis la fiche.
+    if (id){
+      await api(`registre?id=eq.${encodeURIComponent(id)}`,
+        { method:"PATCH", body:donnees, headers:{ "Prefer":"return=representation" } });
+      message(`Carte de ${donnees.nom} ${donnees.prenom} mise à jour.`, "succes");
+    }else{
+      await api("registre",
+        { method:"POST", body:donnees, headers:{ "Prefer":"return=representation" } });
+      message(`Carte de ${donnees.nom} ${donnees.prenom} enregistrée.`, "succes");
+    }
+
+    // 3. L'ancienne image n'est effacée qu'une fois la fiche écrite.
+    if (ancienneP && ancienneP !== donnees.photo) await supprimerPhoto(ancienneP);
+
+    afficherVue("liste");
+    await chargerListe();
+  }catch(e){
+    if (nouvelleP) await supprimerPhoto(nouvelleP);   // pas d'image orpheline
+    message(e.message, "erreur");
+  }finally{
+    bouton.disabled = false;
+  }
+}
+
+async function supprimer(id){
+  const r = etat.lignes.find(x=>x.id===id);
+  if (!confirm(`Supprimer définitivement la carte de ${r.nom} ${r.prenom} ?`)) return;
+  try{
+    await api(`registre?id=eq.${encodeURIComponent(id)}`, { method:"DELETE" });
+    if (r.photo) await supprimerPhoto(r.photo);   // la fiche partie, l'image aussi
+    message(`Carte de ${r.nom} ${r.prenom} supprimée.`, "succes");
+    await chargerListe();
+  }catch(e){ message(e.message, "erreur"); }
+}
+
+/* ==========================================================
+   6. CARTE IMPRIMABLE
+   ========================================================== */
+function afficherCarte(r){
+  $("carte-titre").innerHTML = `<strong>${echapper(r.nom)} ${echapper(r.prenom)}</strong> — aperçu de la carte`;
+  $("carte-intitule").innerHTML = r.date_mariage
+    ? "CARTE<br>DE<br>BAPTÊME<br>&amp; MARIAGE" : "CARTE<br>DE<br>BAPTÊME";
+  const mettre = (id, valeur)=>{ $(id).textContent = valeur || ""; };
+  mettre("c-nom", r.nom);                       mettre("c-prenom", r.prenom);
+  mettre("c-pere", r.nom_pere);                 mettre("c-mere", r.nom_mere);
+  mettre("c-naissance", dateFr(r.date_naissance));
+  mettre("c-bapteme", dateFr(r.date_bapteme));  mettre("c-reg1", r.numero_registre_1);
+  mettre("c-nationalite", r.nationalite);       mettre("c-origine", r.originaire_de);
+  mettre("c-sign1", r.signature_1 || r.celebrant_bapteme);
+  mettre("c-lieu-mariage", r.lieu_mariage);     mettre("c-date-mariage", dateFr(r.date_mariage));
+  mettre("c-conjoint", r.conjoint);             mettre("c-reg2", r.numero_registre_2);
+  mettre("c-sign2", r.signature_2 || r.celebrant_mariage);
+
+  const img = $("c-photo");
+  img.hidden = true; img.removeAttribute("src");
+  $("c-photo-vide").hidden = false;
+  if (r.photo){
+    liensPhotos([r.photo]).then(liens=>{
+      if (!liens[r.photo]) return;
+      img.src = liens[r.photo]; img.hidden = false;
+      $("c-photo-vide").hidden = true;
+    });
+  }
+
+  $("zone-carte").hidden = false;
+}
+
+/* ==========================================================
+   7. EXPORT CSV (ouvrable dans Excel)
+   ========================================================== */
+const COLONNES_EXPORT = [
+  ["nom","Nom"],["prenom","Prénom"],["nom_pere","Fils/Fille de"],["nom_mere","Et de"],
+  ["date_naissance","Date de naissance"],["nationalite","Nationalité"],
+  ["originaire_de","Originaire de"],["date_bapteme","Date de baptême"],
+  ["lieu_bapteme","Lieu du baptême"],["numero_registre_1","N° Registre (1)"],
+  ["celebrant_bapteme","Célébrant baptême"],["signature_1","Signature (1)"],
+  ["lieu_mariage","Lieu du mariage"],["date_mariage","Date du mariage"],
+  ["conjoint","Conjoint"],["numero_registre_2","N° Registre (2)"],
+  ["celebrant_mariage","Célébrant mariage"],["signature_2","Signature (2)"],
+  ["telephone","Téléphone"],["observations","Observations"],
+  ["photo","Fichier photo"]
+];
+
+async function exporterCsv(){
+  try{
+    message("Préparation de l'export…", "info");
+    const { donnees } = await api("registre?select=*&order=nom.asc,prenom.asc", {
+      headers:{ "Range-Unit":"items", "Range":"0-9999" }
+    });
+
+    const cellule = (v)=>{
+      const s = String(v ?? "").replace(/"/g, '""');
+      return /[";\n]/.test(s) ? `"${s}"` : s;
+    };
+    const lignes = [COLONNES_EXPORT.map(c=>cellule(c[1])).join(";")];
+    (donnees||[]).forEach(r=>{
+      lignes.push(COLONNES_EXPORT.map(([champ])=>{
+        const v = r[champ];
+        return cellule(champ.startsWith("date_") ? dateFr(v) : v);
+      }).join(";"));
+    });
+
+    const blob = new Blob(["\uFEFF" + lignes.join("\r\n")],
+      { type:"text/csv;charset=utf-8;" });
+    const lien = document.createElement("a");
+    lien.href = URL.createObjectURL(blob);
+    lien.download = `registre_icm_${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(lien); lien.click(); lien.remove();
+    setTimeout(()=>URL.revokeObjectURL(lien.href), 2000);
+    message(`Export de ${(donnees||[]).length} enregistrement(s) terminé.`, "succes");
+  }catch(e){ message(e.message, "erreur"); }
+}
+
+/* ==========================================================
+   8. SESSION
+   ========================================================== */
+function deconnexion(raison){
+  etat.session = null;
+  stockage.effacer("icm_session");
+  afficherVue("connexion");
+  if (raison) message(raison, "info");
+}
+
+function appliquerNomEglise(){
+  const nom = (etat.config && etat.config.eglise) || "In Christ Ministries";
+  $("nom-eglise").textContent = nom;
+  $("pied-eglise").textContent = nom;
+  $("titre-connexion").textContent = nom;
+}
+
+/* ==========================================================
+   9. ÉVÉNEMENTS
+   ========================================================== */
+document.addEventListener("DOMContentLoaded", ()=>{
+
+  // --- Réglages
+  $("form-reglages").addEventListener("submit", (e)=>{
+    e.preventDefault();
+    const url = $("cfg-url").value.trim().replace(/\/+$/, "");
+    const cle = $("cfg-cle").value.trim();
+    if (!/^https:\/\/.+/.test(url)){
+      message("L'URL doit commencer par https://", "erreur"); return;
+    }
+    enregistrerConfig({ url, cle, eglise: $("cfg-eglise").value.trim() || "In Christ Ministries" });
+    appliquerNomEglise();
+    afficherVue(etat.session ? "liste" : "connexion");
+    message("Connexion à la base enregistrée.", "succes");
+  });
+  $("lien-reglages").addEventListener("click", (e)=>{
+    e.preventDefault();
+    if (etat.config){
+      $("cfg-url").value = etat.config.url;
+      $("cfg-cle").value = etat.config.cle;
+      $("cfg-eglise").value = etat.config.eglise || "";
+    }
+    afficherVue("reglages");
+  });
+
+  // --- Connexion
+  $("form-connexion").addEventListener("submit", async (e)=>{
+    e.preventDefault();
+    const bouton = e.target.querySelector("button");
+    bouton.disabled = true;
+    try{
+      etat.session = await seConnecter($("login-email").value.trim(), $("login-mdp").value);
+      stockage.ecrire("icm_session", JSON.stringify(etat.session));
+      $("etiquette-utilisateur").textContent =
+        (etat.session.user && etat.session.user.email) || "";
+      $("login-mdp").value = "";
+      afficherVue("liste");
+      await chargerListe();
+    }catch(err){ message(err.message, "erreur"); }
+    finally{ bouton.disabled = false; }
+  });
+  $("btn-deconnexion").addEventListener("click", ()=>deconnexion("Vous êtes déconnecté."));
+
+  // --- Navigation
+  document.querySelectorAll("[data-vue]").forEach(b=>{
+    b.addEventListener("click", ()=>{
+      const vue = b.dataset.vue;
+      if (vue === "formulaire") ouvrirFormulaire(null);
+      else if (vue === "reglages"){ $("lien-reglages").click(); }
+      else { afficherVue(vue); chargerListe(); }
+    });
+  });
+  $("btn-nouveau-2").addEventListener("click", ()=>ouvrirFormulaire(null));
+  $("btn-annuler").addEventListener("click", ()=>{ afficherVue("liste"); chargerListe(); });
+  $("btn-export").addEventListener("click", exporterCsv);
+
+  // --- Recherche
+  $("form-recherche").addEventListener("submit", (e)=>{
+    e.preventDefault();
+    etat.q = $("recherche").value.trim();
+    etat.filtre = $("filtre").value;
+    etat.page = 1;
+    chargerListe();
+  });
+  $("btn-reinit").addEventListener("click", ()=>{
+    $("recherche").value = ""; $("filtre").value = "";
+    etat.q = ""; etat.filtre = ""; etat.page = 1;
+    chargerListe();
+  });
+  $("btn-precedent").addEventListener("click", ()=>{ etat.page--; chargerListe(); });
+  $("btn-suivant").addEventListener("click",   ()=>{ etat.page++; chargerListe(); });
+
+  // --- Actions du tableau
+  $("corps-tableau").addEventListener("click", (e)=>{
+    const b = e.target.closest("button[data-action]");
+    if (!b) return;
+    const r = etat.lignes.find(x=>x.id === b.dataset.id);
+    if (!r) return;
+    if (b.dataset.action === "carte")     afficherCarte(r);
+    if (b.dataset.action === "modifier")  ouvrirFormulaire(r);
+    if (b.dataset.action === "supprimer") supprimer(r.id);
+  });
+
+  // --- Volet photo
+  $("photo-choisir").addEventListener("click", ()=>$("photo-fichier").click());
+
+  $("photo-fichier").addEventListener("change", async ()=>{
+    const entree = $("photo-fichier");
+    const f = entree.files && entree.files[0];
+    entree.value = "";                       // permet de rechoisir le même fichier
+    if (!f) return;
+    $("photo-etat").textContent = "";
+    try{
+      const blob = await PhotoICM.recadrer(f);
+      if (!blob) return;                     // recadrage annulé
+      const apercu = $("photo-apercu");
+      if (apercu.dataset.objectUrl) URL.revokeObjectURL(apercu.dataset.objectUrl);
+      const url = URL.createObjectURL(blob);
+      apercu.dataset.objectUrl = url;
+      etat.photo.blob = blob;
+      etat.photo.retiree = false;
+      montrerPhoto(url, `Photo prête (${Math.round(blob.size/1024)} Ko) — `
+        + `elle sera envoyée à l'enregistrement.`);
+    }catch(err){ $("photo-etat").textContent = err.message; }
+  });
+
+  $("photo-retirer").addEventListener("click", ()=>{
+    const apercu = $("photo-apercu");
+    if (apercu.dataset.objectUrl){
+      URL.revokeObjectURL(apercu.dataset.objectUrl);
+      delete apercu.dataset.objectUrl;
+    }
+    apercu.hidden = true; apercu.removeAttribute("src");
+    $("photo-vide").hidden = false;
+    $("photo-retirer").hidden = true;
+    $("photo-choisir").textContent = "Choisir une photo";
+    etat.photo.blob = null;
+    etat.photo.retiree = true;
+    $("photo-etat").textContent = "La photo sera retirée à l'enregistrement.";
+  });
+
+  // --- Formulaire
+  $("form-carte").addEventListener("submit", soumettreFormulaire);
+  $("btn-fermer-carte").addEventListener("click", ()=>{ $("zone-carte").hidden = true; });
+
+  // --- Démarrage
+  etat.config = chargerConfig();
+  appliquerNomEglise();
+  if (!etat.config){ afficherVue("reglages"); return; }
+
+  const sessionSauvee = stockage.lire("icm_session");
+  if (sessionSauvee){
+    try{
+      etat.session = JSON.parse(sessionSauvee);
+      $("etiquette-utilisateur").textContent =
+        (etat.session.user && etat.session.user.email) || "";
+      afficherVue("liste");
+      chargerListe();
+      return;
+    }catch(e){ stockage.effacer("icm_session"); }
+  }
+  afficherVue("connexion");
+});
+</script>
+</body>
+</html>

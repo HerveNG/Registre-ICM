@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titre %}Registre ICM{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<header class="entete">
+  <div class="entete-inner">
+    <a class="marque" href="{{ url_for('index') }}">
+      <span class="marque-sigle">ICM</span>
+      <span class="marque-texte">
+        <strong>{{ paroisse }}</strong>
+        <small>Registre des baptêmes &amp; mariages</small>
+      </span>
+    </a>
+    {% if session.get('utilisateur') %}
+    <nav class="nav">
+      <a href="{{ url_for('index') }}">Registre</a>
+      <a href="{{ url_for('nouveau') }}">Nouvelle carte</a>
+      <a href="{{ url_for('export_csv') }}">Export Excel</a>
+      <a class="nav-sortie" href="{{ url_for('deconnexion') }}">Déconnexion</a>
+    </nav>
+    {% endif %}
+  </div>
+</header>
+
+<main class="conteneur">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="messages">
+        {% for categorie, message in messages %}
+          <div class="message message-{{ categorie }}">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  {% block contenu %}{% endblock %}
+</main>
+
+<footer class="pied">
+  {{ paroisse }} — Registre numérique · MVP
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block titre %}Registre — ICM{% endblock %}
+
+{% block contenu %}
+
+<div class="stats">
+  <div class="stat"><span class="stat-nombre">{{ stats.total }}</span><span class="stat-libelle">fidèles enregistrés</span></div>
+  <div class="stat"><span class="stat-nombre">{{ stats.baptemes }}</span><span class="stat-libelle">baptêmes</span></div>
+  <div class="stat"><span class="stat-nombre">{{ stats.mariages }}</span><span class="stat-libelle">mariages</span></div>
+</div>
+
+<form class="barre-recherche" method="get" action="{{ url_for('index') }}">
+  <input type="search" name="q" value="{{ q }}"
+         placeholder="Rechercher un nom, un prénom, un n° de registre, un conjoint…">
+  <select name="filtre">
+    <option value=""          {% if filtre == ''         %}selected{% endif %}>Tous</option>
+    <option value="bapteme"   {% if filtre == 'bapteme'  %}selected{% endif %}>Baptisés</option>
+    <option value="mariage"   {% if filtre == 'mariage'  %}selected{% endif %}>Mariés</option>
+    <option value="incomplet" {% if filtre == 'incomplet'%}selected{% endif %}>Baptême non renseigné</option>
+  </select>
+  <button type="submit" class="bouton">Rechercher</button>
+  {% if q or filtre %}<a class="bouton bouton-discret" href="{{ url_for('index') }}">Réinitialiser</a>{% endif %}
+  <a class="bouton bouton-principal" href="{{ url_for('nouveau') }}">+ Nouvelle carte</a>
+</form>
+
+{% if records %}
+<div class="tableau-enveloppe">
+<table class="tableau">
+  <thead>
+    <tr>
+      <th>Nom &amp; prénom</th>
+      <th>Né(e) le</th>
+      <th>Baptême</th>
+      <th>N° Registre (1)</th>
+      <th>Mariage</th>
+      <th>Conjoint</th>
+      <th class="col-actions">Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in records %}
+    <tr>
+      <td>
+        <div class="cellule-identite">
+          {% if r.photo %}
+            <img class="vignette" src="{{ url_for('static', filename='photos/' ~ r.photo) }}"
+                 alt="Photo de {{ r.nom }} {{ r.prenom }}">
+          {% else %}
+            <span class="vignette-absente" title="Aucune photo"></span>
+          {% endif %}
+          <div>
+            <strong>{{ r.nom }}</strong> {{ r.prenom }}
+            {% if r.originaire_de %}<br><small class="discret">{{ r.originaire_de }}</small>{% endif %}
+          </div>
+        </div>
+      </td>
+      <td>{{ r.date_naissance | jj_mm_aaaa or '—' }}</td>
+      <td>
+        {% if r.date_bapteme %}
+          {{ r.date_bapteme | jj_mm_aaaa }}
+          {% if r.lieu_bapteme %}<br><small class="discret">{{ r.lieu_bapteme }}</small>{% endif %}
+        {% else %}<span class="etiquette etiquette-attente">à compléter</span>{% endif %}
+      </td>
+      <td><code>{{ r.numero_registre_1 or '—' }}</code></td>
+      <td>
+        {% if r.date_mariage %}
+          {{ r.date_mariage | jj_mm_aaaa }}
+          <br><small class="discret"><code>{{ r.numero_registre_2 or '—' }}</code></small>
+        {% else %}—{% endif %}
+      </td>
+      <td>{{ r.conjoint or '—' }}</td>
+      <td class="col-actions">
+        <a class="bouton bouton-petit" href="{{ url_for('carte', record_id=r.id) }}" target="_blank">Carte</a>
+        <a class="bouton bouton-petit" href="{{ url_for('modifier', record_id=r.id) }}">Modifier</a>
+        <form method="post" action="{{ url_for('supprimer', record_id=r.id) }}"
+              onsubmit="return confirm('Supprimer définitivement la carte de {{ r.nom }} {{ r.prenom }} ?');">
+          <button type="submit" class="bouton bouton-petit bouton-danger">Supprimer</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% if pagination.pages > 1 %}
+<nav class="pagination">
+  {% if pagination.has_prev %}
+    <a class="bouton bouton-petit" href="{{ url_for('index', page=pagination.prev_num, q=q, filtre=filtre) }}">‹ Précédent</a>
+  {% endif %}
+  <span class="pagination-info">Page {{ pagination.page }} sur {{ pagination.pages }}</span>
+  {% if pagination.has_next %}
+    <a class="bouton bouton-petit" href="{{ url_for('index', page=pagination.next_num, q=q, filtre=filtre) }}">Suivant ›</a>
+  {% endif %}
+</nav>
+{% endif %}
+
+{% else %}
+<div class="vide">
+  {% if q or filtre %}
+    <p>Aucun enregistrement ne correspond à cette recherche.</p>
+    <a class="bouton" href="{{ url_for('index') }}">Voir tout le registre</a>
+  {% else %}
+    <p>Le registre est encore vide.</p>
+    <a class="bouton bouton-principal" href="{{ url_for('nouveau') }}">Enregistrer la première carte</a>
+  {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}

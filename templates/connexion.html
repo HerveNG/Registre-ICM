@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block titre %}Connexion — Registre ICM{% endblock %}
+
+{% block contenu %}
+<div class="carte-connexion">
+  <div class="connexion-sigle">ICM</div>
+  <h1>Registre des baptêmes &amp; mariages</h1>
+  <p class="connexion-sous-titre">Accès réservé au secrétariat</p>
+
+  <form method="post" class="formulaire">
+    <label>
+      Identifiant
+      <input type="text" name="utilisateur" required autofocus autocomplete="username">
+    </label>
+    <label>
+      Mot de passe
+      <input type="password" name="mot_de_passe" required autocomplete="current-password">
+    </label>
+    <button type="submit" class="bouton bouton-principal bouton-large">Se connecter</button>
+  </form>
+</div>
+{% endblock %}

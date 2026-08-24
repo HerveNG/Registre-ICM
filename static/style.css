@@ -1,0 +1,222 @@
+/* ============================================================
+   ICM — Registre des baptêmes & mariages
+   Feuille de style de l'application Flask
+   ============================================================ */
+
+:root{
+  --encre:#12203a;
+  --encre-douce:#41526e;
+  --or:#b8912f;
+  --or-clair:#e2c96b;
+  --fond:#f4f6f9;
+  --blanc:#ffffff;
+  --trait:#dde3ec;
+  --succes:#1c7a4d;
+  --succes-fond:#e6f5ed;
+  --erreur:#b3261e;
+  --erreur-fond:#fdeceb;
+  --rayon:10px;
+}
+
+*{box-sizing:border-box;}
+
+body{
+  margin:0;
+  font-family:"Segoe UI",Calibri,system-ui,-apple-system,sans-serif;
+  background:var(--fond);
+  color:var(--encre);
+  line-height:1.55;
+}
+
+/* ---------------- En-tête ---------------- */
+.entete{background:var(--encre); color:#fff;}
+.entete-inner{
+  max-width:1180px; margin:0 auto; padding:.9rem 1.5rem;
+  display:flex; align-items:center; gap:1.5rem; flex-wrap:wrap;
+}
+.marque{display:flex; align-items:center; gap:.85rem; color:#fff; text-decoration:none;}
+.marque-sigle{
+  width:42px; height:42px; border-radius:50%;
+  background:var(--or); color:var(--encre);
+  display:flex; align-items:center; justify-content:center;
+  font-weight:700; letter-spacing:.04em; font-size:.95rem;
+}
+.marque-texte strong{display:block; font-size:1rem; letter-spacing:.02em;}
+.marque-texte small{display:block; font-size:.78rem; opacity:.75;}
+
+.nav{margin-left:auto; display:flex; gap:.35rem; flex-wrap:wrap;}
+.nav a{
+  color:#fff; text-decoration:none; font-size:.9rem;
+  padding:.45rem .8rem; border-radius:6px;
+}
+.nav a:hover{background:rgba(255,255,255,.12);}
+.nav-sortie{opacity:.7;}
+
+/* ---------------- Structure ---------------- */
+.conteneur{max-width:1180px; margin:0 auto; padding:1.8rem 1.5rem 3rem;}
+.pied{
+  text-align:center; padding:1.5rem; font-size:.8rem; color:var(--encre-douce);
+  border-top:1px solid var(--trait);
+}
+.titre-page h1{margin:0 0 .2rem; font-size:1.5rem;}
+.discret{color:var(--encre-douce); font-size:.85rem;}
+
+/* ---------------- Messages ---------------- */
+.messages{margin-bottom:1.2rem; display:grid; gap:.5rem;}
+.message{padding:.7rem 1rem; border-radius:var(--rayon); font-size:.92rem;}
+.message-success{background:var(--succes-fond); color:var(--succes);
+  border-left:4px solid var(--succes);}
+.message-error{background:var(--erreur-fond); color:var(--erreur);
+  border-left:4px solid var(--erreur);}
+
+/* ---------------- Statistiques ---------------- */
+.stats{display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1.4rem;}
+.stat{
+  background:var(--blanc); border:1px solid var(--trait); border-radius:var(--rayon);
+  padding:.9rem 1.4rem; min-width:150px;
+}
+.stat-nombre{display:block; font-size:1.6rem; font-weight:700; color:var(--encre);}
+.stat-libelle{font-size:.8rem; color:var(--encre-douce); text-transform:uppercase;
+  letter-spacing:.05em;}
+
+/* ---------------- Barre de recherche ---------------- */
+.barre-recherche{
+  display:flex; gap:.55rem; flex-wrap:wrap; align-items:center;
+  background:var(--blanc); border:1px solid var(--trait);
+  border-radius:var(--rayon); padding:.8rem; margin-bottom:1.2rem;
+}
+.barre-recherche input[type=search]{flex:1; min-width:240px;}
+.barre-recherche .bouton-principal{margin-left:auto;}
+
+/* ---------------- Champs ---------------- */
+input,select,textarea{
+  font:inherit; color:inherit; width:100%;
+  padding:.55rem .7rem; border:1px solid var(--trait);
+  border-radius:8px; background:var(--blanc);
+}
+input:focus,select:focus,textarea:focus{
+  outline:2px solid var(--or-clair); outline-offset:1px; border-color:var(--or);
+}
+select{max-width:230px;}
+label{display:block; font-size:.85rem; font-weight:600; color:var(--encre-douce);}
+label small{font-weight:400; text-transform:none;}
+label input,label select,label textarea{margin-top:.25rem; font-weight:400;
+  color:var(--encre);}
+.obligatoire::after{content:" *"; color:var(--erreur);}
+
+/* ---------------- Boutons ---------------- */
+.bouton{
+  display:inline-block; font:inherit; font-size:.88rem; font-weight:600;
+  padding:.55rem 1rem; border-radius:8px; cursor:pointer; text-decoration:none;
+  border:1px solid var(--trait); background:var(--blanc); color:var(--encre);
+  white-space:nowrap;
+}
+.bouton:hover{border-color:var(--encre-douce);}
+.bouton-principal{background:var(--encre); border-color:var(--encre); color:#fff;}
+.bouton-principal:hover{background:#1d3057;}
+.bouton-discret{background:transparent; color:var(--encre-douce);}
+.bouton-danger{color:var(--erreur); border-color:#f0c6c3;}
+.bouton-danger:hover{background:var(--erreur-fond); border-color:var(--erreur);}
+.bouton-petit{font-size:.8rem; padding:.35rem .65rem;}
+.bouton-large{width:100%; text-align:center; padding:.7rem;}
+
+/* ---------------- Tableau ---------------- */
+.tableau-enveloppe{
+  background:var(--blanc); border:1px solid var(--trait);
+  border-radius:var(--rayon); overflow-x:auto;
+}
+.tableau{width:100%; border-collapse:collapse; font-size:.9rem;}
+.tableau th{
+  text-align:left; padding:.7rem .9rem; background:#eef1f6;
+  font-size:.75rem; text-transform:uppercase; letter-spacing:.05em;
+  color:var(--encre-douce); border-bottom:1px solid var(--trait);
+  white-space:nowrap;
+}
+.tableau td{padding:.7rem .9rem; border-bottom:1px solid var(--trait);
+  vertical-align:top;}
+.tableau tr:last-child td{border-bottom:none;}
+.tableau tbody tr:hover{background:#fafbfd;}
+.tableau code{font-size:.82rem; background:#eef1f6; padding:.1rem .4rem;
+  border-radius:4px;}
+.col-actions{white-space:nowrap;}
+.col-actions form{display:inline;}
+.col-actions .bouton{margin:1px;}
+.etiquette{
+  display:inline-block; font-size:.72rem; padding:.15rem .5rem; border-radius:999px;
+}
+.etiquette-attente{background:#fff4e0; color:#96601a;}
+
+/* ---------------- Pagination ---------------- */
+.pagination{
+  display:flex; align-items:center; justify-content:center; gap:1rem;
+  margin-top:1.2rem;
+}
+.pagination-info{font-size:.85rem; color:var(--encre-douce);}
+
+/* ---------------- État vide ---------------- */
+.vide{
+  background:var(--blanc); border:1px dashed var(--trait);
+  border-radius:var(--rayon); padding:3rem 1.5rem; text-align:center;
+  color:var(--encre-douce);
+}
+.vide h1{color:var(--encre);}
+
+/* ---------------- Formulaires ---------------- */
+.formulaire{display:grid; gap:1rem;}
+.formulaire-large fieldset{
+  background:var(--blanc); border:1px solid var(--trait);
+  border-radius:var(--rayon); padding:1.2rem 1.4rem 1.4rem; margin:0 0 1rem;
+}
+.formulaire-large legend{
+  font-weight:700; font-size:.95rem; padding:0 .5rem; color:var(--encre);
+}
+.formulaire-large legend small{font-weight:400; color:var(--encre-douce);}
+.grille{
+  display:grid; gap:.9rem 1.2rem;
+  grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+}
+.aide{font-size:.8rem; color:var(--encre-douce); margin:.9rem 0 0;}
+.aide code{background:#eef1f6; padding:.1rem .35rem; border-radius:4px;}
+.actions-formulaire{display:flex; gap:.6rem; flex-wrap:wrap;}
+
+/* ---------------- Photo d'identité ---------------- */
+.bloc-photo{display:flex; gap:1.4rem; align-items:flex-start; flex-wrap:wrap;}
+.photo-cadre{
+  width:132px; height:176px; flex:none;              /* format 3/4 */
+  border:2px solid var(--or); border-radius:4px; background:#eef1f6;
+  display:flex; align-items:center; justify-content:center;
+  overflow:hidden; position:relative;
+}
+.photo-cadre img{width:100%; height:100%; object-fit:cover; display:block;}
+.photo-vide{font-size:.78rem; color:var(--encre-douce); text-align:center; padding:.5rem;}
+.photo-commandes{flex:1; min-width:220px; display:flex; flex-direction:column;
+  align-items:flex-start; gap:.5rem;}
+.photo-commandes .aide{margin:0;}
+
+/* Vignette dans la liste du registre */
+.vignette{
+  width:38px; height:50px; border-radius:3px; object-fit:cover;
+  border:1px solid var(--trait); background:#eef1f6; display:block;
+}
+.vignette-absente{
+  width:38px; height:50px; border-radius:3px; border:1px dashed var(--trait);
+  background:#f7f9fc;
+}
+.cellule-identite{display:flex; gap:.7rem; align-items:flex-start;}
+
+/* ---------------- Connexion ---------------- */
+.carte-connexion{
+  max-width:380px; margin:3rem auto; background:var(--blanc);
+  border:1px solid var(--trait); border-radius:var(--rayon);
+  padding:2.2rem 2rem; text-align:center;
+}
+.connexion-sigle{
+  width:60px; height:60px; margin:0 auto 1rem; border-radius:50%;
+  background:var(--encre); color:var(--or-clair);
+  display:flex; align-items:center; justify-content:center;
+  font-weight:700; letter-spacing:.05em;
+}
+.carte-connexion h1{font-size:1.15rem; margin:0 0 .2rem;}
+.connexion-sous-titre{color:var(--encre-douce); font-size:.85rem;
+  margin:0 0 1.5rem;}
+.carte-connexion label{text-align:left;}

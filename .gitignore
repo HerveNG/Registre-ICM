@@ -1,0 +1,27 @@
+# ============================================================
+#  ICM — Registre des baptêmes & mariages
+#  Fichiers à ne jamais envoyer sur GitHub
+# ============================================================
+
+# Secrets : jamais le vrai fichier, seulement .env.example
+.env
+
+# Base de données locale (version Flask / SQLite)
+instance/
+*.db
+*.sqlite
+*.sqlite3
+
+# Photos des fidèles : données personnelles, ne doivent pas être publiques
+static/photos/*
+!static/photos/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Fichiers système
+.DS_Store
+Thumbs.db

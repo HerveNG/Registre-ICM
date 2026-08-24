@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block titre %}Erreur {{ code }} — ICM{% endblock %}
+{% block contenu %}
+<div class="vide">
+  <h1>Erreur {{ code }}</h1>
+  <p>{{ message }}</p>
+  <a class="bouton bouton-principal" href="{{ url_for('index') }}">Retour au registre</a>
+</div>
+{% endblock %}

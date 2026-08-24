@@ -1,0 +1,6 @@
+-- Les schémas de base de données ont été déplacés dans le dossier database/ :
+--
+--   database/schema_supabase.sql   → à exécuter dans Supabase (version en ligne)
+--   database/schema_sqlite.sql     → documentation du schéma local (Flask/SQLite)
+--
+-- Ce fichier ne sert plus qu'à vous rediriger.

@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+{% block titre %}{{ 'Modifier une carte' if record else 'Nouvelle carte' }} — ICM{% endblock %}
+
+{# --- Valeur d'un champ texte : formulaire renvoyé > enregistrement > vide --- #}
+{% macro txt(nom) -%}
+{%- if valeurs and valeurs.get(nom) is not none -%}{{ valeurs.get(nom) }}
+{%- elif record -%}{{ record[nom] or '' }}
+{%- endif -%}
+{%- endmacro %}
+
+{# --- Valeur d'un champ date au format AAAA-MM-JJ --- #}
+{% macro dte(nom) -%}
+{%- if valeurs and valeurs.get(nom) is not none -%}{{ valeurs.get(nom) }}
+{%- elif record -%}{{ record[nom] | iso }}
+{%- endif -%}
+{%- endmacro %}
+
+{% block contenu %}
+
+<div class="titre-page">
+  <h1>{{ 'Modifier la carte' if record else 'Nouvelle carte' }}</h1>
+  {% if record %}<p class="discret">{{ record.nom }} {{ record.prenom }}
+    {% if record.numero_registre_1 %}· N° {{ record.numero_registre_1 }}{% endif %}</p>{% endif %}
+</div>
+
+<form method="post" class="formulaire formulaire-large">
+
+  <fieldset>
+    <legend>Photo d'identité</legend>
+    <div class="bloc-photo">
+      <div class="photo-cadre" id="photo-cadre">
+        {% if record and record.photo %}
+          <img id="photo-apercu" src="{{ url_for('static', filename='photos/' ~ record.photo) }}" alt="">
+        {% else %}
+          <img id="photo-apercu" hidden alt="">
+          <span class="photo-vide" id="photo-vide">Aucune photo</span>
+        {% endif %}
+      </div>
+      <div class="photo-commandes">
+        <p class="aide" style="margin-top:0">
+          Format identité (3/4). L'image est recadrée puis allégée
+          automatiquement avant l'enregistrement.
+        </p>
+        <input type="file" id="photo-fichier" accept="image/*" hidden>
+        <button type="button" class="bouton" id="photo-choisir">
+          {{ 'Remplacer la photo' if record and record.photo else 'Choisir une photo' }}
+        </button>
+        <button type="button" class="bouton bouton-danger" id="photo-retirer"
+                {% if not (record and record.photo) %}hidden{% endif %}>Retirer</button>
+        <p class="aide" id="photo-etat"></p>
+      </div>
+    </div>
+    <input type="hidden" name="photo_data" id="photo-data">
+    <input type="hidden" name="photo_retiree" id="photo-retiree" value="0">
+  </fieldset>
+
+  <fieldset>
+    <legend>Identité</legend>
+    <div class="grille">
+      <label class="obligatoire">Nom
+        <input type="text" name="nom" value="{{ txt('nom') }}" required maxlength="120">
+      </label>
+      <label class="obligatoire">Prénom
+        <input type="text" name="prenom" value="{{ txt('prenom') }}" required maxlength="120">
+      </label>
+      <label>Fils / Fille de <small>(père)</small>
+        <input type="text" name="nom_pere" value="{{ txt('nom_pere') }}" maxlength="200">
+      </label>
+      <label>Et de <small>(mère)</small>
+        <input type="text" name="nom_mere" value="{{ txt('nom_mere') }}" maxlength="200">
+      </label>
+      <label>Né(e) le
+        <input type="date" name="date_naissance" value="{{ dte('date_naissance') }}">
+      </label>
+      <label>Nationalité
+        <input type="text" name="nationalite" value="{{ txt('nationalite') }}" maxlength="100">
+      </label>
+      <label>Originaire de
+        <input type="text" name="originaire_de" value="{{ txt('originaire_de') }}" maxlength="150">
+      </label>
+      <label>Téléphone
+        <input type="text" name="telephone" value="{{ txt('telephone') }}" maxlength="50">
+      </label>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Baptême</legend>
+    <div class="grille">
+      <label>Baptisé(e) le
+        <input type="date" name="date_bapteme" value="{{ dte('date_bapteme') }}">
+      </label>
+      <label>Lieu du baptême
+        <input type="text" name="lieu_bapteme" value="{{ txt('lieu_bapteme') }}" maxlength="200">
+      </label>
+      <label>N° du Registre (1)
+        <input type="text" name="numero_registre_1" value="{{ txt('numero_registre_1') }}"
+               maxlength="80" placeholder="Laisser vide → attribué automatiquement">
+      </label>
+      <label>Célébrant
+        <input type="text" name="celebrant_bapteme" value="{{ txt('celebrant_bapteme') }}" maxlength="150">
+      </label>
+      <label>Signature (1) — certifié exact
+        <input type="text" name="signature_1" value="{{ txt('signature_1') }}" maxlength="150">
+      </label>
+    </div>
+    <p class="aide">Si le n° de registre est laissé vide, l'application attribue
+      automatiquement le numéro suivant (format <code>ICM-B-AAAA-0001</code>).</p>
+  </fieldset>
+
+  <fieldset>
+    <legend>Mariage <small>(à remplir le jour venu)</small></legend>
+    <div class="grille">
+      <label>À <small>(lieu de célébration)</small>
+        <input type="text" name="lieu_mariage" value="{{ txt('lieu_mariage') }}" maxlength="200">
+      </label>
+      <label>Le
+        <input type="date" name="date_mariage" value="{{ dte('date_mariage') }}">
+      </label>
+      <label>Avec <small>(conjoint)</small>
+        <input type="text" name="conjoint" value="{{ txt('conjoint') }}" maxlength="250">
+      </label>
+      <label>N° du Registre (2)
+        <input type="text" name="numero_registre_2" value="{{ txt('numero_registre_2') }}"
+               maxlength="80" placeholder="Laisser vide → attribué automatiquement">
+      </label>
+      <label>Célébrant
+        <input type="text" name="celebrant_mariage" value="{{ txt('celebrant_mariage') }}" maxlength="150">
+      </label>
+      <label>Signature (2)
+        <input type="text" name="signature_2" value="{{ txt('signature_2') }}" maxlength="150">
+      </label>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Observations</legend>
+    <label>Notes internes
+      <textarea name="observations" rows="3">{{ txt('observations') }}</textarea>
+    </label>
+  </fieldset>
+
+  <div class="actions-formulaire">
+    <button type="submit" class="bouton bouton-principal">
+      {{ 'Enregistrer les modifications' if record else 'Enregistrer la carte' }}
+    </button>
+    <a class="bouton bouton-discret" href="{{ url_for('index') }}">Annuler</a>
+    {% if record %}
+      <a class="bouton" href="{{ url_for('carte', record_id=record.id) }}" target="_blank">Voir la carte</a>
+    {% endif %}
+  </div>
+</form>
+
+<script src="{{ url_for('static', filename='photo.js') }}"></script>
+<script>
+(function(){
+  "use strict";
+  const fichier  = document.getElementById("photo-fichier");
+  const choisir  = document.getElementById("photo-choisir");
+  const retirer  = document.getElementById("photo-retirer");
+  const apercu   = document.getElementById("photo-apercu");
+  const vide     = document.getElementById("photo-vide");
+  const champ    = document.getElementById("photo-data");
+  const drapeau  = document.getElementById("photo-retiree");
+  const etat     = document.getElementById("photo-etat");
+
+  function afficher(source, poids){
+    apercu.src = source; apercu.hidden = false;
+    if (vide) vide.hidden = true;
+    retirer.hidden = false;
+    choisir.textContent = "Remplacer la photo";
+    etat.textContent = poids ? `Photo prête (${Math.round(poids/1024)} Ko).` : "";
+  }
+
+  choisir.addEventListener("click", ()=>fichier.click());
+
+  fichier.addEventListener("change", async ()=>{
+    const f = fichier.files && fichier.files[0];
+    fichier.value = "";                      // permet de rechoisir le même fichier
+    if (!f) return;
+    etat.textContent = "";
+    try{
+      const blob = await PhotoICM.recadrer(f);
+      if (!blob) return;                     // recadrage annulé
+      const dataUrl = await PhotoICM.versDataUrl(blob);
+      champ.value = dataUrl;
+      drapeau.value = "0";
+      afficher(dataUrl, blob.size);
+    }catch(err){
+      etat.textContent = err.message;
+    }
+  });
+
+  retirer.addEventListener("click", ()=>{
+    champ.value = "";
+    drapeau.value = "1";
+    apercu.hidden = true; apercu.removeAttribute("src");
+    if (vide) vide.hidden = false;
+    retirer.hidden = true;
+    choisir.textContent = "Choisir une photo";
+    etat.textContent = "La photo sera retirée à l'enregistrement.";
+  });
+
+  // Si le formulaire revient avec une erreur, on réaffiche la photo choisie
+  const dejaChoisie = {{ (valeurs.get('photo_data') if valeurs else '') | tojson }};
+  if (dejaChoisie) { champ.value = dejaChoisie; afficher(dejaChoisie); }
+})();
+</script>
+
+{% endblock %}
