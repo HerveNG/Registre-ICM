@@ -145,6 +145,28 @@ label input,label select,label textarea{margin-top:.25rem; font-weight:400;
   display:inline-block; font-size:.72rem; padding:.15rem .5rem; border-radius:999px;
 }
 .etiquette-attente{background:#fff4e0; color:#96601a;}
+.etiquette-ok{background:var(--succes-fond); color:var(--succes);}
+.etiquette-erreur{background:var(--erreur-fond); color:var(--erreur);}
+
+/* ---------------- Import Excel/CSV ---------------- */
+.bloc-import{
+  background:var(--blanc); border:1px solid var(--trait); border-radius:var(--rayon);
+  padding:1.4rem 1.6rem; margin-bottom:1.5rem;
+}
+.bloc-import .aide{margin-top:.3rem;}
+.import-resume{
+  display:flex; gap:1.2rem; flex-wrap:wrap; align-items:center;
+  margin:0 0 1rem;
+}
+.import-resume strong{font-size:1.1rem;}
+.import-colonnes-ignorees{
+  font-size:.85rem; color:var(--encre-douce); background:#fff4e0; color:#96601a;
+  padding:.6rem .9rem; border-radius:6px; margin-bottom:1rem;
+}
+.tableau-import td{vertical-align:top;}
+.import-erreurs{margin:0; padding-left:1.1rem; font-size:.82rem; color:var(--erreur);}
+.import-erreurs li{margin-bottom:.15rem;}
+.import-actions{display:flex; gap:.6rem; margin-top:1.2rem; align-items:center;}
 
 /* ---------------- Pagination ---------------- */
 .pagination{

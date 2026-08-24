@@ -125,6 +125,19 @@ code{font-size:.82rem;background:#eef1f6;padding:.1rem .4rem;border-radius:4px;}
 .discret{color:var(--encre-douce);font-size:.85rem;}
 .etiquette{display:inline-block;font-size:.72rem;padding:.15rem .5rem;border-radius:999px;
   background:#fff4e0;color:#96601a;}
+.etiquette-ok{background:var(--succes-fond);color:var(--succes);}
+.etiquette-erreur{background:var(--erreur-fond);color:var(--erreur);}
+
+/* ---------- Import Excel/CSV ---------- */
+.bloc-import{background:var(--blanc);border:1px solid var(--trait);border-radius:var(--rayon);
+  padding:1.4rem 1.6rem;margin-bottom:1.5rem;}
+.import-resume{display:flex;gap:1.2rem;flex-wrap:wrap;align-items:center;margin:0 0 1rem;}
+.import-resume strong{font-size:1.1rem;}
+.import-colonnes-ignorees{font-size:.85rem;background:#fff4e0;color:#96601a;
+  padding:.6rem .9rem;border-radius:6px;margin-bottom:1rem;}
+.import-erreurs{margin:0;padding-left:1.1rem;font-size:.82rem;color:var(--erreur);}
+.import-erreurs li{margin-bottom:.15rem;}
+.import-actions{display:flex;gap:.6rem;margin-top:1.2rem;align-items:center;}
 
 /* ---------- Photo d'identité ---------- */
 .bloc-photo{display:flex;gap:1.4rem;align-items:flex-start;flex-wrap:wrap;}
@@ -227,6 +240,7 @@ h1.titre{margin:0 0 1rem;font-size:1.5rem;}
     <nav class="nav">
       <button data-vue="liste">Registre</button>
       <button data-vue="formulaire" id="btn-nouveau">Nouvelle carte</button>
+      <button data-vue="import" id="btn-import-nav">Importer</button>
       <button id="btn-export">Export Excel</button>
       <button data-vue="reglages">Réglages</button>
       <span class="utilisateur" id="etiquette-utilisateur"></span>
@@ -300,6 +314,7 @@ h1.titre{margin:0 0 1rem;font-size:1.5rem;}
       </select>
       <button type="submit" class="bouton">Rechercher</button>
       <button type="button" class="bouton bouton-discret" id="btn-reinit">Réinitialiser</button>
+      <button type="button" class="bouton bouton-discret" id="btn-import-2">Importer un fichier</button>
       <button type="button" class="bouton bouton-principal" id="btn-nouveau-2">+ Nouvelle carte</button>
     </form>
 
@@ -393,6 +408,64 @@ h1.titre{margin:0 0 1rem;font-size:1.5rem;}
         <button type="button" class="bouton bouton-discret" id="btn-annuler">Annuler</button>
       </div>
     </form>
+  </section>
+
+  <!-- ================= IMPORT DU REGISTRE PAPIER ================= -->
+  <section id="vue-import" hidden>
+    <h1 class="titre">Importer le registre papier existant</h1>
+    <p class="discret">Depuis un fichier Excel (enregistré en .csv) — une ligne par fidèle.</p>
+
+    <div id="import-upload" class="bloc-import">
+      <p class="aide" style="margin-top:0">
+        Téléchargez d'abord le modèle, remplissez-le dans Excel (une ligne
+        par fidèle, sans toucher aux en-têtes de colonnes), enregistrez-le
+        au format .csv, puis envoyez-le ici.
+      </p>
+      <p><button type="button" class="bouton" id="btn-import-modele">Télécharger le modèle (.csv)</button></p>
+
+      <form id="form-import" style="margin-top:1.2rem">
+        <label>Fichier à importer (.csv)
+          <input type="file" id="import-fichier" accept=".csv" required>
+        </label>
+        <div class="actions-formulaire" style="margin-top:1rem">
+          <button type="submit" class="bouton bouton-principal">Analyser le fichier</button>
+        </div>
+      </form>
+
+      <p class="aide">
+        Rien n'est enregistré à cette étape : le fichier est d'abord
+        analysé, vous voyez un aperçu ligne par ligne, et l'import ne se
+        fait qu'après votre confirmation. Les photos ne peuvent pas être
+        importées depuis Excel — ajoutez-les ensuite une par une en
+        modifiant chaque fiche.
+      </p>
+    </div>
+
+    <div id="import-resultats" class="bloc-import" hidden>
+      <div class="import-resume" id="import-resume"></div>
+      <div id="import-colonnes-ignorees"></div>
+      <p class="aide" id="import-aide-erreurs" style="margin-top:0" hidden>
+        Les lignes en erreur ci-dessous ne seront <strong>pas</strong> importées.
+        Corrigez-les dans votre fichier et renvoyez-le si vous voulez aussi
+        les inclure — cela n'empêche pas d'importer dès maintenant les lignes valides.
+      </p>
+      <div class="tableau-enveloppe">
+        <table>
+          <thead><tr>
+            <th>Ligne</th><th>Nom &amp; prénom</th><th>Baptême</th><th>Mariage</th><th>Statut</th>
+          </tr></thead>
+          <tbody id="import-corps-tableau"></tbody>
+        </table>
+      </div>
+      <div class="import-actions">
+        <button type="button" class="bouton bouton-principal" id="btn-import-confirmer" hidden>
+          Confirmer l'import
+        </button>
+        <button type="button" class="bouton bouton-discret" id="btn-import-recommencer">
+          Recommencer avec un autre fichier
+        </button>
+      </div>
+    </div>
   </section>
 </main>
 
@@ -800,7 +873,7 @@ function dateFr(iso){
 }
 
 function afficherVue(nom){
-  ["reglages","connexion","liste","formulaire"].forEach(v=>{
+  ["reglages","connexion","liste","formulaire","import"].forEach(v=>{
     $("vue-"+v).hidden = (v !== nom);
   });
   const connecte = !!etat.session;
@@ -1042,7 +1115,9 @@ function dessinerTableau(){
     $("pagination").hidden = true;
     $("zone-vide").innerHTML = (etat.q || etat.filtre)
       ? `<div class="vide"><p>Aucun enregistrement ne correspond à cette recherche.</p></div>`
-      : `<div class="vide"><p>Le registre est encore vide.</p></div>`;
+      : `<div class="vide"><p>Le registre est encore vide.</p>
+          <button class="bouton bouton-discret" onclick="reinitialiserImport();afficherVue('import');">
+            ou importer le registre papier existant</button></div>`;
     return;
   }
 
@@ -1304,6 +1379,270 @@ async function exporterCsv(){
 }
 
 /* ==========================================================
+   7 bis. IMPORT DU REGISTRE PAPIER (fichier .csv)
+   ----------------------------------------------------------
+   Même principe que la version Flask : le fichier est d'abord
+   analysé (aperçu ligne par ligne, rien n'est écrit), puis
+   l'import ne se fait qu'après confirmation. Les photos ne
+   peuvent pas être importées depuis Excel/CSV.
+   ========================================================== */
+const etatImport = { lignesValides: [] };   // résultats {numeroLigne, donnees} sans erreur
+
+function normaliserEnteteImport(s){
+  return String(s || "")
+    .normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+const CHAMPS_PAR_ENTETE_IMPORT = Object.fromEntries(
+  COLONNES_EXPORT.filter(([champ]) => champ !== "photo")
+    .map(([champ, libelle]) => [normaliserEnteteImport(libelle), champ])
+);
+
+function detecterDelimiteurImport(texte){
+  const premiereLigne = texte.split(/\r?\n/, 1)[0] || "";
+  const nbVirgule = (premiereLigne.match(/,/g) || []).length;
+  const nbPointVirgule = (premiereLigne.match(/;/g) || []).length;
+  return nbVirgule > nbPointVirgule ? "," : ";";
+}
+
+/* Lecteur CSV minimal (gère les champs entre guillemets, les guillemets
+   doublés et les fins de ligne \r\n) — pas de dépendance externe pour
+   garder ce fichier autonome. */
+function analyserCsvTexte(texte){
+  texte = texte.replace(/^\uFEFF/, "");
+  const delimiteur = detecterDelimiteurImport(texte);
+  const lignes = [];
+  let ligne = [], champ = "", enGuillemets = false;
+  const finirChamp = () => { ligne.push(champ); champ = ""; };
+  const finirLigne = () => { finirChamp(); lignes.push(ligne); ligne = []; };
+  for (let i = 0; i < texte.length; i++){
+    const c = texte[i];
+    if (enGuillemets){
+      if (c === '"'){
+        if (texte[i + 1] === '"'){ champ += '"'; i++; }
+        else enGuillemets = false;
+      } else champ += c;
+    } else if (c === '"' && champ === ""){
+      enGuillemets = true;
+    } else if (c === delimiteur){
+      finirChamp();
+    } else if (c === "\n"){
+      finirLigne();
+    } else if (c === "\r"){
+      /* rien : le \n qui suit termine la ligne */
+    } else {
+      champ += c;
+    }
+  }
+  if (champ !== "" || ligne.length) finirLigne();
+  return lignes.filter(l => !(l.length === 1 && l[0] === ""));
+}
+
+function lireDateImport(v){
+  if (v === undefined || v === null) return null;
+  v = String(v).trim();
+  if (!v) return null;
+  let m = v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+  m = v.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+  if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+  return null;
+}
+
+function valeurTexteImport(v){
+  if (v === undefined || v === null) return null;
+  v = String(v).trim();
+  return v || null;
+}
+
+function donneesDepuisLigneImport(ligneBrute){
+  const d = {};
+  CHAMPS.forEach(c => {
+    d[c] = c.startsWith("date_")
+      ? lireDateImport(ligneBrute[c])
+      : valeurTexteImport(ligneBrute[c]);
+  });
+  return d;
+}
+
+/* Numéros de registre déjà pris — un seul aller-retour, dataset toujours
+   petit (voir CHOIX_BASE_DE_DONNEES.md : l'app vise quelques milliers
+   de fiches au plus). */
+async function numerosExistantsImport(){
+  const { donnees } = await api(
+    "registre?select=numero_registre_1,numero_registre_2",
+    { headers: { "Range-Unit": "items", "Range": "0-99999" } }
+  );
+  const s1 = new Set(), s2 = new Set();
+  (donnees || []).forEach(r => {
+    if (r.numero_registre_1) s1.add(r.numero_registre_1);
+    if (r.numero_registre_2) s2.add(r.numero_registre_2);
+  });
+  return { s1, s2 };
+}
+
+function marquerDoublonsImport(lignes, s1, s2){
+  const vus1 = {}, vus2 = {};
+  return lignes.map(({ numeroLigne, donnees, erreurs }) => {
+    const e = erreurs.slice();
+    if (donnees.numero_registre_1){
+      const v = donnees.numero_registre_1;
+      if (s1.has(v)) e.push(`Le numéro de registre de baptême « ${v} » existe déjà.`);
+      else if (vus1[v]) e.push(`N° de registre baptême « ${v} » utilisé aussi à la ligne ${vus1[v]} de ce fichier.`);
+      else vus1[v] = numeroLigne;
+    }
+    if (donnees.numero_registre_2){
+      const v = donnees.numero_registre_2;
+      if (s2.has(v)) e.push(`Le numéro de registre de mariage « ${v} » existe déjà.`);
+      else if (vus2[v]) e.push(`N° de registre mariage « ${v} » utilisé aussi à la ligne ${vus2[v]} de ce fichier.`);
+      else vus2[v] = numeroLigne;
+    }
+    return { numeroLigne, donnees, erreurs: e };
+  });
+}
+
+async function analyserFichierImport(fichier){
+  const texte = await fichier.text();
+  const lignesCsv = analyserCsvTexte(texte);
+  if (!lignesCsv.length)
+    throw new Error("Ce fichier ne contient aucune ligne de données.");
+
+  const entetes = lignesCsv[0];
+  const correspondance = {};
+  entetes.forEach((e, i) => {
+    const champ = CHAMPS_PAR_ENTETE_IMPORT[normaliserEnteteImport(e)];
+    if (champ) correspondance[i] = champ;
+  });
+  const champsTrouves = Object.values(correspondance);
+  if (!champsTrouves.includes("nom") || !champsTrouves.includes("prenom"))
+    throw new Error("Les colonnes « Nom » et « Prénom » sont introuvables dans ce "
+      + "fichier. Téléchargez le modèle et gardez ses en-têtes tels quels.");
+
+  const colonnesIgnorees = entetes.filter((e, i) =>
+    !(i in correspondance) && String(e || "").trim());
+
+  const lignesBrutes = [];
+  for (let i = 1; i < lignesCsv.length; i++){
+    const valeurs = lignesCsv[i];
+    const ligneBrute = {};
+    Object.entries(correspondance).forEach(([idx, champ]) => {
+      ligneBrute[champ] = valeurs[Number(idx)];
+    });
+    const donnees = donneesDepuisLigneImport(ligneBrute);
+    if (Object.values(donnees).some(v => v !== null))
+      lignesBrutes.push({ numeroLigne: i + 1, donnees, erreurs: validerFormulaire(donnees) });
+  }
+  if (!lignesBrutes.length)
+    throw new Error("Ce fichier ne contient aucune ligne de données à importer.");
+
+  const { s1, s2 } = await numerosExistantsImport();
+  const resultats = marquerDoublonsImport(lignesBrutes, s1, s2);
+  return { resultats, colonnesIgnorees };
+}
+
+function afficherResultatsImport(resultats, colonnesIgnorees, nomFichier){
+  etatImport.lignesValides = resultats.filter(r => !r.erreurs.length);
+  const nbValides = etatImport.lignesValides.length;
+  const nbErreurs = resultats.length - nbValides;
+
+  $("import-resume").innerHTML = `
+    <span>Fichier : <strong>${echapper(nomFichier)}</strong></span>
+    <span class="etiquette etiquette-ok">${nbValides} ligne(s) prête(s) à importer</span>
+    ${nbErreurs ? `<span class="etiquette etiquette-erreur">${nbErreurs} ligne(s) en erreur</span>` : ""}`;
+
+  $("import-colonnes-ignorees").innerHTML = colonnesIgnorees.length
+    ? `<p class="import-colonnes-ignorees">Colonne(s) non reconnue(s) et ignorée(s) : `
+      + `${echapper(colonnesIgnorees.join(", "))}.</p>`
+    : "";
+
+  $("import-aide-erreurs").hidden = !nbErreurs;
+
+  $("import-corps-tableau").innerHTML = resultats.map(r => `
+    <tr>
+      <td>${r.numeroLigne}</td>
+      <td>${echapper(r.donnees.nom || "—")} ${echapper(r.donnees.prenom || "")}</td>
+      <td>${dateFr(r.donnees.date_bapteme) || "—"}</td>
+      <td>${dateFr(r.donnees.date_mariage) || "—"}</td>
+      <td>
+        ${ r.erreurs.length
+            ? `<span class="etiquette etiquette-erreur">erreur</span>
+               <ul class="import-erreurs">${r.erreurs.map(e => `<li>${echapper(e)}</li>`).join("")}</ul>`
+            : `<span class="etiquette etiquette-ok">ok</span>` }
+      </td>
+    </tr>`).join("");
+
+  $("btn-import-confirmer").hidden = !nbValides;
+  $("btn-import-confirmer").textContent = `Confirmer l'import de ${nbValides} fiche(s)`;
+  $("import-upload").hidden = true;
+  $("import-resultats").hidden = false;
+}
+
+function reinitialiserImport(){
+  etatImport.lignesValides = [];
+  const entree = $("import-fichier");
+  if (entree) entree.value = "";
+  $("import-upload").hidden = false;
+  $("import-resultats").hidden = true;
+}
+
+async function confirmerImport(){
+  if (!etatImport.lignesValides.length) return;
+  if (!confirm(`Importer ${etatImport.lignesValides.length} fiche(s) dans le registre ?`)) return;
+
+  const bouton = $("btn-import-confirmer");
+  bouton.disabled = true;
+  try{
+    // On revalide juste avant l'écriture : la base a pu changer depuis
+    // l'aperçu (nouvelle fiche saisie entre-temps, numéro déjà pris…).
+    const { s1, s2 } = await numerosExistantsImport();
+    const revalides = marquerDoublonsImport(etatImport.lignesValides, s1, s2);
+    const aEnvoyer = revalides.filter(r => !r.erreurs.length).map(r => r.donnees);
+    const ignorees = revalides.length - aEnvoyer.length;
+
+    if (!aEnvoyer.length){
+      message("Aucune ligne à importer : toutes sont devenues invalides entre-temps.", "erreur");
+      return;
+    }
+
+    await api("registre", { method: "POST", body: aEnvoyer,
+      headers: { "Prefer": "return=minimal" } });
+
+    let msg = `${aEnvoyer.length} fiche(s) importée(s) depuis le fichier.`;
+    if (ignorees) msg += ` ${ignorees} ligne(s) ignorée(s) (doublon apparu entre-temps).`;
+    message(msg, "succes");
+    reinitialiserImport();
+    afficherVue("liste");
+    await chargerListe();
+  }catch(e){ message(e.message, "erreur"); }
+  finally{ bouton.disabled = false; }
+}
+
+function telechargerModeleImport(){
+  const colonnes = COLONNES_EXPORT.filter(([champ]) => champ !== "photo");
+  const exemple = {
+    nom: "NGOOH", prenom: "Hervé", nom_pere: "NGOOH Paul", nom_mere: "MBALLA Marie",
+    date_naissance: "12/04/1990", nationalite: "Camerounaise", originaire_de: "Yaoundé",
+    date_bapteme: "02/06/2024", lieu_bapteme: "Temple ICM Douala",
+    celebrant_bapteme: "Past. Jean ETOUNDI", signature_1: "Past. Jean ETOUNDI",
+    telephone: "677000000", observations: "Exemple à supprimer avant l'import",
+  };
+  const cellule = (v) => {
+    const s = String(v ?? "").replace(/"/g, '""');
+    return /[";\n]/.test(s) ? `"${s}"` : s;
+  };
+  const lignes = [
+    colonnes.map(c => cellule(c[1])).join(";"),
+    colonnes.map(([champ]) => cellule(exemple[champ] || "")).join(";"),
+  ];
+  const blob = new Blob(["\uFEFF" + lignes.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+  const lien = document.createElement("a");
+  lien.href = URL.createObjectURL(blob);
+  lien.download = "modele_import_icm.csv";
+  document.body.appendChild(lien); lien.click(); lien.remove();
+  setTimeout(() => URL.revokeObjectURL(lien.href), 2000);
+}
+
+/* ==========================================================
    8. SESSION
    ========================================================== */
 function deconnexion(raison){
@@ -1372,12 +1711,32 @@ document.addEventListener("DOMContentLoaded", ()=>{
       const vue = b.dataset.vue;
       if (vue === "formulaire") ouvrirFormulaire(null);
       else if (vue === "reglages"){ $("lien-reglages").click(); }
+      else if (vue === "import"){ reinitialiserImport(); afficherVue("import"); }
       else { afficherVue(vue); chargerListe(); }
     });
   });
   $("btn-nouveau-2").addEventListener("click", ()=>ouvrirFormulaire(null));
+  $("btn-import-2").addEventListener("click", ()=>{ reinitialiserImport(); afficherVue("import"); });
   $("btn-annuler").addEventListener("click", ()=>{ afficherVue("liste"); chargerListe(); });
   $("btn-export").addEventListener("click", exporterCsv);
+
+  // --- Import Excel/CSV
+  $("btn-import-modele").addEventListener("click", telechargerModeleImport);
+  $("form-import").addEventListener("submit", async (e)=>{
+    e.preventDefault();
+    const entree = $("import-fichier");
+    const f = entree.files && entree.files[0];
+    if (!f){ message("Choisissez un fichier .csv à importer.", "erreur"); return; }
+    const bouton = e.target.querySelector("button[type=submit]");
+    bouton.disabled = true;
+    try{
+      const { resultats, colonnesIgnorees } = await analyserFichierImport(f);
+      afficherResultatsImport(resultats, colonnesIgnorees, f.name);
+    }catch(err){ message(err.message, "erreur"); }
+    finally{ bouton.disabled = false; }
+  });
+  $("btn-import-confirmer").addEventListener("click", confirmerImport);
+  $("btn-import-recommencer").addEventListener("click", reinitialiserImport);
 
   // --- Recherche
   $("form-recherche").addEventListener("submit", (e)=>{

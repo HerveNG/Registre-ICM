@@ -20,6 +20,7 @@
   </select>
   <button type="submit" class="bouton">Rechercher</button>
   {% if q or filtre %}<a class="bouton bouton-discret" href="{{ url_for('index') }}">Réinitialiser</a>{% endif %}
+  <a class="bouton bouton-discret" href="{{ url_for('importer') }}">Importer un fichier</a>
   <a class="bouton bouton-principal" href="{{ url_for('nouveau') }}">+ Nouvelle carte</a>
 </form>
 
@@ -103,6 +104,7 @@
   {% else %}
     <p>Le registre est encore vide.</p>
     <a class="bouton bouton-principal" href="{{ url_for('nouveau') }}">Enregistrer la première carte</a>
+    <a class="bouton bouton-discret" href="{{ url_for('importer') }}">ou importer le registre papier existant</a>
   {% endif %}
 </div>
 {% endif %}

@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block titre %}Importer le registre — ICM{% endblock %}
+
+{% block contenu %}
+
+<div class="titre-page">
+  <h1>Importer le registre papier existant</h1>
+  <p class="discret">Depuis un fichier Excel (.xlsx) ou CSV — une ligne par fidèle.</p>
+</div>
+
+{% if resultats is none %}
+
+<div class="bloc-import">
+  <p class="aide" style="margin-top:0">
+    Téléchargez d'abord le modèle, remplissez-le (une ligne par fidèle,
+    sans toucher aux en-têtes de colonnes), puis envoyez-le ici. Vous
+    pouvez le remplir dans Excel et l'enregistrer soit au format .xlsx,
+    soit au format .csv — les deux fonctionnent.
+  </p>
+  <p>
+    <a class="bouton" href="{{ url_for('importer_modele') }}">Télécharger le modèle (.csv)</a>
+  </p>
+
+  <form method="post" enctype="multipart/form-data" class="formulaire" style="margin-top:1.2rem">
+    <input type="hidden" name="etape" value="analyser">
+    <label>
+      Fichier à importer
+      <input type="file" name="fichier" accept=".xlsx,.xlsm,.csv" required>
+    </label>
+    <div class="actions-formulaire">
+      <button type="submit" class="bouton bouton-principal">Analyser le fichier</button>
+    </div>
+  </form>
+
+  <p class="aide">
+    Rien n'est enregistré à cette étape : le fichier est d'abord analysé,
+    vous voyez un aperçu ligne par ligne, et l'import ne se fait qu'après
+    votre confirmation. Les photos ne peuvent pas être importées depuis
+    Excel — ajoutez-les ensuite une par une en modifiant chaque fiche.
+  </p>
+</div>
+
+{% else %}
+
+<div class="bloc-import">
+  <div class="import-resume">
+    <span>Fichier : <strong>{{ nom_fichier }}</strong></span>
+    <span class="etiquette etiquette-ok">{{ nb_valides }} ligne(s) prête(s) à importer</span>
+    {% if nb_erreurs %}
+      <span class="etiquette etiquette-erreur">{{ nb_erreurs }} ligne(s) en erreur</span>
+    {% endif %}
+  </div>
+
+  {% if colonnes_ignorees %}
+    <p class="import-colonnes-ignorees">
+      Colonne(s) non reconnue(s) et ignorée(s) : {{ colonnes_ignorees | join(', ') }}.
+    </p>
+  {% endif %}
+
+  {% if nb_erreurs %}
+    <p class="aide">
+      Les lignes en erreur ci-dessous ne seront <strong>pas</strong> importées.
+      Corrigez-les dans votre fichier et renvoyez-le si vous voulez aussi
+      les inclure — cela n'empêche pas d'importer dès maintenant les lignes
+      valides.
+    </p>
+  {% endif %}
+
+  <div class="tableau-enveloppe">
+    <table class="tableau tableau-import">
+      <thead>
+        <tr>
+          <th>Ligne</th>
+          <th>Nom &amp; prénom</th>
+          <th>Baptême</th>
+          <th>Mariage</th>
+          <th>Statut</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in resultats %}
+        <tr>
+          <td>{{ r.numero_ligne }}</td>
+          <td>{{ r.donnees.nom or '—' }} {{ r.donnees.prenom or '' }}</td>
+          <td>{{ r.donnees.date_bapteme | jj_mm_aaaa or '—' }}</td>
+          <td>{{ r.donnees.date_mariage | jj_mm_aaaa or '—' }}</td>
+          <td>
+            {% if r.erreurs %}
+              <span class="etiquette etiquette-erreur">erreur</span>
+              <ul class="import-erreurs">
+                {% for e in r.erreurs %}<li>{{ e }}</li>{% endfor %}
+              </ul>
+            {% else %}
+              <span class="etiquette etiquette-ok">ok</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="import-actions">
+    {% if nb_valides %}
+    <form method="post">
+      <input type="hidden" name="etape" value="confirmer">
+      <input type="hidden" name="donnees_json" value='{{ donnees_json }}'>
+      <button type="submit" class="bouton bouton-principal"
+              onclick="return confirm('Importer {{ nb_valides }} fiche(s) dans le registre ?');">
+        Confirmer l'import de {{ nb_valides }} fiche(s)
+      </button>
+    </form>
+    {% endif %}
+    <a class="bouton bouton-discret" href="{{ url_for('importer') }}">Recommencer avec un autre fichier</a>
+  </div>
+</div>
+
+{% endif %}
+
+{% endblock %}

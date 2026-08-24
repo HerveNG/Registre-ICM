@@ -28,8 +28,10 @@ import base64
 import binascii
 import csv
 import io
+import json
 import os
 import re
+import unicodedata
 import uuid
 from datetime import date, datetime
 from functools import wraps
@@ -47,6 +49,11 @@ try:  # facultatif : charge le fichier .env s'il existe
     load_dotenv()
 except ImportError:
     pass
+
+try:  # facultatif : seul l'import de fichiers .xlsx en a besoin (le .csv non)
+    import openpyxl
+except ImportError:
+    openpyxl = None
 
 
 # ------------------------------------------------------------------
@@ -102,6 +109,23 @@ CHAMPS_TEXTE = [
     "signature_2", "telephone", "observations",
 ]
 CHAMPS_DATE = ["date_naissance", "date_bapteme", "date_mariage"]
+
+# Colonnes de l'export CSV — et, à l'identique (moins la photo), du modèle
+# d'import et de la reconnaissance des en-têtes d'un fichier envoyé. Garder
+# une seule liste ici garantit que l'export et l'import restent en accord.
+COLONNES_EXPORT = [
+    ("nom", "Nom"), ("prenom", "Prénom"), ("nom_pere", "Fils/Fille de"),
+    ("nom_mere", "Et de"), ("date_naissance", "Date de naissance"),
+    ("nationalite", "Nationalité"), ("originaire_de", "Originaire de"),
+    ("date_bapteme", "Date de baptême"), ("lieu_bapteme", "Lieu du baptême"),
+    ("numero_registre_1", "N° Registre (1)"),
+    ("celebrant_bapteme", "Célébrant baptême"), ("signature_1", "Signature (1)"),
+    ("lieu_mariage", "Lieu du mariage"), ("date_mariage", "Date du mariage"),
+    ("conjoint", "Conjoint"), ("numero_registre_2", "N° Registre (2)"),
+    ("celebrant_mariage", "Célébrant mariage"), ("signature_2", "Signature (2)"),
+    ("telephone", "Téléphone"), ("observations", "Observations"),
+    ("photo", "Fichier photo"),
+]
 
 
 class Registre(db.Model):
@@ -203,6 +227,17 @@ def lire_date(valeur):
     return None
 
 
+def normaliser_entete(texte):
+    """Réduit un en-tête de colonne à une forme comparable : minuscules,
+    sans accents, sans ponctuation. Sert à reconnaître les en-têtes d'un
+    fichier importé même s'ils ne sont pas exactement identiques au modèle
+    (majuscules, accents oubliés, espaces en trop…)."""
+    texte = unicodedata.normalize("NFKD", str(texte or ""))
+    texte = texte.encode("ascii", "ignore").decode("ascii")
+    texte = re.sub(r"[^a-z0-9]+", " ", texte.lower()).strip()
+    return texte
+
+
 def prochain_numero(prefixe, colonne, annee):
     """Génère ICM-B-2026-0001 / ICM-M-2026-0001 en continuant la numérotation."""
     motif = f"ICM-{prefixe}-{annee}-%"
@@ -299,16 +334,16 @@ def appliquer_photo(record, form):
     return None
 
 
-def collecter_formulaire(form):
-    """Lit le formulaire et renvoie (données, liste d'erreurs)."""
-    donnees = {c: (form.get(c, "") or "").strip() or None for c in CHAMPS_TEXTE}
-    for c in CHAMPS_DATE:
-        donnees[c] = lire_date(form.get(c))
-
+def valider_donnees(donnees):
+    """Règles métier sur un dict de données déjà typé (dates en `date`,
+    textes vides ramenés à None). Renvoie la liste des erreurs trouvées.
+    Utilisé aussi bien par le formulaire de saisie que par l'import de
+    fichier, pour que les deux chemins appliquent exactement les mêmes
+    règles."""
     erreurs = []
-    if not donnees["nom"]:
+    if not donnees.get("nom"):
         erreurs.append("Le nom est obligatoire.")
-    if not donnees["prenom"]:
+    if not donnees.get("prenom"):
         erreurs.append("Le prénom est obligatoire.")
 
     aujourdhui = date.today()
@@ -317,17 +352,25 @@ def collecter_formulaire(form):
         ("baptême", "date_bapteme"),
         ("mariage", "date_mariage"),
     ):
-        if donnees[champ] and donnees[champ] > aujourdhui:
+        if donnees.get(champ) and donnees[champ] > aujourdhui:
             erreurs.append(f"La date de {libelle} ne peut pas être dans le futur.")
 
-    if donnees["date_naissance"] and donnees["date_bapteme"] \
+    if donnees.get("date_naissance") and donnees.get("date_bapteme") \
             and donnees["date_bapteme"] < donnees["date_naissance"]:
         erreurs.append("Le baptême ne peut pas précéder la naissance.")
-    if donnees["date_naissance"] and donnees["date_mariage"] \
+    if donnees.get("date_naissance") and donnees.get("date_mariage") \
             and donnees["date_mariage"] < donnees["date_naissance"]:
         erreurs.append("Le mariage ne peut pas précéder la naissance.")
 
-    return donnees, erreurs
+    return erreurs
+
+
+def collecter_formulaire(form):
+    """Lit le formulaire et renvoie (données, liste d'erreurs)."""
+    donnees = {c: (form.get(c, "") or "").strip() or None for c in CHAMPS_TEXTE}
+    for c in CHAMPS_DATE:
+        donnees[c] = lire_date(form.get(c))
+    return donnees, valider_donnees(donnees)
 
 
 def verifier_unicite(donnees, id_courant=None):
@@ -496,19 +539,7 @@ def carte(record_id):
 @app.route("/export.csv")
 @login_requis
 def export_csv():
-    colonnes = [
-        ("nom", "Nom"), ("prenom", "Prénom"), ("nom_pere", "Fils/Fille de"),
-        ("nom_mere", "Et de"), ("date_naissance", "Date de naissance"),
-        ("nationalite", "Nationalité"), ("originaire_de", "Originaire de"),
-        ("date_bapteme", "Date de baptême"), ("lieu_bapteme", "Lieu du baptême"),
-        ("numero_registre_1", "N° Registre (1)"),
-        ("celebrant_bapteme", "Célébrant baptême"), ("signature_1", "Signature (1)"),
-        ("lieu_mariage", "Lieu du mariage"), ("date_mariage", "Date du mariage"),
-        ("conjoint", "Conjoint"), ("numero_registre_2", "N° Registre (2)"),
-        ("celebrant_mariage", "Célébrant mariage"), ("signature_2", "Signature (2)"),
-        ("telephone", "Téléphone"), ("observations", "Observations"),
-        ("photo", "Fichier photo"),
-    ]
+    colonnes = COLONNES_EXPORT
 
     tampon = io.StringIO()
     tampon.write("﻿")  # BOM : Excel affiche correctement les accents
@@ -529,6 +560,292 @@ def export_csv():
         tampon.getvalue(),
         mimetype="text/csv; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{nom_fichier}"'},
+    )
+
+
+# ------------------------------------------------------------------
+#  Import du registre papier existant (fichier Excel .xlsx ou .csv)
+# ------------------------------------------------------------------
+# Reconnaît les en-têtes du fichier envoyé en les comparant, une fois
+# normalisés (minuscules, sans accents), à ceux du modèle/export. La photo
+# ne fait pas partie de l'import : un fichier Excel ne contient pas
+# d'images, seulement un nom de fichier qui ne correspondrait à rien.
+CHAMPS_PAR_ENTETE = {
+    normaliser_entete(libelle): champ
+    for champ, libelle in COLONNES_EXPORT if champ != "photo"
+}
+
+
+def _decoder_texte(brut):
+    """Décode un fichier .csv quel que soit son encodage d'origine — Excel,
+    selon la version et la langue de Windows, enregistre parfois en
+    Windows-1252 plutôt qu'en UTF-8."""
+    for encodage in ("utf-8-sig", "cp1252"):
+        try:
+            return brut.decode(encodage)
+        except UnicodeDecodeError:
+            continue
+    return brut.decode("latin-1")  # ne déclenche jamais d'erreur : dernier recours
+
+
+def _lire_csv(fichier):
+    texte = _decoder_texte(fichier.read())
+    lignes_texte = texte.splitlines()
+    if not lignes_texte:
+        return [], []
+    try:
+        delimiteur = csv.Sniffer().sniff(lignes_texte[0], delimiters=";,").delimiter
+    except csv.Error:
+        delimiteur = ";"
+    lignes = list(csv.reader(lignes_texte, delimiter=delimiteur))
+    return (lignes[1:], lignes[0]) if lignes else ([], [])
+
+
+def _lire_xlsx(fichier):
+    classeur = openpyxl.load_workbook(fichier, read_only=True, data_only=True)
+    feuille = classeur.worksheets[0]
+    lignes = feuille.iter_rows(values_only=True)
+    try:
+        entetes = list(next(lignes))
+    except StopIteration:
+        return [], []
+    return [list(l) for l in lignes], entetes
+
+
+def lire_fichier_import(fichier):
+    """Lit un fichier .xlsx ou .csv envoyé par le secrétariat.
+
+    Renvoie (lignes, colonnes_ignorees, erreur). `lignes` est une liste de
+    dicts {champ_interne: valeur_brute} — une entrée par ligne non vide du
+    fichier. `erreur` est une chaîne si le fichier n'a pas pu être exploité
+    du tout (mauvais format, colonnes essentielles introuvables…), et dans
+    ce cas les deux autres valeurs sont None.
+    """
+    nom_fichier = (fichier.filename or "").lower()
+    try:
+        if nom_fichier.endswith((".xlsx", ".xlsm")):
+            if openpyxl is None:
+                return None, None, (
+                    "L'import de fichiers .xlsx nécessite le paquet "
+                    "« openpyxl » (ajouté à requirements.txt — réinstallez "
+                    "les dépendances avec pip install -r requirements.txt), "
+                    "ou envoyez plutôt un fichier .csv."
+                )
+            lignes_brutes, entetes = _lire_xlsx(fichier)
+        elif nom_fichier.endswith(".csv"):
+            lignes_brutes, entetes = _lire_csv(fichier)
+        else:
+            return None, None, "Format non reconnu : envoyez un fichier .xlsx ou .csv."
+    except Exception:
+        return None, None, (
+            "Le fichier n'a pas pu être lu. Vérifiez qu'il n'est pas "
+            "corrompu ou protégé par un mot de passe."
+        )
+
+    correspondance = {}
+    for i, entete in enumerate(entetes):
+        champ = CHAMPS_PAR_ENTETE.get(normaliser_entete(entete))
+        if champ:
+            correspondance[i] = champ
+
+    if "nom" not in correspondance.values() or "prenom" not in correspondance.values():
+        return None, None, (
+            "Les colonnes « Nom » et « Prénom » sont introuvables dans ce "
+            "fichier. Téléchargez le modèle ci-dessous et gardez ses "
+            "en-têtes tels quels."
+        )
+
+    colonnes_ignorees = [
+        entete for i, entete in enumerate(entetes)
+        if i not in correspondance and str(entete or "").strip()
+    ]
+
+    lignes = []
+    for valeurs in lignes_brutes:
+        ligne = {
+            champ: (valeurs[i] if i < len(valeurs) else None)
+            for i, champ in correspondance.items()
+        }
+        if any(v not in (None, "") for v in ligne.values()):
+            lignes.append(ligne)
+
+    return lignes, colonnes_ignorees, None
+
+
+def _valeur_texte_import(valeur):
+    if valeur is None:
+        return None
+    if isinstance(valeur, str):
+        return valeur.strip() or None
+    if isinstance(valeur, float):
+        return str(int(valeur)) if valeur.is_integer() else str(valeur)
+    return str(valeur).strip() or None
+
+
+def _valeur_date_import(valeur):
+    if valeur is None:
+        return None
+    if isinstance(valeur, datetime):
+        return valeur.date()
+    if isinstance(valeur, date):
+        return valeur
+    if isinstance(valeur, str):
+        return lire_date(valeur)
+    return None
+
+
+def donnees_depuis_ligne(ligne_brute):
+    """Convertit une ligne brute (valeurs telles que lues dans le fichier)
+    dans le même format typé que collecter_formulaire : textes vides à
+    None, dates converties."""
+    donnees = {c: _valeur_texte_import(ligne_brute.get(c)) for c in CHAMPS_TEXTE}
+    for c in CHAMPS_DATE:
+        donnees[c] = _valeur_date_import(ligne_brute.get(c))
+    return donnees
+
+
+def donnees_vers_json(donnees):
+    """Rend un dict `donnees` sérialisable en JSON (dates → texte ISO), pour
+    le champ caché qui fait le pont entre l'aperçu et la confirmation."""
+    d = dict(donnees)
+    for c in CHAMPS_DATE:
+        if isinstance(d.get(c), date):
+            d[c] = d[c].isoformat()
+    return d
+
+
+def donnees_depuis_json(d):
+    donnees = {c: (d.get(c) or None) for c in CHAMPS_TEXTE}
+    for c in CHAMPS_DATE:
+        donnees[c] = lire_date(d.get(c))
+    return donnees
+
+
+def analyser_lignes(paires):
+    """Valide une liste de (numero_ligne, donnees) : règles métier, doublons
+    avec la base existante, et doublons entre lignes du même fichier.
+    Renvoie une liste de dicts {numero_ligne, donnees, erreurs}."""
+    resultats = []
+    vus = {"numero_registre_1": {}, "numero_registre_2": {}}
+    libelles = {"numero_registre_1": "baptême", "numero_registre_2": "mariage"}
+
+    for numero_ligne, donnees in paires:
+        erreurs = valider_donnees(donnees) + verifier_unicite(donnees)
+        for champ, dejavu in vus.items():
+            valeur = donnees.get(champ)
+            if not valeur:
+                continue
+            if valeur in dejavu:
+                erreurs.append(
+                    f"N° de registre {libelles[champ]} « {valeur} » utilisé "
+                    f"aussi à la ligne {dejavu[valeur]} de ce fichier."
+                )
+            else:
+                dejavu[valeur] = numero_ligne
+        resultats.append({
+            "numero_ligne": numero_ligne, "donnees": donnees, "erreurs": erreurs,
+        })
+    return resultats
+
+
+@app.route("/importer", methods=["GET", "POST"])
+@login_requis
+def importer():
+    if request.method == "GET":
+        return render_template("importer.html", resultats=None, paroisse=PAROISSE)
+
+    etape = request.form.get("etape", "analyser")
+
+    # -------- Étape 2 : la personne a vérifié l'aperçu et confirme --------
+    if etape == "confirmer":
+        try:
+            lot = json.loads(request.form.get("donnees_json") or "[]")
+        except ValueError:
+            flash("La session d'import a expiré ou est invalide. Recommencez.", "error")
+            return redirect(url_for("importer"))
+
+        paires = [
+            (item.get("numero_ligne"), donnees_depuis_json(item.get("donnees") or {}))
+            for item in lot
+        ]
+        # On revalide entièrement : le champ cache a pu voyager côté
+        # navigateur entre l'aperçu et la confirmation, et la base a pu
+        # changer entre-temps (nouvelle fiche, numéro déjà pris…).
+        resultats = analyser_lignes(paires)
+        valides = [r for r in resultats if not r["erreurs"]]
+
+        for r in valides:
+            db.session.add(Registre(**attribuer_numeros(r["donnees"])))
+        db.session.commit()
+
+        ignorees = len(resultats) - len(valides)
+        message = f"{len(valides)} fiche(s) importée(s) depuis le fichier."
+        if ignorees:
+            message += (
+                f" {ignorees} ligne(s) ignorée(s) : devenue(s) invalide(s) "
+                f"ou en doublon depuis l'aperçu."
+            )
+        flash(message, "success" if valides else "error")
+        return redirect(url_for("index"))
+
+    # -------- Étape 1 : lecture et analyse du fichier envoyé --------
+    fichier = request.files.get("fichier")
+    if not fichier or not fichier.filename:
+        flash("Choisissez un fichier .xlsx ou .csv à importer.", "error")
+        return redirect(url_for("importer"))
+
+    lignes_brutes, colonnes_ignorees, erreur = lire_fichier_import(fichier)
+    if erreur:
+        flash(erreur, "error")
+        return redirect(url_for("importer"))
+    if not lignes_brutes:
+        flash("Ce fichier ne contient aucune ligne de données à importer.", "error")
+        return redirect(url_for("importer"))
+
+    paires = [
+        (i, donnees_depuis_ligne(ligne))
+        for i, ligne in enumerate(lignes_brutes, start=2)  # ligne 1 = en-têtes
+    ]
+    resultats = analyser_lignes(paires)
+    valides = [r for r in resultats if not r["erreurs"]]
+
+    donnees_json = json.dumps([
+        {"numero_ligne": r["numero_ligne"], "donnees": donnees_vers_json(r["donnees"])}
+        for r in valides
+    ])
+
+    return render_template(
+        "importer.html", paroisse=PAROISSE, resultats=resultats,
+        nb_valides=len(valides), nb_erreurs=len(resultats) - len(valides),
+        colonnes_ignorees=colonnes_ignorees, donnees_json=donnees_json,
+        nom_fichier=fichier.filename,
+    )
+
+
+@app.route("/importer/modele.csv")
+@login_requis
+def importer_modele():
+    exemple = {
+        "nom": "NGOOH", "prenom": "Hervé", "nom_pere": "NGOOH Paul",
+        "nom_mere": "MBALLA Marie", "date_naissance": "12/04/1990",
+        "nationalite": "Camerounaise", "originaire_de": "Yaoundé",
+        "date_bapteme": "02/06/2024", "lieu_bapteme": "Temple ICM Douala",
+        "celebrant_bapteme": "Past. Jean ETOUNDI",
+        "signature_1": "Past. Jean ETOUNDI", "telephone": "677000000",
+        "observations": "Exemple à supprimer avant l'import",
+    }
+    colonnes = [(c, l) for c, l in COLONNES_EXPORT if c != "photo"]
+
+    tampon = io.StringIO()
+    tampon.write("﻿")
+    writer = csv.writer(tampon, delimiter=";")
+    writer.writerow([libelle for _, libelle in colonnes])
+    writer.writerow([exemple.get(champ, "") for champ, _ in colonnes])
+
+    return Response(
+        tampon.getvalue(),
+        mimetype="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="modele_import_icm.csv"'},
     )
 
 

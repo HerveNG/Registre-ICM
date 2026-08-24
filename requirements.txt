@@ -1,6 +1,7 @@
 Flask>=3.0,<4
 Flask-SQLAlchemy>=3.1,<4
 python-dotenv>=1.0,<2
+openpyxl>=3.1,<4       # lecture des fichiers .xlsx pour l'import du registre papier
 
 # Décommenter uniquement si vous connectez l'application à Supabase/PostgreSQL :
 # psycopg[binary]>=3.2,<4

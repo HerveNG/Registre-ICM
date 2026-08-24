@@ -25,6 +25,7 @@ Deux applications sont livrées, elles partagent le **même modèle de données*
 - enregistrer le **baptême** : date, lieu, célébrant, n° de registre, signature ;
 - compléter le **mariage** plus tard : lieu, date, conjoint, n° de registre, signature ;
 - **attribuer automatiquement** les numéros : `ICM-B-2026-0001`, `ICM-M-2026-0001` ;
+- **importer d'un coup** le registre papier existant depuis un fichier Excel/CSV ;
 - **rechercher** par nom, prénom, n° de registre ou conjoint ;
 - **filtrer** : baptisés / mariés / baptême non renseigné ;
 - modifier, supprimer ;
@@ -58,7 +59,7 @@ mvp_registre_bapteme_mariage/
 ├── app.py                         ← APPLICATION FLASK
 ├── requirements.txt
 ├── .env.example                   ← à copier en « .env »
-├── templates/                     ← pages (connexion, liste, formulaire, carte)
+├── templates/                     ← pages (connexion, liste, formulaire, carte, import)
 └── static/
     ├── style.css
     ├── photo.js                   ← recadrage et compression des photos
@@ -163,7 +164,32 @@ image externe).
 
 ---
 
-## 6. Photos d'identité
+## 6. Importer le registre papier existant
+
+Bouton **Importer**, en haut du registre. Le principe est le même sur les
+deux versions : rien n'est écrit tant que vous n'avez pas confirmé.
+
+1. **Télécharger le modèle** (.csv) proposé sur l'écran d'import, et le
+   remplir dans Excel — une ligne par fidèle, sans toucher aux en-têtes de
+   colonnes. Vous pouvez l'enregistrer en .xlsx ou en .csv (la version en
+   ligne accepte le .csv ; la version Flask accepte les deux).
+2. **Envoyer le fichier** → l'application l'analyse et affiche un aperçu
+   ligne par ligne : chaque ligne est marquée *ok* ou *erreur*, avec le
+   détail de l'erreur (nom manquant, date incohérente, numéro de registre
+   déjà pris — dans la base ou en double dans le fichier lui-même).
+3. **Confirmer l'import** des lignes valides. Les lignes en erreur ne sont
+   pas importées ; corrigez-les dans le fichier et renvoyez-le si besoin,
+   sans repasser par les lignes déjà importées.
+
+Les numéros de registre non renseignés dans le fichier sont attribués
+automatiquement, exactement comme pour une carte saisie à la main.
+**Les photos ne peuvent pas être importées** depuis un fichier Excel — un
+tableur ne contient pas d'images. Ajoutez-les ensuite une par une, en
+modifiant chaque fiche importée.
+
+---
+
+## 7. Photos d'identité
 
 Dans le formulaire, **Choisir une photo** ouvre une fenêtre de recadrage :
 faites glisser l'image pour centrer le visage, ajustez le zoom, validez.
@@ -201,7 +227,7 @@ fichier — le stockage ne se remplit pas d'images orphelines.
 
 ---
 
-## 7. Sauvegardes
+## 8. Sauvegardes
 
 Une fois par mois : bouton **Export Excel** → ranger le fichier
 `registre_icm_AAAA-MM-JJ.csv` en dehors de l'ordinateur (clé USB, Drive).
@@ -214,11 +240,10 @@ C'est la seule sauvegarde qui vous appartienne vraiment.
 
 ---
 
-## 8. Ce qui reste à faire pour une version 2
+## 9. Ce qui reste à faire pour une version 2
 
 - comptes différenciés (secrétaire / pasteur / lecture seule) ;
 - journal d'audit : qui a créé ou modifié quelle carte, et quand ;
-- import du registre papier existant depuis un fichier Excel ;
 - signature scannée du célébrant sur la carte ;
 - séparation des personnes et des actes (un mariage = deux fidèles liés) ;
 - attestations et statistiques annuelles imprimables ;
@@ -226,7 +251,7 @@ C'est la seule sauvegarde qui vous appartienne vraiment.
 
 ---
 
-## 9. Modèle de données
+## 10. Modèle de données
 
 Un enregistrement = une carte = un fidèle. Le bloc mariage reste vide tant
 que la personne n'est pas mariée, exactement comme sur la carte papier.
