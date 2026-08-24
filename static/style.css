@@ -37,10 +37,10 @@ body{
 .marque{display:flex; align-items:center; gap:.85rem; color:#fff; text-decoration:none;}
 .marque-sigle{
   width:42px; height:42px; border-radius:50%;
-  background:var(--or); color:var(--encre);
   display:flex; align-items:center; justify-content:center;
-  font-weight:700; letter-spacing:.04em; font-size:.95rem;
+  overflow:hidden; flex:none;
 }
+.marque-sigle img{width:100%; height:100%; object-fit:contain;}
 .marque-texte strong{display:block; font-size:1rem; letter-spacing:.02em;}
 .marque-texte small{display:block; font-size:.78rem; opacity:.75;}
 
@@ -212,10 +212,10 @@ label input,label select,label textarea{margin-top:.25rem; font-weight:400;
 }
 .connexion-sigle{
   width:60px; height:60px; margin:0 auto 1rem; border-radius:50%;
-  background:var(--encre); color:var(--or-clair);
   display:flex; align-items:center; justify-content:center;
-  font-weight:700; letter-spacing:.05em;
+  overflow:hidden;
 }
+.connexion-sigle img{width:100%; height:100%; object-fit:contain;}
 .carte-connexion h1{font-size:1.15rem; margin:0 0 .2rem;}
 .connexion-sous-titre{color:var(--encre-douce); font-size:.85rem;
   margin:0 0 1.5rem;}

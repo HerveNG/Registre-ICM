@@ -155,10 +155,11 @@ La carte sort sur deux pages A5 paysage : la couverture (verset de
 Galates 3 : 26-27 et titre) puis l'intérieur rempli.
 Pensez à cocher **« Graphiques d'arrière-plan »** pour conserver les filets dorés.
 
-Le logo ICM est représenté par un rond portant le sigle. Pour utiliser le
-logo réel, remplacez dans `templates/carte.html` (et dans `web/index.html`)
-le bloc `<div class="sigle-carte">ICM</div>` par
-`<img src="logo.png" style="width:26mm">`.
+Le logo réel d'In Christ Ministries est intégré partout dans l'application :
+en-tête, écran de connexion et carte imprimable — sur les deux versions.
+Il vit dans `static/logo.png` pour la version Flask, et directement encodé
+dans `web/index.html` (le fichier doit rester autonome, sans dépendre d'une
+image externe).
 
 ---
 
