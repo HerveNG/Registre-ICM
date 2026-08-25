@@ -1,7 +1,11 @@
 Flask>=3.0,<4
 Flask-SQLAlchemy>=3.1,<4
 Flask-WTF>=1.2,<2      # protection CSRF sur tous les formulaires
-Pillow>=10.0,<11       # revalidation/ré-encodage réel des photos envoyées
+Pillow>=10.0,<13       # revalidation/ré-encodage réel des photos envoyées
+                       # (pas de roue précompilée <11 pour Python 3.14+ :
+                       # pip installerait depuis les sources et échouerait
+                       # sans compilateur C — la plage large laisse pip
+                       # choisir la version la plus récente compatible)
 python-dotenv>=1.0,<2
 openpyxl>=3.1,<4       # lecture des fichiers .xlsx pour l'import du registre papier
 
