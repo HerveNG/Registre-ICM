@@ -47,7 +47,7 @@
       <td>
         <div class="cellule-identite">
           {% if r.photo %}
-            <img class="vignette" src="{{ url_for('static', filename='photos/' ~ r.photo) }}"
+            <img class="vignette" src="{{ url_for('photo', nom_fichier=r.photo) }}"
                  alt="Photo de {{ r.nom }} {{ r.prenom }}">
           {% else %}
             <span class="vignette-absente" title="Aucune photo"></span>
@@ -79,6 +79,7 @@
           <a class="bouton bouton-petit" href="{{ url_for('modifier', record_id=r.id) }}">Modifier</a>
           <form method="post" action="{{ url_for('supprimer', record_id=r.id) }}"
                 onsubmit="return confirm('Supprimer définitivement la carte de {{ r.nom }} {{ r.prenom }} ?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="bouton bouton-petit bouton-danger">Supprimer</button>
           </form>
         {% endif %}

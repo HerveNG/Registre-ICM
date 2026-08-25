@@ -34,13 +34,14 @@
 </div>
 
 <form method="post" class="formulaire formulaire-large">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
   <fieldset>
     <legend>Photo d'identité</legend>
     <div class="bloc-photo">
       <div class="photo-cadre" id="photo-cadre">
         {% if record and record.photo %}
-          <img id="photo-apercu" src="{{ url_for('static', filename='photos/' ~ record.photo) }}" alt="">
+          <img id="photo-apercu" src="{{ url_for('photo', nom_fichier=record.photo) }}" alt="">
         {% else %}
           <img id="photo-apercu" hidden alt="">
           <span class="photo-vide" id="photo-vide">Aucune photo</span>

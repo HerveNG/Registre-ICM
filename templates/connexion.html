@@ -8,6 +8,7 @@
   <p class="connexion-sous-titre">Accès réservé aux comptes autorisés</p>
 
   <form method="post" class="formulaire">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <label>
       Identifiant
       <input type="text" name="utilisateur" required autofocus autocomplete="username">

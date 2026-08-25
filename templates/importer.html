@@ -22,6 +22,7 @@
   </p>
 
   <form method="post" enctype="multipart/form-data" class="formulaire" style="margin-top:1.2rem">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="etape" value="analyser">
     <label>
       Fichier à importer
@@ -103,8 +104,9 @@
   <div class="import-actions">
     {% if nb_valides %}
     <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="etape" value="confirmer">
-      <input type="hidden" name="donnees_json" value='{{ donnees_json }}'>
+      <input type="hidden" name="donnees_json" value='{{ donnees_json | tojson }}'>
       <button type="submit" class="bouton bouton-principal"
               onclick="return confirm('Importer {{ nb_valides }} fiche(s) dans le registre ?');">
         Confirmer l'import de {{ nb_valides }} fiche(s)

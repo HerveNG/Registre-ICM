@@ -56,6 +56,10 @@ mvp_registre_bapteme_mariage/
 │   ├── migration_01_photo.sql     ← si la base existait AVANT les photos
 │   ├── migration_02_roles.sql     ← si la base existait AVANT les rôles
 │   ├── migration_03_journal.sql   ← si la base existait AVANT le journal d'audit
+│   ├── migration_04_durcissement_securite.sql
+│   │                               ← si la base existait AVANT l'audit de sécurité
+│   │                                 du 25/08/2026 (§ 13) — déjà inclus dans
+│   │                                 schema_supabase.sql pour une base neuve
 │   └── schema_sqlite.sql          ← documentation du schéma local
 │
 ├── app.py                         ← APPLICATION FLASK
@@ -84,11 +88,15 @@ mvp_registre_bapteme_mariage/
    étape, un compte créé ne peut rien lire ni écrire.
 4. **Project Settings → API** : noter l'`URL` du projet et la clé `anon`.
 
-> **Vous aviez déjà créé la base avant les photos, avant les rôles, ou
-> avant le journal d'audit ?** Ne rejouez pas le script complet : exécutez,
-> dans cet ordre, `database/migration_01_photo.sql` puis
-> `database/migration_02_roles.sql` puis `database/migration_03_journal.sql`
-> — chacun ajoute seulement ce qui manque, sans toucher à vos données.
+> **Vous aviez déjà créé la base avant les photos, avant les rôles, avant
+> le journal d'audit, ou avant l'audit de sécurité du 25/08/2026 (§ 13) ?**
+> Ne rejouez pas le script complet : exécutez, dans cet ordre,
+> `database/migration_01_photo.sql` puis `database/migration_02_roles.sql`
+> puis `database/migration_03_journal.sql` puis
+> `database/migration_04_durcissement_securite.sql` — chacun ajoute
+> seulement ce qui manque, sans toucher à vos données. Une base créée à
+> partir du `schema_supabase.sql` actuel n'a besoin d'aucune de ces
+> migrations : tout est déjà dedans.
 
 **b) Relier l'application**
 
@@ -354,3 +362,48 @@ que la personne n'est pas mariée, exactement comme sur la carte papier.
 | `signature_2` | Signature (2) |
 | `photo` | cadre photo en haut à droite de l'intérieur |
 | `lieu_bapteme`, `celebrant_*`, `telephone`, `observations` | ajouts utiles au registre |
+
+---
+
+## 13. Sécurité
+
+Un audit complet des deux versions a été mené le 25/08/2026, avec correction
+et **test systématique de chaque correctif** (y compris en simulant des
+tentatives d'attaque réelles contre une base de test) avant toute livraison.
+Aucune modification listée ici ne change la façon d'utiliser l'application au
+quotidien — c'est un durcissement invisible pour les utilisateurs.
+
+**Sur les deux versions**
+
+| Protection | Détail |
+|---|---|
+| Anti-force brute sur la connexion | 5 tentatives maximum, puis blocage 15 min de ce couple identifiant/appareil — sans jamais indiquer si c'est l'identifiant ou le mot de passe qui est faux |
+| Blocage de l'injection de formule dans les exports | Une observation commençant par `=`, `+`, `-` ou `@` est neutralisée dans l'export Excel/CSV, pour qu'Excel ne l'exécute jamais comme une formule à l'ouverture |
+| Longueur maximale des champs texte | Un champ démesurément long (saisie ou import) est refusé avec un message clair, plutôt que d'être accepté sans limite |
+| Messages d'erreur génériques | Aucun détail technique interne (requête SQL, trace serveur) n'est jamais affiché à l'écran, y compris en cas de panne |
+
+**Version Flask**
+
+| Protection | Détail |
+|---|---|
+| Jeton anti-CSRF | Chaque formulaire (connexion, création, modification, suppression, import) exige un jeton à usage limité ; une requête forgée depuis un autre site est refusée |
+| Cookie de session sécurisé | Inaccessible en JavaScript, refusé hors HTTPS en production (`FORCER_HTTPS`, voir `.env.example`), expire après 8 h d'inactivité |
+| En-têtes de sécurité HTTP | Anti-clickjacking, anti-sniffing MIME, `Content-Security-Policy` sur toutes les pages |
+| Photos hors dossier public | Les photos vivent désormais dans un dossier protégé (`photos/`, plus dans `static/`) : elles ne sont plus accessibles par une simple adresse web, seulement via une route qui exige d'être connecté |
+| Vérification réelle du contenu des photos | Un fichier envoyé sous une fausse extension image est décodé et ré-encodé avant tout enregistrement — un contenu qui n'est pas réellement une image est rejeté, quel que soit son nom ou son type déclaré |
+| Redirection après connexion contrôlée | Le lien de retour après connexion ne peut jamais pointer vers un autre site (protection anti-hameçonnage) |
+| Écriture en base cohérente | Toute erreur au moment d'enregistrer (ex. numéro de registre pris entre-temps par un autre poste) annule proprement l'opération, sans fiche à moitié enregistrée ni fichier photo orphelin |
+
+**Version en ligne (Supabase)**
+
+| Protection | Détail |
+|---|---|
+| Fonctions internes non exposées | Les fonctions utilisées uniquement en coulisse (calcul du journal, libellés) ne sont plus exécutables directement par un compte, même connecté |
+| Vue statistiques sous contrôle de rôle | `v_statistiques` respecte désormais les mêmes règles d'accès que le registre, au lieu d'hériter des droits élargis de son propriétaire technique |
+| Auto-promotion de rôle impossible | Un compte ne peut pas se donner lui-même un rôle plus élevé (ex. « visiteur » → « pasteur ») : bloqué à la fois par l'absence de droit d'écriture sur la table des rôles et par un déclencheur indépendant, testé en simulant volontairement une régression future (droit d'écriture ajouté par erreur) — le blocage tient quand même |
+| Journal d'audit rendu immuable | Une entrée du journal ne peut plus être modifiée ni supprimée après coup, par personne, une fois écrite |
+
+Détail technique complet et raisonnement (y compris ce qui a été
+**volontairement laissé de côté**, et pourquoi) : voir l'en-tête de
+`database/migration_04_durcissement_securite.sql` (repris dans
+`database/schema_supabase.sql`, section 12, pour une base neuve).

@@ -1011,6 +1011,10 @@ async function chargerRole(){
     etat.role = (donnees && donnees[0] && donnees[0].role) || null;
   }catch(e){
     etat.role = null;
+    // Si la session a expiré, l'appel à api() ci-dessus a déjà appelé
+    // deconnexion() (écran de connexion + message affichés). Ne pas
+    // ajouter par-dessus le message "aucun rôle attribué", trompeur ici.
+    if (!etat.session) return etat.role;
   }
   if (!etat.role){
     message("Ce compte n'a pas encore de rôle attribué (secrétaire / pasteur / "
@@ -1051,7 +1055,14 @@ async function api(chemin, options={}, deuxiemeEssai=false){
       throw new Error("Accès refusé par la base : votre compte n'a peut-être "
         + "pas le rôle nécessaire (secrétaire ou pasteur), ou le script SQL "
         + "(politiques RLS) n'a pas encore été exécuté dans Supabase.");
-    throw new Error(detail || `Erreur ${r.status}.`);
+    // Pour tout le reste, on ne renvoie pas le message technique brut de
+    // PostgREST/Postgres à l'écran (il peut révéler des noms de colonnes ou
+    // de contraintes, utiles à quelqu'un qui chercherait à contourner les
+    // policies RLS via des appels API directs) : on le garde en console
+    // pour le diagnostic, et on montre un message générique à l'écran.
+    if (detail) console.error("Erreur API Supabase :", detail);
+    throw new Error(`Une erreur est survenue (${r.status}). Réessayez, ou `
+      + `contactez la personne qui gère la base si cela persiste.`);
   }
 
   const intervalle = r.headers.get("content-range");   // ex. "0-19/143"
@@ -1254,10 +1265,10 @@ function dessinerTableau(){
               : "—" }</td>
       <td>${echapper(r.conjoint || "—")}</td>
       <td class="col-actions">
-        <button class="bouton bouton-petit" data-action="carte" data-id="${r.id}">Carte</button>
+        <button class="bouton bouton-petit" data-action="carte" data-id="${echapper(r.id)}">Carte</button>
         ${ peutEcrire() ? `
-        <button class="bouton bouton-petit" data-action="modifier"  data-id="${r.id}">Modifier</button>
-        <button class="bouton bouton-petit bouton-danger" data-action="supprimer" data-id="${r.id}">Supprimer</button>
+        <button class="bouton bouton-petit" data-action="modifier"  data-id="${echapper(r.id)}">Modifier</button>
+        <button class="bouton bouton-petit bouton-danger" data-action="supprimer" data-id="${echapper(r.id)}">Supprimer</button>
         ` : "" }
       </td>
     </tr>`).join("");
@@ -1479,6 +1490,10 @@ function validerFormulaire(d){
 
 async function soumettreFormulaire(evt){
   evt.preventDefault();
+  if (!peutEcrire()){
+    message("Accès réservé au secrétariat et au pasteur.", "erreur");
+    return;
+  }
   const donnees = lireFormulaire();
   const erreurs = validerFormulaire(donnees);
   if (erreurs.length){ message(erreurs.join(" "), "erreur"); return; }
@@ -1537,6 +1552,9 @@ async function supprimer(id){
     await api(`registre?id=eq.${encodeURIComponent(id)}`, { method:"DELETE" });
     if (r.photo) await supprimerPhoto(r.photo);   // la fiche partie, l'image aussi
     message(`Carte de ${r.nom} ${r.prenom} supprimée.`, "succes");
+    // Si c'était la dernière ligne de la page courante (et qu'il existe une
+    // page précédente), on y revient plutôt que d'afficher une page vide.
+    if (etat.lignes.length === 1 && etat.page > 1) etat.page--;
     await chargerListe();
   }catch(e){ message(e.message, "erreur"); }
 }
@@ -1589,6 +1607,18 @@ const COLONNES_EXPORT = [
   ["photo","Fichier photo"]
 ];
 
+// Neutralise l'injection de formule CSV (CWE-1236) : un champ texte libre
+// commençant par =, +, -, @ (ou une tabulation) serait interprété comme une
+// formule par Excel/LibreOffice/Google Sheets à l'ouverture du fichier —
+// potentiellement piégée. On préfixe d'une apostrophe, affichée telle
+// quelle par ces logiciels comme texte, avant l'échappement CSV habituel.
+function celluleCsv(v){
+  let s = String(v ?? "");
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+  s = s.replace(/"/g, '""');
+  return /[";\n]/.test(s) ? `"${s}"` : s;
+}
+
 async function exporterCsv(){
   if (!peutEcrire()){
     message("Accès réservé au secrétariat et au pasteur.", "erreur");
@@ -1600,15 +1630,11 @@ async function exporterCsv(){
       headers:{ "Range-Unit":"items", "Range":"0-9999" }
     });
 
-    const cellule = (v)=>{
-      const s = String(v ?? "").replace(/"/g, '""');
-      return /[";\n]/.test(s) ? `"${s}"` : s;
-    };
-    const lignes = [COLONNES_EXPORT.map(c=>cellule(c[1])).join(";")];
+    const lignes = [COLONNES_EXPORT.map(c=>celluleCsv(c[1])).join(";")];
     (donnees||[]).forEach(r=>{
       lignes.push(COLONNES_EXPORT.map(([champ])=>{
         const v = r[champ];
-        return cellule(champ.startsWith("date_") ? dateFr(v) : v);
+        return celluleCsv(champ.startsWith("date_") ? dateFr(v) : v);
       }).join(";"));
     });
 
@@ -1875,13 +1901,9 @@ function telechargerModeleImport(){
     celebrant_bapteme: "Past. Jean ETOUNDI", signature_1: "Past. Jean ETOUNDI",
     telephone: "677000000", observations: "Exemple à supprimer avant l'import",
   };
-  const cellule = (v) => {
-    const s = String(v ?? "").replace(/"/g, '""');
-    return /[";\n]/.test(s) ? `"${s}"` : s;
-  };
   const lignes = [
-    colonnes.map(c => cellule(c[1])).join(";"),
-    colonnes.map(([champ]) => cellule(exemple[champ] || "")).join(";"),
+    colonnes.map(c => celluleCsv(c[1])).join(";"),
+    colonnes.map(([champ]) => celluleCsv(exemple[champ] || "")).join(";"),
   ];
   const blob = new Blob(["\uFEFF" + lignes.join("\r\n")], { type: "text/csv;charset=utf-8;" });
   const lien = document.createElement("a");
@@ -1946,6 +1968,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       etat.session = await seConnecter($("login-email").value.trim(), $("login-mdp").value);
       stockage.ecrire("icm_session", JSON.stringify(etat.session));
       await chargerRole();
+      if (!etat.session) return;   // sécurité : session invalidée entre-temps
       $("etiquette-utilisateur").textContent = etiquetteCompte();
       $("login-mdp").value = "";
       afficherVue("liste");
@@ -2094,6 +2117,10 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     try{
       etat.session = JSON.parse(sessionSauvee);
       await chargerRole();
+      // Si le jeton était expiré et non renouvelable, chargerRole() a
+      // déclenché deconnexion() (écran de connexion déjà affiché) : ne pas
+      // l'écraser en continuant vers la vue "liste".
+      if (!etat.session) return;
       $("etiquette-utilisateur").textContent = etiquetteCompte();
       afficherVue("liste");
       chargerListe();

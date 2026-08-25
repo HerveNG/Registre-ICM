@@ -31,17 +31,24 @@ import io
 import json
 import os
 import re
+import secrets
+import shutil
+import time
 import unicodedata
 import uuid
-from datetime import date, datetime
+from collections import defaultdict, deque
+from datetime import date, datetime, timedelta
 from functools import wraps
+from io import BytesIO
 
 from flask import (
     Flask, Response, abort, flash, redirect, render_template,
-    request, session, url_for,
+    request, send_from_directory, session, url_for,
 )
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import or_, func
+from flask_wtf import CSRFProtect
+from sqlalchemy import or_, func, text
+from sqlalchemy.exc import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
 
 try:  # facultatif : charge le fichier .env s'il existe
@@ -55,12 +62,78 @@ try:  # facultatif : seul l'import de fichiers .xlsx en a besoin (le .csv non)
 except ImportError:
     openpyxl = None
 
+# Pillow revalide et ré-encode chaque photo décodée (voir enregistrer_photo) :
+# un contenu qui ne serait pas réellement une image, quel que soit ce que son
+# préfixe data:URL prétend, est ainsi rejeté plutôt qu'écrit tel quel.
+from PIL import Image, UnidentifiedImageError
+
 
 # ------------------------------------------------------------------
 #  Configuration
 # ------------------------------------------------------------------
 app = Flask(__name__)
-app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "changez-moi-en-production")
+
+# FLASK_DEBUG par défaut à "0" (production sûre par défaut) : le mode debug
+# expose le débogueur interactif Werkzeug (exécution de code arbitraire pour
+# quiconque atteint une page d'erreur) et des traces techniques détaillées.
+# Ne le passez à 1 que sur votre poste, jamais sur un déploiement accessible
+# depuis l'extérieur.
+DEBUG = os.getenv("FLASK_DEBUG", "0") == "1"
+
+_secret_key = (os.getenv("SECRET_KEY") or "").strip()
+if not _secret_key or _secret_key == "remplacez-par-une-longue-chaine-aleatoire":
+    # Pas de clé valide fournie : on en génère une aléatoire plutôt que
+    # d'utiliser une valeur fixe et prévisible (qui permettrait de forger de
+    # fausses sessions). Inconvénient assumé : elle change à chaque
+    # redémarrage, ce qui déconnecte tout le monde — définissez SECRET_KEY
+    # dans votre fichier .env pour une installation durable.
+    _secret_key = secrets.token_hex(32)
+    print(
+        "  ATTENTION : SECRET_KEY absente ou laissée à sa valeur d'exemple "
+        "dans .env — une clé aléatoire temporaire a été générée pour ce "
+        "démarrage. Toutes les sessions seront invalidées au prochain "
+        "redémarrage. Définissez SECRET_KEY dans .env pour une installation "
+        "durable.\n"
+    )
+app.config["SECRET_KEY"] = _secret_key
+
+# Cookies de session durcis. FORCER_HTTPS gouverne l'attribut Secure : par
+# défaut aligné sur DEBUG (activé dès que le mode debug est coupé, ce qui
+# suppose un déploiement derrière HTTPS) — si vous exploitez volontairement
+# l'application en HTTP simple sur un réseau local sans certificat, mettez
+# explicitement FORCER_HTTPS=0 dans .env, sinon les cookies de session
+# n'atteindront jamais le navigateur et la connexion échouera silencieusement.
+FORCER_HTTPS = os.getenv("FORCER_HTTPS", "0" if DEBUG else "1") == "1"
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=FORCER_HTTPS,
+    PERMANENT_SESSION_LIFETIME=timedelta(hours=8),
+)
+
+csrf = CSRFProtect(app)
+
+
+@app.after_request
+def ajouter_entetes_securite(reponse):
+    """En-têtes de sécurité HTTP appliqués à toutes les réponses : anti
+    clickjacking, anti MIME-sniffing, et une CSP qui bloque le chargement de
+    scripts/objets/frames externes (le CSS et le JS de l'application restent
+    autorisés en ligne, quelques attributs style/onclick historiques en
+    dépendent encore)."""
+    reponse.headers["X-Frame-Options"] = "DENY"
+    reponse.headers["X-Content-Type-Options"] = "nosniff"
+    reponse.headers["Referrer-Policy"] = "same-origin"
+    reponse.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "img-src 'self' data:; "
+        "style-src 'self' 'unsafe-inline'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+    )
+    if FORCER_HTTPS:
+        reponse.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return reponse
 
 # ------------------------------------------------------------------
 #  Comptes et rôles (à changer dans le fichier .env)
@@ -121,9 +194,30 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 PAROISSE = os.getenv("PAROISSE", "In Christ Ministries")
 
-# Dossier des photos d'identité (les images ne vont pas dans la base)
-DOSSIER_PHOTOS = os.path.join(app.static_folder, "photos")
+# Dossier des photos d'identité, volontairement HORS de static/ : tout ce qui
+# se trouve dans static/ est servi sans aucune authentification par Flask.
+# Les photos sont des données personnelles (voir .gitignore) et ne doivent
+# être accessibles qu'aux comptes connectés — elles sont donc servies par la
+# route protégée /photos/<fichier> ci-dessous, jamais par /static/photos/.
+DOSSIER_PHOTOS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "photos")
 os.makedirs(DOSSIER_PHOTOS, exist_ok=True)
+
+# Migration automatique et sans danger pour une installation existante : si
+# d'anciennes photos se trouvent encore dans l'emplacement public
+# static/photos/ (utilisé avant ce durcissement), on les déplace une fois
+# vers le nouveau dossier privé. Idempotent : ne fait rien si déjà fait.
+_ancien_dossier_photos = os.path.join(app.static_folder, "photos")
+if os.path.isdir(_ancien_dossier_photos):
+    for _nom in os.listdir(_ancien_dossier_photos):
+        if _nom == ".gitkeep":
+            continue
+        _source = os.path.join(_ancien_dossier_photos, _nom)
+        _destination = os.path.join(DOSSIER_PHOTOS, _nom)
+        if os.path.isfile(_source) and not os.path.exists(_destination):
+            try:
+                shutil.move(_source, _destination)
+            except OSError:
+                pass
 
 # 500 Ko : plafond imposé à chaque photo. Le navigateur (static/photo.js)
 # compresse déjà l'image sous ce seuil avant de l'envoyer — ce contrôle est
@@ -131,16 +225,64 @@ os.makedirs(DOSSIER_PHOTOS, exist_ok=True)
 # pas par ce chemin normal (ancien navigateur, appel direct, etc.).
 PHOTO_TAILLE_MAX = 500 * 1024
 
-# La photo recadrée arrive dans un champ de formulaire (texte base64, environ
-# 1,33 fois plus lourd que l'image d'origine). Sans ces deux réglages, Flask
-# coupe les envois volumineux avec une page d'erreur brute avant même que le
-# contrôle ci-dessus s'exécute : on fixe des limites nettes, larges par
-# rapport aux ~665 Ko qu'occupe une photo de 500 Ko une fois encodée, pour
-# que ce soit PHOTO_TAILLE_MAX qui réponde, avec un message compréhensible.
-app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024
-app.config["MAX_FORM_MEMORY_SIZE"] = 2 * 1024 * 1024
+# Le champ caché qui porte, à l'étape de confirmation d'un import, toutes les
+# lignes déjà validées (JSON) peut peser nettement plus que le fichier
+# .xlsx/.csv d'origine — d'où une limite plus large que la seule photo
+# encodée (~665 Ko pour 500 Ko réels) ne l'exigerait. Reste borné pour ne pas
+# accepter des envois disproportionnés.
+app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024
+app.config["MAX_FORM_MEMORY_SIZE"] = 8 * 1024 * 1024
 
 db = SQLAlchemy(app)
+
+
+# ------------------------------------------------------------------
+#  Anti brute-force sur la connexion
+# ------------------------------------------------------------------
+# Compteur en mémoire (pas de dépendance externe) : au-delà de
+# TENTATIVES_MAX échecs pour un même identifiant dans la fenêtre glissante
+# FENETRE_SECONDES, les tentatives suivantes sont refusées sans même
+# vérifier le mot de passe, avec un délai d'attente affiché à l'utilisateur.
+# Limite assumée : ce compteur est local au processus (il repart à zéro à
+# chaque redémarrage, et n'est pas partagé entre plusieurs workers si
+# l'application est un jour déployée avec plusieurs processus) — suffisant
+# pour la taille de cette application, pas conçu pour un service exposé à
+# grande échelle.
+TENTATIVES_MAX = 5
+FENETRE_SECONDES = 15 * 60
+_tentatives_connexion = defaultdict(deque)
+
+
+def _cle_limitation(identifiant):
+    # Combine IP + identifiant visé : ralentit aussi bien le bourrage d'un
+    # seul compte depuis une IP que le balayage de plusieurs identifiants.
+    return f"{request.remote_addr}:{identifiant.lower()}"
+
+
+def trop_de_tentatives(identifiant):
+    """True si l'appelant doit patienter avant de retenter cet identifiant."""
+    maintenant = time.monotonic()
+    historique = _tentatives_connexion[_cle_limitation(identifiant)]
+    while historique and maintenant - historique[0] > FENETRE_SECONDES:
+        historique.popleft()
+    return len(historique) >= TENTATIVES_MAX
+
+
+def enregistrer_echec_connexion(identifiant):
+    _tentatives_connexion[_cle_limitation(identifiant)].append(time.monotonic())
+
+
+def reinitialiser_tentatives_connexion(identifiant):
+    _tentatives_connexion.pop(_cle_limitation(identifiant), None)
+
+
+# Hash factice contre lequel on vérifie un mot de passe quand l'identifiant
+# n'existe pas : sans cela, une réponse pour un identifiant inconnu revient
+# quasi instantanément (aucun hachage à calculer) alors qu'un identifiant
+# connu avec un mauvais mot de passe prend le temps du calcul PBKDF2 — cet
+# écart de latence mesurable permettrait à un attaquant de deviner quels
+# identifiants existent sans jamais voir le message d'erreur.
+_HASH_FACTICE = generate_password_hash(secrets.token_hex(16))
 
 
 # ------------------------------------------------------------------
@@ -295,16 +437,48 @@ def ecriture_requise(vue):
     return wrapper
 
 
+def _destination_sure(suivant):
+    """N'accepte `suivant` (redirection post-connexion) que s'il s'agit d'un
+    chemin relatif interne à l'application — jamais une URL absolue ni un
+    « //hôte » — pour empêcher une redirection ouverte vers un site externe
+    (phishing) après une connexion légitime."""
+    if not suivant or not suivant.startswith("/") or suivant.startswith("//"):
+        return None
+    if "\\" in suivant or suivant.startswith("/\\"):
+        return None
+    return suivant
+
+
 @app.route("/connexion", methods=["GET", "POST"])
 def connexion():
     if request.method == "POST":
         utilisateur = request.form.get("utilisateur", "").strip()
         mot_de_passe = request.form.get("mot_de_passe", "")
+
+        if trop_de_tentatives(utilisateur):
+            flash(
+                "Trop de tentatives avec cet identifiant. Réessayez dans "
+                "quelques minutes.", "error"
+            )
+            return render_template("connexion.html", paroisse=PAROISSE), 429
+
         compte = COMPTES.get(utilisateur)
-        if compte and check_password_hash(compte["hash"], mot_de_passe):
+        # check_password_hash s'exécute toujours, même sans compte trouvé
+        # (contre un hash factice), pour que le temps de réponse ne trahisse
+        # pas l'existence de l'identifiant (voir _HASH_FACTICE ci-dessus).
+        mot_de_passe_ok = check_password_hash(
+            compte["hash"] if compte else _HASH_FACTICE, mot_de_passe
+        )
+        if compte and mot_de_passe_ok:
+            reinitialiser_tentatives_connexion(utilisateur)
+            session.clear()
             session["utilisateur"] = utilisateur
             session["role"] = compte["role"]
-            return redirect(request.args.get("suivant") or url_for("index"))
+            session.permanent = True
+            destination = _destination_sure(request.args.get("suivant"))
+            return redirect(destination or url_for("index"))
+
+        enregistrer_echec_connexion(utilisateur)
         flash("Identifiant ou mot de passe incorrect.", "error")
     return render_template("connexion.html", paroisse=PAROISSE)
 
@@ -383,8 +557,14 @@ def supprimer_photo(nom_fichier):
             pass
 
 
+FORMATS_PHOTO = {"jpg": "JPEG", "png": "PNG", "webp": "WEBP"}
+
+
 def enregistrer_photo(data_url):
-    """Décode l'image recadrée envoyée par le navigateur et l'écrit sur disque.
+    """Décode l'image recadrée envoyée par le navigateur, la revalide
+    réellement (pas seulement le type déclaré dans le préfixe data:URL, qui
+    vient du navigateur et pourrait être falsifié par un appel direct au
+    formulaire) et l'écrit sur disque.
 
     Renvoie (nom_du_fichier, erreur). L'un des deux est toujours None.
     """
@@ -410,6 +590,38 @@ def enregistrer_photo(data_url):
     if len(binaire) < 100:
         return None, "Photo vide ou illisible."
 
+    # On ne stocke jamais les octets reçus tels quels : on les décode comme
+    # une vraie image, puis on la ré-encode nous-mêmes. Tout contenu qui
+    # n'est pas une image valide est rejeté ici (quel que soit ce que le
+    # préfixe data:URL prétendait), et un éventuel contenu malveillant logé
+    # dans les métadonnées d'un vrai fichier image ne survit pas au
+    # ré-encodage.
+    try:
+        image = Image.open(BytesIO(binaire))
+        image.verify()
+        image = Image.open(BytesIO(binaire))  # verify() consomme l'objet : on rouvre
+        image.load()
+    except (UnidentifiedImageError, OSError, ValueError):
+        return None, "Ce fichier n'est pas une image valide."
+
+    format_pillow = FORMATS_PHOTO.get(extension, "JPEG")
+    if format_pillow == "JPEG" and image.mode in ("RGBA", "P", "LA"):
+        image = image.convert("RGB")
+
+    options = {"quality": 90} if format_pillow in ("JPEG", "WEBP") else {}
+    tampon = BytesIO()
+    try:
+        image.save(tampon, format=format_pillow, **options)
+    except (OSError, ValueError):
+        return None, "Ce fichier n'a pas pu être traité comme une image."
+    binaire = tampon.getvalue()
+
+    if len(binaire) > PHOTO_TAILLE_MAX:
+        return None, (
+            f"Photo trop lourde une fois revalidée ({len(binaire) // 1024} Ko) : "
+            f"le maximum autorisé est {PHOTO_TAILLE_MAX // 1024} Ko."
+        )
+
     nom = f"{uuid.uuid4().hex}.{extension}"
     with open(os.path.join(DOSSIER_PHOTOS, nom), "wb") as fichier:
         fichier.write(binaire)
@@ -420,7 +632,11 @@ def appliquer_photo(record, form):
     """Applique la photo envoyée par le formulaire à un enregistrement.
 
     Trois cas : nouvelle photo, retrait de la photo, ou aucun changement.
-    Renvoie un message d'erreur, ou None si tout s'est bien passé.
+    Ne supprime jamais un fichier elle-même : renvoie
+    (erreur, nouvelle_photo, photo_a_supprimer) pour que l'appelant ne
+    supprime l'ancienne photo (ou, en cas d'échec, la nouvelle) qu'après un
+    commit() réussi — les effets sur le disque restent ainsi cohérents avec
+    la base même si la transaction échoue en cours de route.
     """
     data_url = (form.get("photo_data") or "").strip()
     retirer = form.get("photo_retiree") == "1"
@@ -428,15 +644,30 @@ def appliquer_photo(record, form):
     if data_url:
         nom, erreur = enregistrer_photo(data_url)
         if erreur:
-            return erreur
+            return erreur, None, None
         ancienne = record.photo
         record.photo = nom
-        if ancienne and ancienne != nom:
-            supprimer_photo(ancienne)
-    elif retirer and record.photo:
-        supprimer_photo(record.photo)
+        return None, nom, (ancienne if ancienne and ancienne != nom else None)
+    if retirer and record.photo:
+        ancienne = record.photo
         record.photo = None
-    return None
+        return None, None, ancienne
+    return None, None, None
+
+
+# Longueurs maximales des champs texte — doivent rester cohérentes avec les
+# colonnes db.String(n) du modèle Registre ci-dessus. Validées ici, côté
+# serveur, avant tout insert/update : le `maxlength` HTML des formulaires
+# n'est qu'un confort de saisie et ne protège en rien un appel direct
+# (formulaire forgé, requête HTTP construite à la main).
+LONGUEURS_MAX = {
+    "nom": 120, "prenom": 120, "nom_pere": 200, "nom_mere": 200,
+    "nationalite": 100, "originaire_de": 150, "lieu_bapteme": 200,
+    "numero_registre_1": 80, "celebrant_bapteme": 150, "signature_1": 150,
+    "lieu_mariage": 200, "conjoint": 250, "numero_registre_2": 80,
+    "celebrant_mariage": 150, "signature_2": 150, "telephone": 50,
+    "observations": 5000,
+}
 
 
 def valider_donnees(donnees):
@@ -450,6 +681,14 @@ def valider_donnees(donnees):
         erreurs.append("Le nom est obligatoire.")
     if not donnees.get("prenom"):
         erreurs.append("Le prénom est obligatoire.")
+
+    for champ, maximum in LONGUEURS_MAX.items():
+        valeur = donnees.get(champ)
+        if valeur and len(valeur) > maximum:
+            erreurs.append(
+                f"« {LIBELLES_CHAMPS.get(champ, champ)} » dépasse la longueur "
+                f"maximale autorisée ({maximum} caractères)."
+            )
 
     aujourdhui = date.today()
     for libelle, champ in (
@@ -643,16 +882,27 @@ def nouveau():
 
         record = Registre(**attribuer_numeros(donnees))
 
-        erreur_photo = appliquer_photo(record, request.form)
+        erreur_photo, nouvelle_photo, _ = appliquer_photo(record, request.form)
         if erreur_photo:
             flash(erreur_photo, "error")
             return render_template("form.html", record=None,
                                    valeurs=request.form, paroisse=PAROISSE)
 
         db.session.add(record)
-        db.session.flush()          # attribue record.id sans clôturer la transaction
-        journaliser("creation", record)
-        db.session.commit()
+        try:
+            db.session.flush()      # attribue record.id sans clôturer la transaction
+            journaliser("creation", record)
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            if nouvelle_photo:
+                supprimer_photo(nouvelle_photo)
+            flash(
+                "Ce numéro de registre vient d'être attribué à une autre "
+                "carte au même instant. Réessayez l'enregistrement.", "error"
+            )
+            return render_template("form.html", record=None,
+                                   valeurs=request.form, paroisse=PAROISSE)
         flash(f"Carte de {record.nom_complet} enregistrée "
               f"(N° {record.numero_registre_1 or '—'}).", "success")
         return redirect(url_for("index"))
@@ -676,17 +926,32 @@ def modifier(record_id):
             return render_template("form.html", record=record,
                                    valeurs=request.form, paroisse=PAROISSE)
 
-        erreur_photo = appliquer_photo(record, request.form)
+        erreur_photo, nouvelle_photo, ancienne_photo = appliquer_photo(record, request.form)
         if erreur_photo:
             db.session.rollback()
+            if nouvelle_photo:
+                supprimer_photo(nouvelle_photo)
             flash(erreur_photo, "error")
             return render_template("form.html", record=record,
                                    valeurs=request.form, paroisse=PAROISSE)
 
         for champ, valeur in attribuer_numeros(donnees).items():
             setattr(record, champ, valeur)
-        journaliser("modification", record, avant=avant)
-        db.session.commit()
+        try:
+            journaliser("modification", record, avant=avant)
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            if nouvelle_photo:
+                supprimer_photo(nouvelle_photo)
+            flash(
+                "Ce numéro de registre vient d'être attribué à une autre "
+                "carte au même instant. Réessayez l'enregistrement.", "error"
+            )
+            return render_template("form.html", record=record,
+                                   valeurs=request.form, paroisse=PAROISSE)
+        if ancienne_photo:
+            supprimer_photo(ancienne_photo)
         flash(f"Carte de {record.nom_complet} mise à jour.", "success")
         return redirect(url_for("index"))
 
@@ -703,7 +968,12 @@ def supprimer(record_id):
     photo = record.photo
     journaliser("suppression", record)
     db.session.delete(record)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        flash("La suppression a échoué. Réessayez.", "error")
+        return redirect(url_for("index"))
     supprimer_photo(photo)          # la fiche partie, l'image n'a plus de raison d'être
     flash(f"Carte de {nom} supprimée.", "success")
     return redirect(url_for("index"))
@@ -717,6 +987,18 @@ def supprimer(record_id):
 def carte(record_id):
     record = db.session.get(Registre, record_id) or abort(404)
     return render_template("carte.html", r=record, paroisse=PAROISSE)
+
+
+@app.route("/photos/<nom_fichier>")
+@login_requis
+def photo(nom_fichier):
+    """Sert une photo d'identité — réservé aux comptes connectés. Les photos
+    ne sont plus dans static/ (servi sans authentification par Flask) : ce
+    sont des données personnelles, elles ne doivent être visibles qu'à
+    quelqu'un déjà identifié dans l'application, quel que soit son rôle."""
+    if not chemin_photo(nom_fichier):
+        abort(404)
+    return send_from_directory(DOSSIER_PHOTOS, nom_fichier)
 
 
 # ------------------------------------------------------------------
@@ -745,6 +1027,21 @@ def journal():
 # ------------------------------------------------------------------
 #  Export CSV (ouvrable directement dans Excel)
 # ------------------------------------------------------------------
+CARACTERES_FORMULE = ("=", "+", "-", "@", "\t", "\r")
+
+
+def neutraliser_formule(valeur):
+    """Empêche l'injection de formule CSV (CWE-1236) : un champ texte libre
+    (observations, célébrant, signature…) qui commencerait par =, +, -, @ ou
+    une tabulation serait interprété comme une formule par Excel/LibreOffice/
+    Google Sheets à l'ouverture du fichier exporté — potentiellement piégée
+    (lien trompeur, exfiltration de données d'autres cellules). On neutralise
+    en préfixant d'une apostrophe, ce qu'Excel affiche tel quel comme texte."""
+    if isinstance(valeur, str) and valeur.startswith(CARACTERES_FORMULE):
+        return "'" + valeur
+    return valeur
+
+
 @app.route("/export.csv")
 @ecriture_requise
 def export_csv():
@@ -761,7 +1058,7 @@ def export_csv():
             valeur = getattr(r, champ)
             if isinstance(valeur, date):
                 valeur = valeur.strftime("%d/%m/%Y")
-            ligne.append(valeur or "")
+            ligne.append(neutraliser_formule(valeur) or "")
         writer.writerow(ligne)
 
     nom_fichier = f"registre_icm_{date.today():%Y-%m-%d}.csv"
@@ -988,10 +1285,20 @@ def importer():
             record = Registre(**attribuer_numeros(r["donnees"]))
             db.session.add(record)
             nouvelles_fiches.append(record)
-        db.session.flush()          # attribue un id à chaque fiche avant de journaliser
-        for record in nouvelles_fiches:
-            journaliser("creation", record, origine="import")
-        db.session.commit()
+        try:
+            db.session.flush()      # attribue un id à chaque fiche avant de journaliser
+            for record in nouvelles_fiches:
+                journaliser("creation", record, origine="import")
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            flash(
+                "L'import a échoué : un numéro de registre s'est trouvé en "
+                "double au moment d'enregistrer (peut-être une autre "
+                "création simultanée). Aucune fiche n'a été importée — "
+                "réessayez.", "error"
+            )
+            return redirect(url_for("importer"))
 
         ignorees = len(resultats) - len(valides)
         message = f"{len(valides)} fiche(s) importée(s) depuis le fichier."
@@ -1024,10 +1331,13 @@ def importer():
     resultats = analyser_lignes(paires)
     valides = [r for r in resultats if not r["erreurs"]]
 
-    donnees_json = json.dumps([
+    # Passé tel quel (liste Python, pas déjà sérialisé) : le template le
+    # sérialise avec le filtre |tojson, échappé pour un contexte HTML plutôt
+    # qu'avec un json.dumps() brut inséré directement dans l'attribut.
+    donnees_json = [
         {"numero_ligne": r["numero_ligne"], "donnees": donnees_vers_json(r["donnees"])}
         for r in valides
-    ])
+    ]
 
     return render_template(
         "importer.html", paroisse=PAROISSE, resultats=resultats,
@@ -1103,12 +1413,41 @@ def envoi_trop_gros(_):
 # ------------------------------------------------------------------
 with app.app_context():
     db.create_all()
+    # Empêche deux fiches de partager le même numéro de registre au niveau
+    # de la base elle-même — pas seulement par le contrôle applicatif
+    # verifier_unicite(), qui ne couvre pas une numérotation automatique
+    # concurrente (deux créations/imports simultanés). NULL reste autorisé
+    # en plusieurs exemplaires (une fiche pas encore baptisée/mariée), donc
+    # un index unique simple suffit, sans clause partielle. Idempotent et
+    # sans danger sur une base existante : si des doublons s'y trouvent déjà
+    # (l'ancienne race condition, avant ce correctif), la création échoue
+    # silencieusement et un avertissement s'affiche plutôt que de bloquer le
+    # démarrage — nettoyez alors les doublons signalés puis redémarrez.
+    for _nom_index, _colonne in (
+        ("ux_registre_numero_registre_1", "numero_registre_1"),
+        ("ux_registre_numero_registre_2", "numero_registre_2"),
+    ):
+        try:
+            db.session.execute(text(
+                f"CREATE UNIQUE INDEX IF NOT EXISTS {_nom_index} "
+                f"ON registre ({_colonne})"
+            ))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            print(
+                f"  ATTENTION : impossible de garantir l'unicité de "
+                f"« {_colonne} » (des doublons existent déjà en base ?). "
+                f"Vérifiez et corrigez-les manuellement."
+            )
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5000))
-    debug = os.getenv("FLASK_DEBUG", "1") == "1"
     print(f"\n  Registre ICM  →  http://127.0.0.1:{port}")
     for identifiant, compte in COMPTES.items():
         print(f"  Identifiant : {identifiant}  ({LIBELLES_ROLES[compte['role']]})")
+    if DEBUG:
+        print("  Mode debug ACTIVÉ — ne jamais utiliser ce réglage sur un "
+              "déploiement accessible depuis l'extérieur.")
     print()
-    app.run(debug=debug, host="0.0.0.0", port=port)
+    app.run(debug=DEBUG, host="0.0.0.0", port=port)

@@ -12,7 +12,13 @@ instance/
 *.sqlite
 *.sqlite3
 
-# Photos des fidèles : données personnelles, ne doivent pas être publiques
+# Photos des fidèles : données personnelles, ne doivent pas être publiques.
+# Hors de static/ (tout ce qui est dans static/ est servi sans authentification
+# par Flask) : voir la route protégée /photos/<fichier> dans app.py.
+photos/*
+!photos/.gitkeep
+# Ancien emplacement (avant durcissement) : gardé au cas où une installation
+# existante aurait encore des fichiers ici avant la migration automatique.
 static/photos/*
 !static/photos/.gitkeep
 

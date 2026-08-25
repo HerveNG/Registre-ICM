@@ -187,7 +187,7 @@
     <div class="zone-photo">
       <div class="photo-carte">
         {% if r.photo %}
-          <img src="{{ url_for('static', filename='photos/' ~ r.photo) }}"
+          <img src="{{ url_for('photo', nom_fichier=r.photo) }}"
                alt="Photo de {{ r.nom }} {{ r.prenom }}">
         {% else %}
           <span>Photo</span>
