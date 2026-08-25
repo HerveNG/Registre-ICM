@@ -66,10 +66,14 @@ mvp_registre_bapteme_mariage/
 ├── requirements.txt
 ├── .env.example                   ← à copier en « .env »
 ├── templates/                     ← pages (connexion, liste, formulaire, carte, import, journal)
-└── static/
-    ├── style.css
-    ├── photo.js                   ← recadrage et compression des photos
-    └── photos/                    ← photos enregistrées (version Flask)
+├── static/
+│   ├── style.css
+│   ├── photo.js                   ← recadrage et compression des photos
+│   └── photos/                    ← photos enregistrées (version Flask)
+│
+├── tests/                         ← tests automatiques des deux versions (§ 13)
+│   └── README.md                  ← comment les lancer, ce qu'ils couvrent
+└── .github/workflows/tests.yml    ← les fait tourner à chaque git push
 ```
 
 ---
@@ -407,3 +411,14 @@ Détail technique complet et raisonnement (y compris ce qui a été
 **volontairement laissé de côté**, et pourquoi) : voir l'en-tête de
 `database/migration_04_durcissement_securite.sql` (repris dans
 `database/schema_supabase.sql`, section 12, pour une base neuve).
+
+**Tests automatiques.** 112 tests protègent ce durcissement (76 pour la
+version Flask, 25 pour la version en ligne, 11 garde-fous sur le schéma
+Supabase) : ils sont dans `tests/` et rejoués automatiquement à chaque
+`git push` par une action GitHub (onglet **Actions** du dépôt), pour que
+tout changement futur qui romprait une de ces protections soit signalé
+avant même d'atteindre la production. Les vérifications côté Supabase
+relisent le texte du script SQL (RLS, `revoke`, trigger d'immuabilité du
+rôle) plutôt que d'attaquer une vraie base — un vrai projet Supabase en
+CI dépasserait la portée de ce dépôt. Détail, limites et instructions
+pour lancer les tests en local : voir `tests/README.md`.

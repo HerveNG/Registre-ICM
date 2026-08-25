@@ -1,0 +1,5 @@
+# Dépendances des tests uniquement — s'ajoutent à ../requirements.txt
+# (Flask, Flask-SQLAlchemy, Pillow, openpyxl... nécessaires pour importer
+# app.py, donc pour tester quoi que ce soit).
+pytest>=8.0,<10
+playwright>=1.45,<2   # pilote un vrai Chromium pour tester web/index.html

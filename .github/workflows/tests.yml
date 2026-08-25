@@ -1,0 +1,36 @@
+name: Tests
+
+# Rejoue les tests de tests/ à chaque push et à chaque pull request touchant
+# le dépôt — le filet de sécurité décrit au § 13 du README : une régression
+# sur app.py, web/index.html ou database/schema_supabase.sql est signalée
+# ici avant d'atteindre la production.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:  # bouton "Run workflow" manuel, onglet Actions
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: |
+            requirements.txt
+            tests/requirements.txt
+
+      - name: Installer les dépendances
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r tests/requirements.txt
+
+      - name: Installer Chromium (pour tester web/index.html)
+        run: playwright install --with-deps chromium
+
+      - name: Lancer les tests
+        run: pytest tests/ -v

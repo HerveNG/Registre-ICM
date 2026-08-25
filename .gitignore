@@ -28,6 +28,9 @@ __pycache__/
 .venv/
 venv/
 
+# Tests (voir tests/README.md)
+.pytest_cache/
+
 # Fichiers système
 .DS_Store
 Thumbs.db
