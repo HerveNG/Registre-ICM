@@ -11,7 +11,10 @@ def test_creer_une_fiche_attribue_un_numero(client_secretaire, icm_app):
     )
     assert reponse.status_code == 302
     with icm_app.app.app_context():
-        fiche = icm_app.Registre.query.filter_by(nom="Ngooh").one()
+        # Le nom est normalisé en MAJUSCULES à la saisie (voir
+        # normaliser_casse), quelle que soit la casse tapée par l'usager.
+        fiche = icm_app.Registre.query.filter_by(nom="NGOOH").one()
+        assert fiche.prenom == "Cédric"
         assert fiche.numero_registre_1 == "ICM-B-2026-0001"
 
 
@@ -52,7 +55,8 @@ def test_modifier_une_fiche_journalise_les_champs_changes(client_secretaire, icm
 
     with icm_app.app.app_context():
         fiche = icm_app.db.session.get(icm_app.Registre, id_fiche)
-        assert fiche.nom == "Après"
+        # Idem : "Après" saisi devient "APRÈS" une fois normalisé.
+        assert fiche.nom == "APRÈS"
         entree = icm_app.JournalAudit.query.filter_by(
             registre_id=id_fiche, action="modification"
         ).one()

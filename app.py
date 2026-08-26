@@ -33,9 +33,18 @@ import os
 import re
 import secrets
 import shutil
+import sys
 import time
 import unicodedata
 import uuid
+
+# Sur certaines consoles Windows (code page cp1252), stdout ne sait pas
+# encoder les caractères comme « → » utilisés dans les messages de
+# démarrage ci-dessous, ce qui plante l'application avant même qu'elle ne
+# se lance. On force l'UTF-8 quand c'est possible.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 from collections import defaultdict, deque
 from datetime import date, datetime, timedelta
 from functools import wraps
@@ -295,6 +304,37 @@ CHAMPS_TEXTE = [
     "signature_2", "telephone", "observations",
 ]
 CHAMPS_DATE = ["date_naissance", "date_bapteme", "date_mariage"]
+
+# Casse imposée à certains champs texte, quelle que soit la façon dont
+# l'utilisateur les a saisis (tout en majuscules, tout en minuscules,
+# mélangés...) — un registre officiel ne doit pas dépendre de l'habitude de
+# saisie de chacun :
+#   - CHAMPS_MAJUSCULES : entièrement en MAJUSCULES (noms de famille, lieux,
+#     célébrants).
+#   - CHAMPS_CAPITALISES : seule la première lettre en majuscule, le reste en
+#     minuscule (prénom, nationalité, origine).
+# Appliquée par normaliser_casse() ci-dessous, appelée aussi bien par
+# collecter_formulaire() (saisie manuelle) que par donnees_depuis_ligne()
+# (import de fichier), pour que les deux chemins restent cohérents.
+CHAMPS_MAJUSCULES = {
+    "nom", "nom_pere", "nom_mere",
+    "lieu_bapteme", "celebrant_bapteme",
+    "lieu_mariage", "celebrant_mariage",
+}
+CHAMPS_CAPITALISES = {"prenom", "nationalite", "originaire_de"}
+
+
+def normaliser_casse(champ, valeur):
+    """Applique à `valeur` la casse imposée au champ `champ`, s'il en a une
+    (voir CHAMPS_MAJUSCULES / CHAMPS_CAPITALISES ci-dessus). Ne touche pas
+    aux valeurs vides, et laisse inchangé tout champ sans règle de casse."""
+    if not valeur:
+        return valeur
+    if champ in CHAMPS_MAJUSCULES:
+        return valeur.upper()
+    if champ in CHAMPS_CAPITALISES:
+        return valeur[:1].upper() + valeur[1:].lower()
+    return valeur
 
 # Colonnes de l'export CSV — et, à l'identique (moins la photo), du modèle
 # d'import et de la reconnaissance des en-têtes d'un fichier envoyé. Garder
@@ -711,7 +751,10 @@ def valider_donnees(donnees):
 
 def collecter_formulaire(form):
     """Lit le formulaire et renvoie (données, liste d'erreurs)."""
-    donnees = {c: (form.get(c, "") or "").strip() or None for c in CHAMPS_TEXTE}
+    donnees = {
+        c: normaliser_casse(c, (form.get(c, "") or "").strip() or None)
+        for c in CHAMPS_TEXTE
+    }
     for c in CHAMPS_DATE:
         donnees[c] = lire_date(form.get(c))
     return donnees, valider_donnees(donnees)
@@ -1203,8 +1246,13 @@ def _valeur_date_import(valeur):
 def donnees_depuis_ligne(ligne_brute):
     """Convertit une ligne brute (valeurs telles que lues dans le fichier)
     dans le même format typé que collecter_formulaire : textes vides à
-    None, dates converties."""
-    donnees = {c: _valeur_texte_import(ligne_brute.get(c)) for c in CHAMPS_TEXTE}
+    None, dates converties, et la même casse imposée (voir
+    normaliser_casse) — un fidèle importé depuis le registre papier suit
+    exactement la même règle qu'une fiche saisie à la main."""
+    donnees = {
+        c: normaliser_casse(c, _valeur_texte_import(ligne_brute.get(c)))
+        for c in CHAMPS_TEXTE
+    }
     for c in CHAMPS_DATE:
         donnees[c] = _valeur_date_import(ligne_brute.get(c))
     return donnees

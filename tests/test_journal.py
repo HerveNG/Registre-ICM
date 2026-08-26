@@ -7,7 +7,9 @@ def test_creation_journalisee(client_secretaire, icm_app):
     client_secretaire.post("/nouveau", data={"nom": "Traçable", "prenom": "Test"})
     with icm_app.app.app_context():
         entree = icm_app.JournalAudit.query.filter_by(action="creation").one()
-        assert entree.nom_complet == "Traçable Test"
+        # "Traçable" saisi devient "TRAÇABLE" une fois normalisé (voir
+        # normaliser_casse) — le journal reflète la valeur réellement stockée.
+        assert entree.nom_complet == "TRAÇABLE Test"
         assert entree.utilisateur
 
 
@@ -31,12 +33,16 @@ def test_suppression_journalisee_avec_nom_conserve(client_secretaire, icm_app):
 
 def test_modification_sans_changement_ne_journalise_rien(client_secretaire, icm_app):
     with icm_app.app.app_context():
-        fiche = icm_app.Registre(nom="Stable", prenom="Test")
+        # "STABLE" (déjà en majuscules) : la valeur qu'aurait réellement la
+        # fiche si elle avait été créée via le formulaire, une fois passée
+        # par normaliser_casse — voir test_normalisation_casse.py.
+        fiche = icm_app.Registre(nom="STABLE", prenom="Test")
         icm_app.db.session.add(fiche)
         icm_app.db.session.commit()
         id_fiche = fiche.id
 
-    # Renvoie exactement les mêmes valeurs.
+    # Renvoie la même valeur ("Stable" redevient "STABLE" une fois normalisé) :
+    # aucun changement réel, donc rien à journaliser.
     client_secretaire.post(f"/modifier/{id_fiche}", data={"nom": "Stable", "prenom": "Test"})
 
     with icm_app.app.app_context():

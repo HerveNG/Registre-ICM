@@ -855,6 +855,25 @@ const CHAMPS = ["nom","prenom","nom_pere","nom_mere","date_naissance","nationali
   "signature_1","lieu_mariage","date_mariage","conjoint","numero_registre_2",
   "celebrant_mariage","signature_2","telephone","observations"];
 
+/* Casse imposée à certains champs texte, quelle que soit la façon dont
+   l'utilisateur les a saisis — en miroir de CHAMPS_MAJUSCULES /
+   CHAMPS_CAPITALISES / normaliser_casse côté Flask (app.py), pour que les
+   deux moitiés de l'application appliquent exactement la même règle. */
+const CHAMPS_MAJUSCULES = new Set([
+  "nom","nom_pere","nom_mere",
+  "lieu_bapteme","celebrant_bapteme",
+  "lieu_mariage","celebrant_mariage",
+]);
+const CHAMPS_CAPITALISES = new Set(["prenom","nationalite","originaire_de"]);
+
+function normaliserCasseChamp(champ, valeur){
+  if (!valeur) return valeur;
+  if (CHAMPS_MAJUSCULES.has(champ)) return valeur.toUpperCase();
+  if (CHAMPS_CAPITALISES.has(champ))
+    return valeur.charAt(0).toUpperCase() + valeur.slice(1).toLowerCase();
+  return valeur;
+}
+
 const PAR_PAGE = 20;
 const PAR_PAGE_JOURNAL = 30;
 const SEAU_PHOTOS = "photos";        // nom du bucket créé par le script SQL
@@ -1467,15 +1486,28 @@ function montrerPhoto(source, texte){
 
 function lireFormulaire(){
   const d = {};
-  CHAMPS.forEach(c=>{ d[c] = $("f-"+c).value.trim() || null; });
+  CHAMPS.forEach(c=>{ d[c] = normaliserCasseChamp(c, $("f-"+c).value.trim() || null); });
   return d;
+}
+
+/* Date du jour au format AAAA-MM-JJ, dans le fuseau LOCAL du navigateur —
+   jamais `new Date().toISOString()`, qui donne la date en UTC : entre
+   minuit et l'heure de décalage local (ex. 00h-01h à Douala/Lagos,
+   UTC+1), cela renvoyait encore la veille et faisait rejeter à tort une
+   date de naissance/baptême/mariage fixée à aujourd'hui même comme étant
+   « dans le futur » (et inversement, dans les fuseaux en retard sur UTC,
+   acceptait à tort une vraie date future). C'était le bug du calendrier. */
+function aujourdhuiLocalISO(){
+  const d = new Date();
+  const deuxChiffres = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${deuxChiffres(d.getMonth()+1)}-${deuxChiffres(d.getDate())}`;
 }
 
 function validerFormulaire(d){
   const erreurs = [];
   if (!d.nom)    erreurs.push("Le nom est obligatoire.");
   if (!d.prenom) erreurs.push("Le prénom est obligatoire.");
-  const aujourdhui = new Date().toISOString().slice(0,10);
+  const aujourdhui = aujourdhuiLocalISO();
   [["naissance","date_naissance"],["baptême","date_bapteme"],["mariage","date_mariage"]]
     .forEach(([libelle,champ])=>{
       if (d[champ] && d[champ] > aujourdhui)
@@ -1642,7 +1674,7 @@ async function exporterCsv(){
       { type:"text/csv;charset=utf-8;" });
     const lien = document.createElement("a");
     lien.href = URL.createObjectURL(blob);
-    lien.download = `registre_icm_${new Date().toISOString().slice(0,10)}.csv`;
+    lien.download = `registre_icm_${aujourdhuiLocalISO()}.csv`;
     document.body.appendChild(lien); lien.click(); lien.remove();
     setTimeout(()=>URL.revokeObjectURL(lien.href), 2000);
     message(`Export de ${(donnees||[]).length} enregistrement(s) terminé.`, "succes");
@@ -1731,7 +1763,7 @@ function donneesDepuisLigneImport(ligneBrute){
   CHAMPS.forEach(c => {
     d[c] = c.startsWith("date_")
       ? lireDateImport(ligneBrute[c])
-      : valeurTexteImport(ligneBrute[c]);
+      : normaliserCasseChamp(c, valeurTexteImport(ligneBrute[c]));
   });
   return d;
 }

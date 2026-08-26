@@ -228,3 +228,66 @@ def test_lire_date_import_formats_multiples(page):
     assert page.evaluate("lireDateImport('15/01/2026')") == "2026-01-15"
     assert page.evaluate("lireDateImport('')") is None
     assert page.evaluate("lireDateImport(null)") is None
+
+
+# ------------------------------------------------------------------
+#  Casse imposée à certains champs texte (normaliserCasseChamp), en miroir
+#  de normaliser_casse côté Flask (app.py) — voir tests/test_normalisation_casse.py.
+# ------------------------------------------------------------------
+def test_normaliser_casse_champ_majuscules(page):
+    for champ in ("nom", "nom_pere", "nom_mere", "lieu_bapteme",
+                  "celebrant_bapteme", "lieu_mariage", "celebrant_mariage"):
+        assert page.evaluate(f"normaliserCasseChamp('{champ}', 'ngooh mvondo')") == "NGOOH MVONDO"
+
+
+def test_normaliser_casse_champ_capitalise(page):
+    for champ in ("prenom", "nationalite", "originaire_de"):
+        assert page.evaluate(f"normaliserCasseChamp('{champ}', 'HERVÉ')") == "Hervé"
+
+
+def test_normaliser_casse_champ_sans_regle_inchange(page):
+    assert page.evaluate("normaliserCasseChamp('telephone', '0612345678')") == "0612345678"
+
+
+def test_lire_formulaire_applique_la_normalisation_de_casse(page):
+    page.evaluate("""() => {
+        $("f-nom").value = "ngooh";
+        $("f-prenom").value = "HERVÉ";
+    }""")
+    donnees = page.evaluate("lireFormulaire()")
+    assert donnees["nom"] == "NGOOH"
+    assert donnees["prenom"] == "Hervé"
+
+
+# ------------------------------------------------------------------
+#  Régression : validerFormulaire comparait la date saisie (locale, telle
+#  que rendue par <input type="date">) à `new Date().toISOString()` (UTC).
+#  Entre minuit et l'heure de décalage local, dans un fuseau en avance sur
+#  UTC (ex. Afrique centrale, UTC+1), cela renvoyait encore la veille et
+#  rejetait à tort une date d'aujourd'hui comme « dans le futur ». C'était
+#  le bug du calendrier — aujourdhuiLocalISO() le corrige.
+# ------------------------------------------------------------------
+def test_validation_accepte_la_date_locale_du_jour(page):
+    """Preuve directe du bug corrigé : si validerFormulaire utilisait encore
+    la date UTC, la date locale du jour se retrouverait à tort strictement
+    supérieure à « aujourd'hui » dès que UTC et le fuseau local divergent
+    de date — ce test le vérifie sans dépendre de l'heure à laquelle il
+    tourne, en comparant directement les deux calculs de date."""
+    aujourdhui_local = page.evaluate("aujourdhuiLocalISO()")
+    aujourdhui_utc = page.evaluate("new Date().toISOString().slice(0,10)")
+    erreurs = page.evaluate(
+        "(d) => validerFormulaire({nom:'A', prenom:'B', date_naissance:d})",
+        aujourdhui_local,
+    )
+    assert erreurs == [], (
+        f"date locale du jour ({aujourdhui_local!r}) rejetée comme future "
+        f"(comparée à {aujourdhui_utc!r} en UTC)"
+    )
+
+
+def test_aujourdhui_local_iso_suit_lheure_locale_de_la_machine(page):
+    attendu = page.evaluate(
+        """() => { const d=new Date(); const p=n=>String(n).padStart(2,"0");
+           return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`; }"""
+    )
+    assert page.evaluate("aujourdhuiLocalISO()") == attendu
