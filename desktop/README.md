@@ -27,11 +27,11 @@ Ce script :
 1. installe `pywebview` et `pyinstaller` dans `.venv` (build uniquement,
    jamais nécessaires pour faire tourner l'exécutable une fois construit) ;
 2. convertit `static/logo.png` en icône Windows (`desktop/icone.ico`) ;
-3. produit `desktop\dist\Registre-ICM.exe`.
+3. produit `desktop\dist\ICM Registre.exe`.
 
 ## Installer sur un autre poste
 
-Copier uniquement `desktop\dist\Registre-ICM.exe` sur le poste cible (clé
+Copier uniquement `desktop\dist\ICM Registre.exe` sur le poste cible (clé
 USB, partage réseau, e-mail) et le lancer. Rien d'autre à installer — sauf
 sur un Windows très ancien ou allégé où le runtime **WebView2** ne serait
 pas déjà présent (il l'est nativement sur toute installation Windows 10/11
