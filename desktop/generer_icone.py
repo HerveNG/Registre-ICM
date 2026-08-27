@@ -1,12 +1,16 @@
-"""Convertit static/logo.png en .ico multi-tailles pour l'icône de l'exécutable
-Windows (PyInstaller --icon n'accepte pas les .png). Lancé une seule fois par
-construire.ps1 avant l'appel à PyInstaller."""
+"""Convertit desktop/logo_icm.png en .ico multi-tailles pour l'icône de
+l'exécutable Windows (PyInstaller --icon n'accepte pas les .png). Lancé une
+seule fois par construire.ps1 avant l'appel à PyInstaller.
+
+logo_icm.png (et non static/logo.png, utilisé lui pour l'en-tête et la carte
+imprimable) : déjà cadré en carré à coins arrondis, au format attendu d'une
+icône d'application plutôt que du logo rond utilisé ailleurs dans l'app."""
 import os
 
 from PIL import Image
 
 ICI = os.path.dirname(os.path.abspath(__file__))
-SOURCE = os.path.join(ICI, "..", "static", "logo.png")
+SOURCE = os.path.join(ICI, "logo_icm.png")
 DESTINATION = os.path.join(ICI, "icone.ico")
 
 if __name__ == "__main__":
