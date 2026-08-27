@@ -194,6 +194,18 @@ COMPTES = {
     if c
 }
 
+# Le mot de passe par défaut du compte secrétariat ("icm2026") est visible
+# publiquement dans .env.example et dans le dépôt : un oubli de le changer
+# rend ce compte trivialement devinable. On avertit au démarrage, comme pour
+# SECRET_KEY ci-dessus, plutôt que de laisser passer silencieusement.
+if not os.getenv("ADMIN_PASSWORD_HASH") and os.getenv("ADMIN_PASSWORD", "icm2026") == "icm2026":
+    print(
+        "  ATTENTION : le compte secrétariat utilise encore le mot de passe "
+        "par défaut du dépôt (« icm2026 ») — définissez ADMIN_PASSWORD (ou "
+        "ADMIN_PASSWORD_HASH) dans .env avant toute utilisation réelle : ce "
+        "mot de passe par défaut est public (.env.example).\n"
+    )
+
 # Base de données : SQLite par défaut, PostgreSQL/Supabase si DATABASE_URL
 database_url = os.getenv("DATABASE_URL", "").strip() or "sqlite:///registre.db"
 if database_url.startswith("postgres://"):

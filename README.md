@@ -381,7 +381,6 @@ quotidien — c'est un durcissement invisible pour les utilisateurs.
 
 | Protection | Détail |
 |---|---|
-| Anti-force brute sur la connexion | 5 tentatives maximum, puis blocage 15 min de ce couple identifiant/appareil — sans jamais indiquer si c'est l'identifiant ou le mot de passe qui est faux |
 | Blocage de l'injection de formule dans les exports | Une observation commençant par `=`, `+`, `-` ou `@` est neutralisée dans l'export Excel/CSV, pour qu'Excel ne l'exécute jamais comme une formule à l'ouverture |
 | Longueur maximale des champs texte | Un champ démesurément long (saisie ou import) est refusé avec un message clair, plutôt que d'être accepté sans limite |
 | Messages d'erreur génériques | Aucun détail technique interne (requête SQL, trace serveur) n'est jamais affiché à l'écran, y compris en cas de panne |
@@ -390,6 +389,7 @@ quotidien — c'est un durcissement invisible pour les utilisateurs.
 
 | Protection | Détail |
 |---|---|
+| Anti-force brute sur la connexion | 5 tentatives maximum, puis blocage 15 min de ce couple identifiant/appareil — sans jamais indiquer si c'est l'identifiant ou le mot de passe qui est faux |
 | Jeton anti-CSRF | Chaque formulaire (connexion, création, modification, suppression, import) exige un jeton à usage limité ; une requête forgée depuis un autre site est refusée |
 | Cookie de session sécurisé | Inaccessible en JavaScript, refusé hors HTTPS en production (`FORCER_HTTPS`, voir `.env.example`), expire après 8 h d'inactivité |
 | En-têtes de sécurité HTTP | Anti-clickjacking, anti-sniffing MIME, `Content-Security-Policy` sur toutes les pages |
@@ -402,6 +402,7 @@ quotidien — c'est un durcissement invisible pour les utilisateurs.
 
 | Protection | Détail |
 |---|---|
+| Anti-force brute sur la connexion | Pas de compteur applicatif propre à ce dépôt (contrairement à la version Flask) : la connexion passe par Supabase Auth, qui applique ses propres limites de tentatives côté plateforme — une garantie différente, définie par Supabase, pas par ce code |
 | Fonctions internes non exposées | Les fonctions utilisées uniquement en coulisse (calcul du journal, libellés) ne sont plus exécutables directement par un compte, même connecté |
 | Vue statistiques sous contrôle de rôle | `v_statistiques` respecte désormais les mêmes règles d'accès que le registre, au lieu d'hériter des droits élargis de son propriétaire technique |
 | Auto-promotion de rôle impossible | Un compte ne peut pas se donner lui-même un rôle plus élevé (ex. « visiteur » → « pasteur ») : bloqué à la fois par l'absence de droit d'écriture sur la table des rôles et par un déclencheur indépendant, testé en simulant volontairement une régression future (droit d'écriture ajouté par erreur) — le blocage tient quand même |

@@ -866,6 +866,19 @@ const CHAMPS_MAJUSCULES = new Set([
 ]);
 const CHAMPS_CAPITALISES = new Set(["prenom","nationalite","originaire_de"]);
 
+/* Longueurs maximales — en miroir de LONGUEURS_MAX côté Flask (app.py) et
+   des contraintes CHECK "<champ>_longueur_raisonnable" de la base
+   (database/schema_supabase.sql § 12.4), pour que ce formulaire refuse une
+   saisie trop longue avant même l'aller-retour réseau. */
+const LONGUEURS_MAX = {
+  nom: 120, prenom: 120, nom_pere: 200, nom_mere: 200,
+  nationalite: 100, originaire_de: 150, lieu_bapteme: 200,
+  numero_registre_1: 80, celebrant_bapteme: 150, signature_1: 150,
+  lieu_mariage: 200, conjoint: 250, numero_registre_2: 80,
+  celebrant_mariage: 150, signature_2: 150, telephone: 50,
+  observations: 5000,
+};
+
 function normaliserCasseChamp(champ, valeur){
   if (!valeur) return valeur;
   if (CHAMPS_MAJUSCULES.has(champ)) return valeur.toUpperCase();
@@ -1068,8 +1081,24 @@ async function api(chemin, options={}, deuxiemeEssai=false){
     try{ const j = await r.json(); detail = j.message || j.hint || j.details || ""; }catch(e){}
     if (/duplicate key|unique/i.test(detail))
       throw new Error("Ce numéro de registre est déjà utilisé par une autre carte.");
-    if (/violates check constraint/i.test(detail))
-      throw new Error("Dates incohérentes : le baptême ou le mariage précède la naissance.");
+    if (/violates check constraint/i.test(detail)){
+      // Le nom de la contrainte violée (schema_supabase.sql § 1 et § 12.4)
+      // permet de renvoyer le même message précis que côté Flask
+      // (valider_donnees, app.py), plutôt qu'un message générique qui
+      // pourrait être faux (ex. accuser une date alors que c'est une
+      // longueur de champ qui a été dépassée).
+      if (/"bapteme_apres_naissance"/.test(detail))
+        throw new Error("Le baptême ne peut pas précéder la naissance.");
+      if (/"mariage_apres_naissance"/.test(detail))
+        throw new Error("Le mariage ne peut pas précéder la naissance.");
+      if (/"(nom|prenom)_non_vide"/.test(detail))
+        throw new Error("Le nom et le prénom sont obligatoires.");
+      const longueur = detail.match(/"(\w+)_longueur_raisonnable"/);
+      if (longueur)
+        throw new Error(`« ${libelleChamp(longueur[1])} » dépasse la longueur maximale autorisée.`);
+      throw new Error("Une valeur saisie ne respecte pas les règles du registre "
+        + "(dates ou longueur d'un champ).");
+    }
     if (/row-level security/i.test(detail))
       throw new Error("Accès refusé par la base : votre compte n'a peut-être "
         + "pas le rôle nécessaire (secrétaire ou pasteur), ou le script SQL "
@@ -1507,6 +1536,10 @@ function validerFormulaire(d){
   const erreurs = [];
   if (!d.nom)    erreurs.push("Le nom est obligatoire.");
   if (!d.prenom) erreurs.push("Le prénom est obligatoire.");
+  for (const [champ, max] of Object.entries(LONGUEURS_MAX)){
+    if (d[champ] && d[champ].length > max)
+      erreurs.push(`« ${libelleChamp(champ)} » dépasse la longueur maximale autorisée (${max} caractères).`);
+  }
   const aujourdhui = aujourdhuiLocalISO();
   [["naissance","date_naissance"],["baptême","date_bapteme"],["mariage","date_mariage"]]
     .forEach(([libelle,champ])=>{
@@ -1638,6 +1671,11 @@ const COLONNES_EXPORT = [
   ["telephone","Téléphone"],["observations","Observations"],
   ["photo","Fichier photo"]
 ];
+
+function libelleChamp(champ){
+  const trouve = COLONNES_EXPORT.find(([c]) => c === champ);
+  return trouve ? trouve[1] : champ;
+}
 
 // Neutralise l'injection de formule CSV (CWE-1236) : un champ texte libre
 // commençant par =, +, -, @ (ou une tabulation) serait interprété comme une
