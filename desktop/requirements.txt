@@ -1,0 +1,2 @@
+pywebview>=5.0,<6   # fenêtre native autour de web/index.html (WebView2 sur Windows)
+pyinstaller>=6.0,<7  # pour produire l'exécutable .exe (build uniquement, pas à l'exécution)

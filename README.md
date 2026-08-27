@@ -1,15 +1,23 @@
 # Registre numérique des Baptêmes & Mariages — In Christ Ministries
 
 MVP construit à partir de la carte papier ICM (baptême / mariage).
-Deux applications sont livrées, elles partagent le **même modèle de données** :
+Trois façons d'y accéder sont livrées ; les deux premières partagent le
+**même modèle de données** (Supabase) et donc le même registre partagé —
+la troisième n'est qu'un habillage de la première :
 
-| | `web/index.html` — **version en ligne** | `app.py` — **version locale (Flask)** |
-|---|---|---|
-| Installation | aucune : un fichier HTML à ouvrir | Python + `pip install` |
-| Base de données | Supabase (PostgreSQL, gratuit) | SQLite, fichier sur le PC |
-| Nombre de postes | illimité, chacun avec son compte | un seul poste |
-| Sauvegarde | assurée par Supabase | à faire à la main |
-| À utiliser quand… | le registre est en service | pour tester, ou sans internet |
+| | `web/index.html` — **version en ligne** | `app.py` — **version locale (Flask)** | `desktop/` — **version bureau (.exe)** |
+|---|---|---|---|
+| Installation | aucune : un fichier HTML à ouvrir | Python + `pip install` | copier un `.exe`, rien d'autre |
+| Base de données | Supabase (PostgreSQL, gratuit) | SQLite, fichier sur le PC | Supabase — la même que la version en ligne |
+| Nombre de postes | illimité, chacun avec son compte | un seul poste | illimité, chacun avec son compte |
+| Sauvegarde | assurée par Supabase | à faire à la main | assurée par Supabase |
+| À utiliser quand… | le registre est en service | pour tester, ou sans internet | pour une icône bureau plutôt qu'un onglet de navigateur |
+
+> **Version bureau.** Un exécutable Windows autonome (fenêtre native, sans
+> navigateur visible) autour de la version en ligne — mêmes comptes, mêmes
+> rôles, même base Supabase partagée par tous les postes, accessible dès
+> que le PC a Internet. Voir `desktop/README.md` pour le construire et
+> l'installer.
 
 > **Par où commencer ?** Ouvrez la version Flask pour prendre l'application
 > en main hors ligne. Passez à la version en ligne dès que plusieurs personnes
@@ -50,6 +58,11 @@ mvp_registre_bapteme_mariage/
 │
 ├── web/
 │   └── index.html                 ← APPLICATION EN LIGNE (fichier unique)
+│
+├── desktop/                       ← VERSION BUREAU (.exe autour de web/index.html)
+│   ├── README.md                  ← comment construire et installer l'exécutable
+│   ├── app_bureau.py
+│   └── construire.ps1
 │
 ├── database/
 │   ├── schema_supabase.sql        ← à exécuter dans Supabase

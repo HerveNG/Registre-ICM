@@ -31,6 +31,14 @@ venv/
 # Tests (voir tests/README.md)
 .pytest_cache/
 
+# Version bureau (exécutable Windows) : artefacts de construction, jamais
+# le résultat compilé — voir desktop/README.md pour reconstruire le .exe
+desktop/build/
+desktop/dist/
+desktop/*.spec
+desktop/icone.ico
+pip_install_log.txt
+
 # Fichiers système
 .DS_Store
 Thumbs.db
