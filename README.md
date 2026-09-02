@@ -88,8 +88,9 @@ mvp_registre_bapteme_mariage/
 │   ├── migration_03_journal.sql   ← si la base existait AVANT le journal d'audit
 │   ├── migration_04_durcissement_securite.sql
 │   │                               ← si la base existait AVANT l'audit de sécurité
-│   │                                 du 25/08/2026 (§ 13) — déjà inclus dans
+│   │                                 du 25/08/2026 (§ 14) — déjà inclus dans
 │   │                                 schema_supabase.sql pour une base neuve
+│   ├── migration_05_presences.sql ← si la base existait AVANT le module Présences (§ 11)
 │   └── schema_sqlite.sql          ← documentation du schéma local
 │
 ├── app.py                         ← APPLICATION FLASK
@@ -124,11 +125,13 @@ mvp_registre_bapteme_mariage/
 4. **Project Settings → API** : noter l'`URL` du projet et la clé `anon`.
 
 > **Vous aviez déjà créé la base avant les photos, avant les rôles, avant
-> le journal d'audit, ou avant l'audit de sécurité du 25/08/2026 (§ 13) ?**
+> le journal d'audit, avant l'audit de sécurité du 25/08/2026 (§ 14), ou
+> avant le module Présences (§ 11) ?**
 > Ne rejouez pas le script complet : exécutez, dans cet ordre,
 > `database/migration_01_photo.sql` puis `database/migration_02_roles.sql`
 > puis `database/migration_03_journal.sql` puis
-> `database/migration_04_durcissement_securite.sql` — chacun ajoute
+> `database/migration_04_durcissement_securite.sql` puis
+> `database/migration_05_presences.sql` — chacun ajoute
 > seulement ce qui manque, sans toucher à vos données. Une base créée à
 > partir du `schema_supabase.sql` actuel n'a besoin d'aucune de ces
 > migrations : tout est déjà dedans.
@@ -369,9 +372,11 @@ C'est la seule sauvegarde qui vous appartienne vraiment.
 
 ## 11. Présences & Statistiques des cultes
 
-*Actuellement disponible sur la version Flask uniquement (branche `v2`) ;
-la version en ligne (Supabase) et la version bureau en hériteront lors de
-la fusion vers `main`.*
+*Disponible sur la version Flask et sur la version en ligne (Supabase) —
+voir `database/schema_supabase.sql` § 13 / `database/migration_05_presences.sql`.
+La version bureau et la version Android en héritent automatiquement (elles
+encapsulent `web/index.html`) dès qu'elles sont reconstruites — voir
+`desktop/construire.ps1` et `docs/ANDROID-BUILD.md`.*
 
 Un module séparé du registre des baptêmes/mariages, accessible depuis
 l'en-tête (**📊 Présences**), pour suivre la fréquentation des cultes :
@@ -414,9 +419,15 @@ l'en-tête (**📊 Présences**), pour suivre la fréquentation des cultes :
 Mêmes rôles que le reste de l'application (§5) : secrétaire et pasteur ont
 accès complet, le visiteur consulte sans modifier.
 
-**Reporté à une prochaine itération** (voir le suivi de la branche `v2`) :
-miroir vers la version en ligne (Supabase) et propagation aux versions
-bureau/Android — ce module n'existe pour l'instant que côté Flask.
+**Différences entre les deux versions.** Le calcul des statistiques (§8),
+l'analyse intelligente et la comparaison de périodes tournent côté serveur
+en Flask, côté navigateur (JavaScript) dans la version en ligne — même
+logique, mêmes résultats, sources différentes. Le rapport imprimable de la
+version en ligne s'ouvre dans un nouvel onglet généré localement (pas de
+route serveur dédiée), pour rester cohérent avec le principe d'un fichier
+unique sans backend. `created_by`/`updated_by` y sont l'adresse e-mail du
+compte Supabase (texte simple, pas une clé étrangère vers `auth.users` —
+cette table n'est pas exposée par l'API REST).
 
 ---
 

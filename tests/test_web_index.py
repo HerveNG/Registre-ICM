@@ -291,3 +291,99 @@ def test_aujourdhui_local_iso_suit_lheure_locale_de_la_machine(page):
            return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`; }"""
     )
     assert page.evaluate("aujourdhuiLocalISO()") == attendu
+
+
+# ------------------------------------------------------------------
+#  Présences & Statistiques (version en ligne) — miroir en JS pur des
+#  fonctions Python équivalentes (app.py), testées côté Flask dans
+#  tests/test_presences.py. Ici : uniquement les fonctions sans appel
+#  réseau (Supabase est bloqué dans ces tests, voir la fixture `page`).
+# ------------------------------------------------------------------
+def test_jour_semaine_presence_detecte_le_dimanche(page):
+    assert page.evaluate("jourSemainePresence('2026-08-30')") == "Dimanche"
+    assert page.evaluate("jourSemainePresence('2026-08-26')") == "Mercredi"
+    assert page.evaluate("jourSemainePresence('')") == ""
+
+
+def test_periode_precedente_presence_calcule_le_mois_juste_avant(page):
+    resultat = page.evaluate("periodePrecedentePresence('mois', '2026-08-01', '2026-08-31')")
+    assert resultat == ["2026-07-01", "2026-07-31"]
+
+
+def test_periode_precedente_presence_calcule_lannee_juste_avant(page):
+    resultat = page.evaluate("periodePrecedentePresence('annee', '2026-01-01', '2026-12-31')")
+    assert resultat == ["2025-01-01", "2025-12-31"]
+
+
+def test_periode_precedente_presence_semaine(page):
+    # Une semaine de 7 jours (lundi->dimanche) doit être suivie d'une
+    # période précédente de la même durée, se terminant la veille.
+    resultat = page.evaluate("periodePrecedentePresence('semaine', '2026-08-24', '2026-08-30')")
+    assert resultat == ["2026-08-17", "2026-08-23"]
+
+
+def test_periode_precedente_presence_aucune_pour_tout_ou_sans_bornes(page):
+    assert page.evaluate("periodePrecedentePresence('tout', null, null)") == [None, None]
+    assert page.evaluate("periodePrecedentePresence('personnalise', null, null)") == [None, None]
+
+
+def test_bornes_periode_presence_personnalisee(page):
+    resultat = page.evaluate(
+        "bornesPeriodePresence('personnalise', '2026-08-01', '2026-08-31')")
+    assert resultat == ["2026-08-01", "2026-08-31"]
+
+
+def test_bornes_periode_presence_tout_est_sans_limite(page):
+    assert page.evaluate("bornesPeriodePresence('tout', '', '')") == [None, None]
+
+
+def test_generer_analyses_presence_vide_sans_aucun_culte(page):
+    resultat = page.evaluate(
+        "genererAnalysesPresence({nb_cultes:0, total:0}, [], [], [], null)")
+    assert resultat == []
+
+
+def test_generer_analyses_presence_reproduit_lexemple_du_cahier_des_charges(page):
+    """Mêmes chiffres que l'exemple du cahier des charges (85/135/95/315)
+    et que test_presences.py côté Flask — les deux versions doivent
+    produire des observations cohérentes à partir des mêmes données."""
+    resultat = page.evaluate(
+        """() => {
+            const resume = {nb_cultes:1, total:315, hommes:85, femmes:135, enfants:95,
+                             moyenne:315, maximum:315, minimum:315};
+            const repartition = [
+              {groupe:'hommes', libelle:'Hommes', valeur:85, pourcentage:27.0},
+              {groupe:'femmes', libelle:'Femmes', valeur:135, pourcentage:42.9},
+              {groupe:'enfants', libelle:'Enfants', valeur:95, pourcentage:30.2},
+            ];
+            const analyseJours = [{jour:'Dimanche', moyenne:315, nb:1}];
+            const enregistrements = [{date_culte:'2026-08-30', total_general:315}];
+            return genererAnalysesPresence(resume, repartition, analyseJours, enregistrements, null);
+        }"""
+    )
+    assert any("Femmes" in a or "femmes" in a for a in resultat)
+    assert any("Dimanche" in a for a in resultat)
+    assert any("30/08/2026" in a for a in resultat)
+
+
+def test_camembert_html_repartit_360_degres_et_echappe(page):
+    html = page.evaluate(
+        """() => camembertHtml([
+            {groupe:'hommes', libelle:'<b>Hommes</b>', valeur:50, couleur:'red', pourcentage:50},
+            {groupe:'femmes', libelle:'Femmes', valeur:50, couleur:'blue', pourcentage:50},
+        ])"""
+    )
+    assert "conic-gradient" in html
+    assert "red 0deg 180deg" in html
+    assert "blue 180deg 360deg" in html
+    assert "<b>Hommes</b>" not in html   # échappé, pas injecté tel quel
+
+
+def test_barres_html_largeur_proportionnelle_au_maximum(page):
+    html = page.evaluate(
+        """() => barresHtml(
+            [{jour:'Dimanche', moyenne:100}, {jour:'Mercredi', moyenne:50}],
+            'jour', 'moyenne', 100)"""
+    )
+    assert "width:100%" in html
+    assert "width:50%" in html
