@@ -1,6 +1,6 @@
 {
   "appId": "com.elman.icmregistre",
-  "appName": "Registre ICM",
+  "appName": "ICM Registre",
   "webDir": "web",
   "android": {
     "allowMixedContent": false

@@ -131,7 +131,7 @@ signature — Gradle utilise un certificat de debug généré automatiquement.
 ## 10. Emplacement de l'APK Debug
 
 ```
-android\app\build\outputs\apk\debug\app-debug.apk
+android\app\build\outputs\apk\debug\ICM Registre-debug.apk
 ```
 
 ## 11. Génération de l'APK Release
@@ -144,15 +144,18 @@ npm run android:apk:release
 `android/signing.properties` (voir §14), le résultat est un APK **non
 signé** — utile pour vérifier que tout compile, mais **pas installable tel
 quel** sur un téléphone (Android refuse les APK non signés) ni publiable.
+Le fichier porte le même nom dans les deux cas (voir §12) : pour savoir
+s'il est réellement signé, vérifier la présence de
+`android/signing.properties`, ou lancer :
+
+```powershell
+& "$env:ANDROID_HOME\build-tools\35.0.0\apksigner.bat" verify --print-certs "android\app\build\outputs\apk\release\ICM Registre.apk"
+```
 
 ## 12. Emplacement de l'APK Release
 
 ```
-# Signé (avec signing.properties configuré) :
-android\app\build\outputs\apk\release\app-release.apk
-
-# Non signé (sans signing.properties) :
-android\app\build\outputs\apk\release\app-release-unsigned.apk
+android\app\build\outputs\apk\release\ICM Registre.apk
 ```
 
 ## 13. Génération de l'AAB (Android App Bundle, pour le Play Store)
@@ -224,7 +227,7 @@ taper 7 fois sur « Numéro de build »* pour activer le mode développeur, puis
 *Paramètres → Options pour développeurs → Débogage USB* :
 
 ```powershell
-& "$env:ANDROID_HOME\platform-tools\adb.exe" install android\app\build\outputs\apk\debug\app-debug.apk
+& "$env:ANDROID_HOME\platform-tools\adb.exe" install "android\app\build\outputs\apk\debug\ICM Registre-debug.apk"
 ```
 
 **Sans câble** : envoyer le fichier `.apk` (Drive, e-mail, clé USB…), puis
@@ -263,7 +266,7 @@ signé, voir `desktop/README.md`).
 | `SDK location not found` | `ANDROID_HOME` non défini ou `android/local.properties` absent | Voir §5 |
 | `Failed to install the following Android SDK packages... License not accepted` | Licences SDK non acceptées | `sdkmanager --licenses` puis taper `y` à chaque question |
 | Téléchargement Gradle/Maven qui échoue ou reste bloqué | Pare-feu/proxy d'entreprise bloquant `repo.maven.apache.org` ou `dl.google.com` | Vérifier la connexion Internet directe (sans proxy restrictif) ; réessayer — Gradle reprend les téléchargements interrompus |
-| `app-release-unsigned.apk` refusé à l'installation (« Application non installée ») | APK Release non signé (normal sans `signing.properties`, voir §11) | Configurer la signature (§14) puis reconstruire |
+| `ICM Registre.apk` (release) refusé à l'installation (« Application non installée ») | APK Release non signé (normal sans `signing.properties`, voir §11) | Vérifier avec `apksigner verify` (§11) ; configurer la signature (§14) puis reconstruire |
 | `keytool` introuvable | Pas dans le `PATH` | Utiliser le chemin complet `$env:JAVA_HOME\bin\keytool.exe` (§14a) |
 | L'app affiche un écran blanc au lancement | `web/` non synchronisé après une modification | `npm run android:sync` avant de reconstruire |
 | Bouton « Imprimer / Enregistrer en PDF » inactif sur le téléphone | Normal : la WebView Android n'a pas de boîte de dialogue d'impression native — un message l'indique désormais à l'utilisateur (voir `web/index.html`, bloc Capacitor en fin de fichier) | Utiliser la version Web (navigateur) ou Windows pour imprimer/exporter en PDF |

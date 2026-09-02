@@ -43,6 +43,17 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+
+    // Nom du fichier .apk livré : "ICM Registre.apk" pour la release (à
+    // installer/distribuer), "ICM Registre-debug.apk" pour le debug — même
+    // logique de nommage que "ICM Registre.exe" côté version bureau
+    // (desktop/construire.ps1). Sans effet sur l'AAB (nommé par Gradle).
+    applicationVariants.all { variant ->
+        variant.outputs.all { output ->
+            outputFileName = variant.buildType.name == "release" ?
+                "ICM Registre.apk" : "ICM Registre-${variant.buildType.name}.apk"
+        }
+    }
 }
 
 repositories {
