@@ -7,7 +7,7 @@
 # chaque valeur.
 
 # Chemin vers le fichier .jks/.keystore, relatif au dossier android/
-storeFile=../keystore/icm-registre-release.jks
+storeFile=keystore/icm-registre-release.jks
 
 # Mot de passe du keystore
 storePassword=changez-moi
