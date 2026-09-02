@@ -33,6 +33,7 @@
   {% if q or type_id or date_debut or date_fin or tri != 'date_desc' %}
     <a class="bouton bouton-discret" href="{{ url_for('presences_historique') }}">Réinitialiser</a>
   {% endif %}
+  <a class="bouton bouton-discret" href="{{ url_for('presences_export_csv', q=q, type=type_id, debut=date_debut, fin=date_fin) }}">Export Excel</a>
   {% if peut_ecrire %}
     <a class="bouton bouton-principal" href="{{ url_for('presences_nouvelle') }}">+ Nouvelle présence</a>
   {% endif %}

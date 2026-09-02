@@ -394,14 +394,29 @@ l'en-tête (**📊 Présences**), pour suivre la fréquentation des cultes :
   activation/désactivation. Une catégorie désactivée reste visible sur les
   fiches déjà enregistrées qui l'utilisaient (rien n'est jamais perdu),
   seulement retirée des nouvelles saisies.
+- **Comparer deux périodes** : deux plages de dates libres (par défaut, ce
+  mois-ci contre le mois précédent), indicateur par indicateur, avec
+  évolution (▲/▼/stable).
+- **Analyse intelligente** : sur la page Statistiques et dans chaque
+  rapport, quelques observations en langage naturel déduites des chiffres
+  réels de la période (évolution vs période précédente, groupe dominant,
+  jour le plus fréquenté, tendance des derniers cultes, record de
+  fréquentation) — jamais générées quand les données sont insuffisantes.
+- **Rapports** : hebdomadaire / mensuel / trimestriel / annuel / période
+  personnalisée — une page imprimable (même principe que la carte de
+  baptême, §7 : impression navigateur → PDF, aucune bibliothèque PDF
+  ajoutée) reprenant KPI, répartition, comparaison des cultes, analyses et
+  détail culte par culte.
+- **Export** : CSV (compatible Excel, avec l'anti-injection de formule du
+  §14) respectant les filtres actifs de l'historique — type de culte,
+  période, recherche.
 
 Mêmes rôles que le reste de l'application (§5) : secrétaire et pasteur ont
 accès complet, le visiteur consulte sans modifier.
 
 **Reporté à une prochaine itération** (voir le suivi de la branche `v2`) :
-rapports PDF/Excel/CSV, moteur d'analyse automatique en langage naturel,
-comparaison chiffrée de deux périodes, miroir vers la version en ligne
-(Supabase) et propagation aux versions bureau/Android.
+miroir vers la version en ligne (Supabase) et propagation aux versions
+bureau/Android — ce module n'existe pour l'instant que côté Flask.
 
 ---
 

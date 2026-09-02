@@ -25,6 +25,8 @@
 <form class="barre-recherche" method="get" action="{{ url_for('presences_historique') }}">
   <a class="bouton" href="{{ url_for('presences_historique') }}">Historique</a>
   <a class="bouton" href="{{ url_for('presences_statistiques') }}">Statistiques</a>
+  <a class="bouton" href="{{ url_for('presences_comparaison') }}">Comparer deux périodes</a>
+  <a class="bouton" href="{{ url_for('presences_rapports') }}">Rapports</a>
   {% if peut_ecrire %}
     <a class="bouton bouton-discret" href="{{ url_for('presences_parametres') }}">Paramètres</a>
     <a class="bouton bouton-principal" href="{{ url_for('presences_nouvelle') }}">+ Enregistrer une présence</a>

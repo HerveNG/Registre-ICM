@@ -1557,14 +1557,99 @@ def bornes_periode(periode, debut_brut, fin_brut):
     return None, None   # "tout"
 
 
-@app.route("/presences/statistiques")
-@login_requis
-def presences_statistiques():
-    periode = request.args.get("periode", "mois")
-    debut_brut = request.args.get("debut", "")
-    fin_brut = request.args.get("fin", "")
-    debut, fin = bornes_periode(periode, debut_brut, fin_brut)
+def periode_precedente(periode, debut, fin):
+    """Bornes de la période « équivalente » immédiatement avant (debut, fin)
+    — pour comparer un mois au mois précédent, une semaine à la semaine
+    précédente, etc. Retourne (None, None) quand la notion n'a pas de sens
+    (periode == "tout"/"personnalise", ou bornes manquantes) : mieux vaut
+    ne pas comparer que comparer à une période mal définie."""
+    if not debut or not fin:
+        return None, None
+    if periode == "aujourdhui":
+        veille = debut - timedelta(days=1)
+        return veille, veille
+    if periode == "semaine":
+        duree = (fin - debut).days + 1
+        fin_prec = debut - timedelta(days=1)
+        return fin_prec - timedelta(days=duree - 1), fin_prec
+    if periode == "mois":
+        fin_prec = debut - timedelta(days=1)
+        return fin_prec.replace(day=1), fin_prec
+    if periode == "trimestre":
+        fin_prec = debut - timedelta(days=1)
+        premier_mois = ((fin_prec.month - 1) // 3) * 3 + 1
+        return fin_prec.replace(month=premier_mois, day=1), fin_prec
+    if periode == "annee":
+        return debut.replace(year=debut.year - 1), fin.replace(year=fin.year - 1)
+    return None, None
 
+
+EMOJIS_GROUPES = {GROUPE_HOMMES: "👨", GROUPE_FEMMES: "👩", GROUPE_ENFANTS: "🧒"}
+
+
+def generer_analyses(resume, repartition, analyse_jours, enregistrements, resume_precedent):
+    """§13 : observations en langage naturel, toujours déduites des
+    données réelles passées en paramètre — jamais générées si les données
+    sont insuffisantes (voir chaque garde ci-dessous)."""
+    analyses = []
+    if resume["nb_cultes"] == 0:
+        return analyses
+
+    if resume_precedent and resume_precedent["total"]:
+        variation = round(
+            (resume["total"] - resume_precedent["total"]) / resume_precedent["total"] * 100)
+        if variation > 0:
+            analyses.append(f"📈 La fréquentation a augmenté de {variation} % "
+                             f"par rapport à la période précédente.")
+        elif variation < 0:
+            analyses.append(f"📉 La fréquentation a diminué de {abs(variation)} % "
+                             f"par rapport à la période précédente.")
+        else:
+            analyses.append("➡️ La fréquentation est stable par rapport à la période précédente.")
+
+    if repartition:
+        principal = max(repartition, key=lambda p: p["valeur"])
+        analyses.append(
+            f"{EMOJIS_GROUPES[principal['groupe']]} Les {principal['libelle'].lower()} "
+            f"représentent {principal['pourcentage']} % de la fréquentation totale.")
+
+    if analyse_jours:
+        jour_top = max(analyse_jours, key=lambda j: j["moyenne"])
+        analyses.append(
+            f"📅 {jour_top['jour']} est le jour ayant la plus forte affluence "
+            f"(en moyenne {jour_top['moyenne']} personnes).")
+
+    # Tendance sur les derniers cultes : nécessite au moins 6 cultes pour
+    # comparer un groupe de 3 récents à un groupe de 3 précédents.
+    if len(enregistrements) >= 6:
+        recents = enregistrements[-3:]
+        avant = enregistrements[-6:-3]
+        moyenne_recents = sum(r.total_general for r in recents) / 3
+        moyenne_avant = sum(r.total_general for r in avant) / 3
+        if moyenne_avant:
+            variation = (moyenne_recents - moyenne_avant) / moyenne_avant
+            if variation <= -0.1:
+                analyses.append("📉 Une baisse de fréquentation a été observée "
+                                 "au cours des trois derniers cultes.")
+            elif variation >= 0.1:
+                analyses.append("📈 Une hausse de fréquentation a été observée "
+                                 "au cours des trois derniers cultes.")
+
+    if enregistrements:
+        record_max = max(enregistrements, key=lambda r: r.total_general)
+        analyses.append(
+            f"🔥 Le culte du {record_max.date_culte.strftime('%d/%m/%Y')} a enregistré "
+            f"la plus forte participation de la période, avec {record_max.total_general} "
+            f"personnes.")
+
+    return analyses
+
+
+def calculer_statistiques_periode(debut, fin):
+    """Agrège les présences de (debut, fin] (bornes incluses, l'une ou
+    l'autre pouvant être None) — utilisé à la fois par /presences/
+    statistiques et par /presences/rapport pour ne calculer ces chiffres
+    qu'à un seul endroit."""
     requete = AttendanceRecord.query
     if debut:
         requete = requete.filter(AttendanceRecord.date_culte >= debut)
@@ -1621,13 +1706,36 @@ def presences_statistiques():
     evolution = [{"date": r.date_culte, "total": r.total_general} for r in enregistrements[-20:]]
     max_evolution = max((e["total"] for e in evolution), default=0)
 
+    return {
+        "enregistrements": enregistrements, "resume": resume, "repartition": repartition,
+        "comparaison_types": comparaison_types, "max_comparaison": max_comparaison,
+        "analyse_jours": analyse_jours, "max_jour": max_jour,
+        "evolution": evolution, "max_evolution": max_evolution,
+    }
+
+
+@app.route("/presences/statistiques")
+@login_requis
+def presences_statistiques():
+    periode = request.args.get("periode", "mois")
+    debut_brut = request.args.get("debut", "")
+    fin_brut = request.args.get("fin", "")
+    debut, fin = bornes_periode(periode, debut_brut, fin_brut)
+
+    stats = calculer_statistiques_periode(debut, fin)
+
+    debut_prec, fin_prec = periode_precedente(periode, debut, fin)
+    resume_precedent = calculer_statistiques_periode(debut_prec, fin_prec)["resume"] \
+        if debut_prec else None
+
+    analyses = generer_analyses(
+        stats["resume"], stats["repartition"], stats["analyse_jours"],
+        stats["enregistrements"], resume_precedent)
+
     return render_template(
         "presences_statistiques.html", paroisse=PAROISSE,
         periode=periode, debut=debut, fin=fin, debut_brut=debut_brut, fin_brut=fin_brut,
-        resume=resume, repartition=repartition,
-        comparaison_types=comparaison_types, max_comparaison=max_comparaison,
-        analyse_jours=analyse_jours, max_jour=max_jour,
-        evolution=evolution, max_evolution=max_evolution,
+        analyses=analyses, **stats,
     )
 
 
@@ -1712,6 +1820,157 @@ def presences_parametres():
     return render_template(
         "presences_parametres.html", paroisse=PAROISSE,
         types_culte=types_culte, par_groupe=par_groupe)
+
+
+# ------------------------------------------------------------------
+#  Comparaison de deux périodes (§14)
+# ------------------------------------------------------------------
+@app.route("/presences/comparaison")
+@login_requis
+def presences_comparaison():
+    mois_debut, mois_fin = bornes_periode("mois", "", "")
+    mois_prec_debut, mois_prec_fin = periode_precedente("mois", mois_debut, mois_fin)
+
+    def _lire_date(cle, defaut):
+        brut = request.args.get(cle, "")
+        try:
+            return datetime.strptime(brut, "%Y-%m-%d").date() if brut else defaut
+        except ValueError:
+            return defaut
+
+    a_debut = _lire_date("a_debut", mois_debut)
+    a_fin = _lire_date("a_fin", mois_fin)
+    b_debut = _lire_date("b_debut", mois_prec_debut)
+    b_fin = _lire_date("b_fin", mois_prec_fin)
+
+    stats_a = calculer_statistiques_periode(a_debut, a_fin)
+    stats_b = calculer_statistiques_periode(b_debut, b_fin)
+
+    def _comparer(cle, libelle):
+        val_a = stats_a["resume"].get(cle, 0)
+        val_b = stats_b["resume"].get(cle, 0)
+        if val_b:
+            evolution = round((val_a - val_b) / val_b * 100)
+        else:
+            evolution = 100 if val_a else 0
+        return {"libelle": libelle, "a": val_a, "b": val_b, "evolution": evolution}
+
+    indicateurs = [
+        _comparer("total", "Présence totale"),
+        _comparer("moyenne", "Moyenne par culte"),
+        _comparer(GROUPE_HOMMES, "Hommes"),
+        _comparer(GROUPE_FEMMES, "Femmes"),
+        _comparer(GROUPE_ENFANTS, "Enfants"),
+    ]
+
+    return render_template(
+        "presences_comparaison.html", paroisse=PAROISSE,
+        a_debut=a_debut, a_fin=a_fin, b_debut=b_debut, b_fin=b_fin,
+        stats_a=stats_a, stats_b=stats_b, indicateurs=indicateurs,
+    )
+
+
+# ------------------------------------------------------------------
+#  Rapports automatiques (§12) — page de choix, puis rapport imprimable
+#  (même principe que carte.html : impression navigateur -> PDF, sans
+#  bibliothèque de génération de PDF côté serveur).
+# ------------------------------------------------------------------
+LIBELLES_RAPPORTS = {
+    "semaine": "Rapport hebdomadaire", "mois": "Rapport mensuel",
+    "trimestre": "Rapport trimestriel", "annee": "Rapport annuel",
+    "personnalise": "Rapport personnalisé", "tout": "Rapport — tout l'historique",
+}
+
+
+@app.route("/presences/rapports")
+@login_requis
+def presences_rapports():
+    return render_template("presences_rapports.html", paroisse=PAROISSE)
+
+
+@app.route("/presences/rapport")
+@login_requis
+def presences_rapport():
+    periode = request.args.get("periode", "mois")
+    debut_brut = request.args.get("debut", "")
+    fin_brut = request.args.get("fin", "")
+    debut, fin = bornes_periode(periode, debut_brut, fin_brut)
+
+    stats = calculer_statistiques_periode(debut, fin)
+    debut_prec, fin_prec = periode_precedente(periode, debut, fin)
+    resume_precedent = calculer_statistiques_periode(debut_prec, fin_prec)["resume"] \
+        if debut_prec else None
+    analyses = generer_analyses(
+        stats["resume"], stats["repartition"], stats["analyse_jours"],
+        stats["enregistrements"], resume_precedent)
+
+    return render_template(
+        "presences_rapport.html", paroisse=PAROISSE,
+        titre=LIBELLES_RAPPORTS.get(periode, "Rapport"),
+        periode=periode, debut=debut, fin=fin, aujourdhui=date.today(),
+        analyses=analyses, **stats,
+    )
+
+
+# ------------------------------------------------------------------
+#  Export CSV (ouvrable directement dans Excel) des présences — respecte
+#  les mêmes filtres que l'historique (§15).
+# ------------------------------------------------------------------
+@app.route("/presences/export.csv")
+@login_requis
+def presences_export_csv():
+    q = request.args.get("q", "").strip()
+    type_id = request.args.get("type", type=int)
+    date_debut = request.args.get("debut", "").strip()
+    date_fin = request.args.get("fin", "").strip()
+
+    requete = AttendanceRecord.query
+    if q:
+        motif = f"%{q}%"
+        requete = requete.filter(or_(
+            AttendanceRecord.lieu.ilike(motif), AttendanceRecord.notes.ilike(motif)))
+    if type_id:
+        requete = requete.filter(AttendanceRecord.service_type_id == type_id)
+    if date_debut:
+        try:
+            requete = requete.filter(
+                AttendanceRecord.date_culte >= datetime.strptime(date_debut, "%Y-%m-%d").date())
+        except ValueError:
+            pass
+    if date_fin:
+        try:
+            requete = requete.filter(
+                AttendanceRecord.date_culte <= datetime.strptime(date_fin, "%Y-%m-%d").date())
+        except ValueError:
+            pass
+
+    enregistrements = requete.order_by(AttendanceRecord.date_culte.asc()).all()
+    categories = (AttendanceCategory.query.filter_by(is_active=True)
+                  .order_by(AttendanceCategory.groupe, AttendanceCategory.ordre_affichage).all())
+
+    tampon = io.StringIO()
+    tampon.write("﻿")   # BOM : Excel affiche correctement les accents
+    writer = csv.writer(tampon, delimiter=";")
+    writer.writerow(
+        ["Date", "Jour", "Type de culte", "Lieu"] + [c.nom for c in categories]
+        + ["Total Hommes", "Total Femmes", "Total Enfants", "Total Général", "Notes"]
+    )
+    for r in enregistrements:
+        valeurs_par_categorie = {v.category_id: v.effectif for v in r.valeurs}
+        ligne = [
+            r.date_culte.strftime("%d/%m/%Y"), r.jour_semaine,
+            r.service_type.nom if r.service_type else "", neutraliser_formule(r.lieu) or "",
+        ]
+        ligne += [valeurs_par_categorie.get(c.id, 0) for c in categories]
+        ligne += [r.total_hommes, r.total_femmes, r.total_enfants, r.total_general,
+                  neutraliser_formule(r.notes) or ""]
+        writer.writerow(ligne)
+
+    nom_fichier = f"presences_icm_{date.today():%Y-%m-%d}.csv"
+    return Response(
+        tampon.getvalue(), mimetype="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{nom_fichier}"'},
+    )
 
 
 # ------------------------------------------------------------------

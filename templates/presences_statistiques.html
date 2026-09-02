@@ -28,6 +28,7 @@
     au <input type="date" name="fin" value="{{ fin_brut }}" style="width:auto; display:inline-block;">
     <button type="submit" class="bouton bouton-petit">Appliquer</button>
   </span>
+  <a class="bouton bouton-discret" href="{{ url_for('presences_rapport', periode=periode, debut=debut_brut, fin=fin_brut) }}" target="_blank">🖨 Rapport imprimable</a>
 </form>
 
 <div class="cartes-tableau-bord">
@@ -41,6 +42,17 @@
 {% if resume.nb_cultes == 0 %}
 <div class="vide"><p>Aucune présence enregistrée sur cette période.</p></div>
 {% else %}
+
+{% if analyses %}
+<div class="bloc-stat">
+  <h2>🔎 Ce que disent les chiffres</h2>
+  <ul style="margin:0; padding-left:1.2rem; display:grid; gap:.5rem;">
+    {% for texte in analyses %}
+      <li>{{ texte }}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
 
 <div class="bloc-stat">
   <h2>Répartition Hommes / Femmes / Enfants</h2>

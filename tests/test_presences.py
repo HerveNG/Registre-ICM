@@ -14,6 +14,11 @@ def _id_type_dimanche(icm_app):
         return icm_app.ServiceType.query.filter_by(nom="Culte du dimanche").one().id
 
 
+def _id_type_mercredi(icm_app):
+    with icm_app.app.app_context():
+        return icm_app.ServiceType.query.filter_by(nom="Culte du mercredi").one().id
+
+
 def _id_categorie(icm_app, nom):
     with icm_app.app.app_context():
         return icm_app.AttendanceCategory.query.filter_by(nom=nom).one().id
@@ -313,13 +318,154 @@ def test_categorie_modifiee_desactivee_reste_visible_sur_fiche_existante(
     silencieusement les valeurs déjà enregistrées pour les fiches qui
     l'utilisaient (voir categories_pour_edition)."""
     client_secretaire.post("/presences/nouvelle", data=_donnees_exemple(icm_app))
+    id_cat = _id_categorie(icm_app, "Jeunes hommes")
     with icm_app.app.app_context():
         id_record = icm_app.AttendanceRecord.query.one().id
-        id_cat = _id_categorie(icm_app, "Jeunes hommes")
         cat = icm_app.db.session.get(icm_app.AttendanceCategory, id_cat)
         cat.is_active = False
         icm_app.db.session.commit()
 
-    page = client_secretaire.get(f"/presences/{id_record}/modifier")
-    assert page.status_code == 200
-    assert b"Jeunes hommes" in page.data
+    try:
+        page = client_secretaire.get(f"/presences/{id_record}/modifier")
+        assert page.status_code == 200
+        assert b"Jeunes hommes" in page.data
+    finally:
+        # AttendanceCategory n'est pas réinitialisée entre les tests (voir
+        # conftest.py) : remettre "Jeunes hommes" active pour ne pas fausser
+        # les totaux des autres tests qui s'appuient sur _donnees_exemple().
+        with icm_app.app.app_context():
+            cat = icm_app.db.session.get(icm_app.AttendanceCategory, id_cat)
+            cat.is_active = True
+            icm_app.db.session.commit()
+
+
+# ------------------------------------------------------------------
+#  Comparaison de deux périodes
+# ------------------------------------------------------------------
+def test_comparaison_agrege_chaque_periode_separement(client_secretaire, icm_app):
+    client_secretaire.post("/presences/nouvelle", data=_donnees_exemple(icm_app))
+    autre = _donnees_exemple(icm_app, date_culte="2026-07-15")
+    autre["service_type_id"] = str(_id_type_mercredi(icm_app))
+    for cle in list(autre):
+        if cle.startswith("cat_"):
+            autre[cle] = "0"
+    autre[f"cat_{_id_categorie(icm_app, 'Hommes adultes')}"] = "10"
+    client_secretaire.post("/presences/nouvelle", data=autre)
+
+    reponse = client_secretaire.get(
+        "/presences/comparaison?a_debut=2026-08-01&a_fin=2026-08-31"
+        "&b_debut=2026-07-01&b_fin=2026-07-31")
+    assert reponse.status_code == 200
+    assert b"315" in reponse.data   # periode A : la carte d'exemple
+    assert b"10" in reponse.data    # periode B : le seul enregistrement
+
+
+def test_comparaison_par_defaut_sans_parametres(client_secretaire):
+    """Sans paramètres, la page doit se charger (ce mois vs le mois
+    précédent) sans lever d'erreur, même si aucune présence n'existe."""
+    reponse = client_secretaire.get("/presences/comparaison")
+    assert reponse.status_code == 200
+
+
+# ------------------------------------------------------------------
+#  Rapports
+# ------------------------------------------------------------------
+def test_page_choix_des_rapports(client_secretaire):
+    assert client_secretaire.get("/presences/rapports").status_code == 200
+
+
+def test_rapport_periode_sans_donnees_naffiche_aucune_erreur(client_secretaire):
+    reponse = client_secretaire.get("/presences/rapport?periode=mois")
+    assert reponse.status_code == 200
+    assert "Aucune présence enregistrée".encode() in reponse.data
+
+
+def test_rapport_tout_lhistorique_contient_le_detail(client_secretaire, icm_app):
+    client_secretaire.post("/presences/nouvelle", data=_donnees_exemple(icm_app))
+    reponse = client_secretaire.get("/presences/rapport?periode=tout")
+    assert reponse.status_code == 200
+    assert b"315" in reponse.data
+    assert b"30/08/2026" in reponse.data
+
+
+def test_rapport_periode_personnalisee(client_secretaire, icm_app):
+    client_secretaire.post("/presences/nouvelle", data=_donnees_exemple(icm_app))
+    reponse = client_secretaire.get(
+        "/presences/rapport?periode=personnalise&debut=2026-08-01&fin=2026-08-31")
+    assert reponse.status_code == 200
+    assert b"315" in reponse.data
+
+
+# ------------------------------------------------------------------
+#  Analyse intelligente — jamais de conclusion sans données suffisantes
+# ------------------------------------------------------------------
+def test_analyses_vides_sans_aucun_culte(icm_app):
+    with icm_app.app.app_context():
+        analyses = icm_app.generer_analyses(
+            {"nb_cultes": 0, "total": 0}, [], [], [], None)
+        assert analyses == []
+
+
+def test_analyses_incluent_evolution_seulement_si_periode_precedente_fournie(
+        client_secretaire, icm_app):
+    client_secretaire.post("/presences/nouvelle", data=_donnees_exemple(icm_app))
+    reponse_sans_comparaison = client_secretaire.get("/presences/statistiques?periode=tout")
+    assert "rapport à la période précédente".encode() \
+        not in reponse_sans_comparaison.data
+
+    reponse_avec_comparaison = client_secretaire.get(
+        "/presences/statistiques?periode=personnalise&debut=2026-08-01&fin=2026-08-31")
+    # periode="personnalise" n'a pas non plus de "précédente" bien définie
+    # (voir periode_precedente) : aucune comparaison ne doit être affichée.
+    assert "rapport à la période précédente".encode() \
+        not in reponse_avec_comparaison.data
+
+
+def test_periode_precedente_calcule_le_mois_juste_avant(icm_app):
+    with icm_app.app.app_context():
+        from datetime import date
+        debut, fin = date(2026, 8, 1), date(2026, 8, 31)
+        prec_debut, prec_fin = icm_app.periode_precedente("mois", debut, fin)
+        assert prec_debut == date(2026, 7, 1)
+        assert prec_fin == date(2026, 7, 31)
+
+
+# ------------------------------------------------------------------
+#  Export CSV — respecte les filtres, neutralise l'injection de formule
+# ------------------------------------------------------------------
+def test_export_csv_contient_les_colonnes_et_les_totaux(client_secretaire, icm_app):
+    client_secretaire.post("/presences/nouvelle", data=_donnees_exemple(icm_app))
+    reponse = client_secretaire.get("/presences/export.csv")
+    assert reponse.status_code == 200
+    assert reponse.mimetype == "text/csv"
+    contenu = reponse.data.decode("utf-8-sig")
+    assert "Total Général" in contenu
+    assert "315" in contenu
+
+
+def test_export_csv_respecte_le_filtre_type(client_secretaire, icm_app):
+    client_secretaire.post("/presences/nouvelle", data=_donnees_exemple(icm_app))
+    autre = _donnees_exemple(icm_app, date_culte="2026-07-15")
+    autre["service_type_id"] = str(_id_type_mercredi(icm_app))
+    client_secretaire.post("/presences/nouvelle", data=autre)
+
+    id_dimanche = _id_type_dimanche(icm_app)
+    reponse = client_secretaire.get(f"/presences/export.csv?type={id_dimanche}")
+    contenu = reponse.data.decode("utf-8-sig")
+    assert "30/08/2026" in contenu
+    assert "15/07/2026" not in contenu
+
+
+def test_export_csv_neutralise_injection_de_formule(client_secretaire, icm_app):
+    donnees = _donnees_exemple(icm_app)
+    donnees["lieu"] = "=CMD('calc')"
+    client_secretaire.post("/presences/nouvelle", data=donnees)
+    reponse = client_secretaire.get("/presences/export.csv")
+    contenu = reponse.data.decode("utf-8-sig")
+    assert "'=CMD" in contenu   # préfixé d'une apostrophe, jamais tel quel
+
+
+def test_visiteur_peut_consulter_comparaison_rapports_et_export(client_visiteur):
+    for chemin in ("/presences/comparaison", "/presences/rapports",
+                   "/presences/rapport?periode=tout", "/presences/export.csv"):
+        assert client_visiteur.get(chemin).status_code == 200
