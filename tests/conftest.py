@@ -73,9 +73,17 @@ def icm_app(_environnement_app):
 def _base_propre(icm_app):
     """Vide les tables entre chaque test et réinitialise le limiteur de
     tentatives de connexion (en mémoire, sinon un test de brute-force
-    pourrait faire échouer les tests suivants utilisant le même identifiant)."""
+    pourrait faire échouer les tests suivants utilisant le même identifiant).
+
+    ServiceType et AttendanceCategory ne sont volontairement PAS vidées : ce
+    sont des données de configuration semées une seule fois par session
+    (comme les comptes), pas des données de test transactionnelles — voir
+    tests/test_presences.py, qui n'en dépend qu'en lecture ou en ajoutant
+    de nouvelles entrées plutôt qu'en mutant les entrées par défaut."""
     yield
     with icm_app.app.app_context():
+        icm_app.AttendanceValue.query.delete()
+        icm_app.AttendanceRecord.query.delete()
         icm_app.JournalAudit.query.delete()
         icm_app.Registre.query.delete()
         icm_app.db.session.commit()

@@ -243,6 +243,86 @@ label input,label select,label textarea{margin-top:.25rem; font-weight:400;
 }
 .cellule-identite{display:flex; gap:.7rem; align-items:flex-start;}
 
+/* ---------------- Présences & Statistiques ---------------- */
+.cartes-tableau-bord{display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1.4rem;}
+.carte-kpi{
+  background:var(--blanc); border:1px solid var(--trait); border-radius:var(--rayon);
+  padding:1rem 1.3rem; min-width:160px; flex:1;
+}
+.carte-kpi-libelle{font-size:.78rem; color:var(--encre-douce); text-transform:uppercase;
+  letter-spacing:.05em; display:block; margin-bottom:.3rem;}
+.carte-kpi-valeur{font-size:1.7rem; font-weight:700; color:var(--encre); display:block;}
+.carte-kpi-evolution{font-size:.85rem; font-weight:600; margin-top:.3rem; display:block;}
+.evolution-hausse{color:var(--succes);}
+.evolution-baisse{color:var(--erreur);}
+.evolution-stable{color:var(--encre-douce);}
+
+.groupe-presence{margin-bottom:1.1rem;}
+.groupe-presence:last-child{margin-bottom:0;}
+.groupe-presence-titre{
+  font-weight:700; font-size:.8rem; text-transform:uppercase; letter-spacing:.06em;
+  color:var(--encre-douce); margin:0 0 .6rem;
+}
+.compteur{
+  display:flex; align-items:center; justify-content:space-between; gap:.8rem;
+  padding:.55rem 0; border-bottom:1px solid var(--trait);
+}
+.compteur:last-of-type{border-bottom:none;}
+.compteur-nom{font-size:.92rem;}
+.compteur-nom small{display:block; color:var(--encre-douce); font-size:.76rem; font-weight:400;}
+.compteur-controles{display:flex; align-items:center; gap:.5rem; flex:none;}
+.compteur-bouton{
+  width:34px; height:34px; border-radius:8px; border:1px solid var(--trait);
+  background:var(--blanc); font-size:1.1rem; font-weight:700; line-height:1;
+  cursor:pointer; color:var(--encre); flex:none;
+}
+.compteur-bouton:hover{border-color:var(--or); color:var(--or);}
+.compteur-valeur{
+  width:56px; text-align:center; font-weight:700; font-size:1rem;
+  padding:.4rem .3rem;
+}
+.groupe-presence-total{
+  display:flex; justify-content:space-between; font-weight:700;
+  padding-top:.6rem; margin-top:.2rem; border-top:2px solid var(--trait);
+}
+.total-general{
+  display:flex; justify-content:space-between; align-items:baseline;
+  background:var(--encre); color:#fff; border-radius:var(--rayon);
+  padding:1rem 1.3rem; margin:0 0 1.2rem; font-weight:700;
+}
+.total-general span:last-child{font-size:1.6rem;}
+
+/* Graphiques CSS purs (pas de bibliothèque externe, cf. CSP §13 README) */
+.camembert-enveloppe{display:flex; align-items:center; gap:1.6rem; flex-wrap:wrap;}
+.camembert{width:150px; height:150px; border-radius:50%; flex:none;}
+.camembert-legende{display:grid; gap:.5rem;}
+.camembert-legende li{display:flex; align-items:center; gap:.5rem; font-size:.88rem; list-style:none;}
+.camembert-pastille{width:12px; height:12px; border-radius:3px; flex:none;}
+
+.barres{display:grid; gap:.7rem;}
+.barre-ligne{display:grid; grid-template-columns:minmax(90px,auto) 1fr auto; gap:.7rem; align-items:center;}
+.barre-etiquette{font-size:.85rem; color:var(--encre-douce); white-space:nowrap;}
+.barre-piste{background:#eef1f6; border-radius:999px; height:12px; overflow:hidden;}
+.barre-remplissage{background:var(--or); height:100%; border-radius:999px;}
+.barre-valeur{font-size:.85rem; font-weight:700; text-align:right; min-width:2.4em;}
+
+.filtres-periode{
+  display:flex; gap:.55rem; flex-wrap:wrap; align-items:center;
+  background:var(--blanc); border:1px solid var(--trait);
+  border-radius:var(--rayon); padding:.8rem; margin-bottom:1.4rem;
+}
+
+.bloc-stat{
+  background:var(--blanc); border:1px solid var(--trait); border-radius:var(--rayon);
+  padding:1.2rem 1.4rem; margin-bottom:1.4rem;
+}
+.bloc-stat h2{margin:0 0 1rem; font-size:1rem;}
+
+.tableau-parametres input[type=text],
+.tableau-parametres input[type=number]{padding:.4rem .5rem;}
+.tableau-parametres input[type=number]{width:75px;}
+.tableau-parametres td{vertical-align:middle;}
+
 /* ---------------- Connexion ---------------- */
 .carte-connexion{
   max-width:380px; margin:3rem auto; background:var(--blanc);

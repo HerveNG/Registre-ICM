@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block titre %}Statistiques des présences — ICM{% endblock %}
+
+{% block contenu %}
+
+<div class="titre-page">
+  <h1>Statistiques</h1>
+  <p class="discret">
+    {% if debut and fin %}Du {{ debut | jj_mm_aaaa }} au {{ fin | jj_mm_aaaa }}
+    {% elif debut %}Depuis le {{ debut | jj_mm_aaaa }}
+    {% elif fin %}Jusqu'au {{ fin | jj_mm_aaaa }}
+    {% else %}Toutes périodes confondues{% endif %}
+  </p>
+</div>
+
+<form class="filtres-periode" method="get" action="{{ url_for('presences_statistiques') }}">
+  <select name="periode" onchange="document.getElementById('bloc-personnalise').hidden = this.value !== 'personnalise'; if (this.value !== 'personnalise') this.form.submit();">
+    <option value="aujourdhui" {% if periode == 'aujourdhui' %}selected{% endif %}>Aujourd'hui</option>
+    <option value="semaine" {% if periode == 'semaine' %}selected{% endif %}>Cette semaine</option>
+    <option value="mois" {% if periode == 'mois' %}selected{% endif %}>Ce mois</option>
+    <option value="trimestre" {% if periode == 'trimestre' %}selected{% endif %}>Ce trimestre</option>
+    <option value="annee" {% if periode == 'annee' %}selected{% endif %}>Cette année</option>
+    <option value="tout" {% if periode == 'tout' %}selected{% endif %}>Tout l'historique</option>
+    <option value="personnalise" {% if periode == 'personnalise' %}selected{% endif %}>Période personnalisée…</option>
+  </select>
+  <span id="bloc-personnalise" {% if periode != 'personnalise' %}hidden{% endif %}>
+    Du <input type="date" name="debut" value="{{ debut_brut }}" style="width:auto; display:inline-block;">
+    au <input type="date" name="fin" value="{{ fin_brut }}" style="width:auto; display:inline-block;">
+    <button type="submit" class="bouton bouton-petit">Appliquer</button>
+  </span>
+</form>
+
+<div class="cartes-tableau-bord">
+  <div class="carte-kpi"><span class="carte-kpi-libelle">Cultes enregistrés</span><span class="carte-kpi-valeur">{{ resume.nb_cultes }}</span></div>
+  <div class="carte-kpi"><span class="carte-kpi-libelle">Présence totale</span><span class="carte-kpi-valeur">{{ resume.total }}</span></div>
+  <div class="carte-kpi"><span class="carte-kpi-libelle">Moyenne / culte</span><span class="carte-kpi-valeur">{{ resume.moyenne }}</span></div>
+  <div class="carte-kpi"><span class="carte-kpi-libelle">Maximum</span><span class="carte-kpi-valeur">{{ resume.maximum }}</span></div>
+  <div class="carte-kpi"><span class="carte-kpi-libelle">Minimum</span><span class="carte-kpi-valeur">{{ resume.minimum }}</span></div>
+</div>
+
+{% if resume.nb_cultes == 0 %}
+<div class="vide"><p>Aucune présence enregistrée sur cette période.</p></div>
+{% else %}
+
+<div class="bloc-stat">
+  <h2>Répartition Hommes / Femmes / Enfants</h2>
+  <div class="camembert-enveloppe">
+    {% set ns = namespace(cumul=0) %}
+    {% set degres = [] %}
+    {% for part in repartition %}
+      {% set debut_deg = ns.cumul %}
+      {% set ns.cumul = ns.cumul + (part.pourcentage / 100 * 360) %}
+      {% set _ = degres.append(part.couleur ~ ' ' ~ debut_deg ~ 'deg ' ~ ns.cumul ~ 'deg') %}
+    {% endfor %}
+    <div class="camembert" style="background: conic-gradient({{ degres | join(', ') }});"></div>
+    <ul class="camembert-legende">
+      {% for part in repartition %}
+      <li><span class="camembert-pastille" style="background:{{ part.couleur }};"></span>
+        {{ part.libelle }} — <strong>{{ part.valeur }}</strong> ({{ part.pourcentage }} %)</li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+
+<div class="bloc-stat">
+  <h2>Évolution des présences {% if evolution|length == 20 %}<small class="discret">(20 derniers cultes)</small>{% endif %}</h2>
+  <div class="barres">
+    {% for e in evolution %}
+    <div class="barre-ligne">
+      <span class="barre-etiquette">{{ e.date | jj_mm_aaaa }}</span>
+      <span class="barre-piste"><span class="barre-remplissage" style="width:{{ (e.total / max_evolution * 100) if max_evolution else 0 }}%;"></span></span>
+      <span class="barre-valeur">{{ e.total }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="bloc-stat">
+  <h2>Comparaison des cultes</h2>
+  <div class="barres">
+    {% for c in comparaison_types %}
+    <div class="barre-ligne">
+      <span class="barre-etiquette">{{ c.nom }}</span>
+      <span class="barre-piste"><span class="barre-remplissage" style="width:{{ (c.moyenne / max_comparaison * 100) if max_comparaison else 0 }}%;"></span></span>
+      <span class="barre-valeur">{{ c.moyenne }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="tableau-enveloppe" style="margin-top:1rem;">
+    <table class="tableau">
+      <thead><tr><th>Type de culte</th><th>Nb cultes</th><th>Moyenne</th><th>Maximum</th><th>Minimum</th></tr></thead>
+      <tbody>
+        {% for c in comparaison_types %}
+        <tr><td>{{ c.nom }}</td><td>{{ c.nb }}</td><td>{{ c.moyenne }}</td><td>{{ c.maximum }}</td><td>{{ c.minimum }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="bloc-stat">
+  <h2>Analyse par jour de la semaine</h2>
+  <div class="barres">
+    {% for j in analyse_jours %}
+    <div class="barre-ligne">
+      <span class="barre-etiquette">{{ j.jour }}</span>
+      <span class="barre-piste"><span class="barre-remplissage" style="width:{{ (j.moyenne / max_jour * 100) if max_jour else 0 }}%;"></span></span>
+      <span class="barre-valeur">{{ j.moyenne }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  <p class="discret" style="margin-top:.8rem;">
+    📅 {{ analyse_jours[0].jour }} est le jour ayant la plus forte affluence en moyenne ({{ analyse_jours[0].moyenne }} personnes).
+  </p>
+</div>
+
+{% endif %}
+{% endblock %}
