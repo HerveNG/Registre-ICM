@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block titre %}Historique des présences — ICM{% endblock %}
+
+{% block contenu %}
+{% set peut_ecrire = session.get('role') in ('secretaire', 'pasteur') %}
+
+<div class="titre-page">
+  <h1>Historique des présences</h1>
+  <p class="discret">Toutes les présences enregistrées, culte par culte.</p>
+</div>
+
+<form class="barre-recherche" method="get" action="{{ url_for('presences_historique') }}">
+  <input type="search" name="q" value="{{ q }}" placeholder="Rechercher par lieu ou note…">
+  <select name="type">
+    <option value="">Tous les types</option>
+    {% for t in types_culte %}
+      <option value="{{ t.id }}" {% if type_id == t.id %}selected{% endif %}>{{ t.nom }}</option>
+    {% endfor %}
+  </select>
+  <label class="discret" style="display:flex; align-items:center; gap:.4rem; margin:0;">Du
+    <input type="date" name="debut" value="{{ date_debut }}" style="width:auto">
+  </label>
+  <label class="discret" style="display:flex; align-items:center; gap:.4rem; margin:0;">au
+    <input type="date" name="fin" value="{{ date_fin }}" style="width:auto">
+  </label>
+  <select name="tri">
+    <option value="date_desc" {% if tri == 'date_desc' %}selected{% endif %}>Date (récent → ancien)</option>
+    <option value="date_asc" {% if tri == 'date_asc' %}selected{% endif %}>Date (ancien → récent)</option>
+    <option value="total_desc" {% if tri == 'total_desc' %}selected{% endif %}>Total (décroissant)</option>
+    <option value="total_asc" {% if tri == 'total_asc' %}selected{% endif %}>Total (croissant)</option>
+  </select>
+  <button type="submit" class="bouton">Filtrer</button>
+  {% if q or type_id or date_debut or date_fin or tri != 'date_desc' %}
+    <a class="bouton bouton-discret" href="{{ url_for('presences_historique') }}">Réinitialiser</a>
+  {% endif %}
+  <a class="bouton bouton-discret" href="{{ url_for('presences_export_csv', q=q, type=type_id, debut=date_debut, fin=date_fin) }}">Export Excel</a>
+  {% if peut_ecrire %}
+    <a class="bouton bouton-principal" href="{{ url_for('presences_nouvelle') }}">+ Nouvelle présence</a>
+  {% endif %}
+</form>
+
+{% if entrees %}
+<div class="tableau-enveloppe">
+<table class="tableau">
+  <thead>
+    <tr>
+      <th>Date</th><th>Jour</th><th>Type de culte</th>
+      <th>Hommes</th><th>Femmes</th><th>Enfants</th><th>Total</th>
+      <th class="col-actions">Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in entrees %}
+    <tr>
+      <td>{{ r.date_culte | jj_mm_aaaa }}</td>
+      <td>{{ r.jour_semaine }}</td>
+      <td>{{ r.service_type.nom if r.service_type else '—' }}</td>
+      <td>{{ r.total_hommes }}</td>
+      <td>{{ r.total_femmes }}</td>
+      <td>{{ r.total_enfants }}</td>
+      <td><strong>{{ r.total_general }}</strong></td>
+      <td class="col-actions">
+        <a class="bouton bouton-petit" href="{{ url_for('presences_detail', record_id=r.id) }}">👁 Voir</a>
+        {% if peut_ecrire %}
+          <a class="bouton bouton-petit" href="{{ url_for('presences_modifier', record_id=r.id) }}">✏ Modifier</a>
+          <form method="post" action="{{ url_for('presences_supprimer', record_id=r.id) }}"
+                onsubmit="return confirm('Supprimer définitivement les présences du {{ r.date_culte | jj_mm_aaaa }} ({{ r.service_type.nom if r.service_type else '' }}) ?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="bouton bouton-petit bouton-danger">🗑 Supprimer</button>
+          </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% if pagination.pages > 1 %}
+<nav class="pagination">
+  {% if pagination.has_prev %}
+    <a class="bouton bouton-petit" href="{{ url_for('presences_historique', page=pagination.prev_num, q=q, type=type_id, debut=date_debut, fin=date_fin, tri=tri) }}">‹ Précédent</a>
+  {% endif %}
+  <span class="pagination-info">Page {{ pagination.page }} sur {{ pagination.pages }}</span>
+  {% if pagination.has_next %}
+    <a class="bouton bouton-petit" href="{{ url_for('presences_historique', page=pagination.next_num, q=q, type=type_id, debut=date_debut, fin=date_fin, tri=tri) }}">Suivant ›</a>
+  {% endif %}
+</nav>
+{% endif %}
+
+{% else %}
+<div class="vide">
+  {% if q or type_id or date_debut or date_fin %}
+    <p>Aucune présence ne correspond à cette recherche.</p>
+    <a class="bouton" href="{{ url_for('presences_historique') }}">Voir tout l'historique</a>
+  {% elif peut_ecrire %}
+    <p>Aucune présence enregistrée pour le moment.</p>
+    <a class="bouton bouton-principal" href="{{ url_for('presences_nouvelle') }}">Enregistrer la première présence</a>
+  {% else %}
+    <p>Aucune présence enregistrée pour le moment.</p>
+  {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}

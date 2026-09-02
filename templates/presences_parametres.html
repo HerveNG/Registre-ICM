@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block titre %}Paramètres des présences — ICM{% endblock %}
+
+{% block contenu %}
+
+<div class="titre-page">
+  <h1>Paramètres — Présences</h1>
+  <p class="discret">Types de culte et catégories d'âge, communs à toute l'application.</p>
+</div>
+
+<div class="bloc-stat">
+  <h2>Types de culte</h2>
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="action" value="modifier_types">
+    <div class="tableau-enveloppe">
+      <table class="tableau tableau-parametres">
+        <thead><tr><th>Nom</th><th>Ordre</th><th>Actif</th></tr></thead>
+        <tbody>
+          {% for t in types_culte %}
+          <tr>
+            <td><input type="text" name="type_nom_{{ t.id }}" value="{{ t.nom }}" maxlength="100" required></td>
+            <td><input type="number" name="type_ordre_{{ t.id }}" value="{{ t.ordre_affichage }}"></td>
+            <td><input type="checkbox" name="type_actif_{{ t.id }}" {% if t.is_active %}checked{% endif %}></td>
+          </tr>
+          {% else %}
+          <tr><td colspan="3" class="discret">Aucun type de culte.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="actions-formulaire" style="margin-top:.9rem;">
+      <button type="submit" class="bouton bouton-principal">Enregistrer les types de culte</button>
+    </p>
+  </form>
+
+  <form method="post" class="grille" style="margin-top:1rem; align-items:end;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="action" value="ajouter_type">
+    <label>Nouveau type de culte
+      <input type="text" name="nom" maxlength="100" placeholder="Ex. Veillée de prière" required>
+    </label>
+    <button type="submit" class="bouton">+ Ajouter</button>
+  </form>
+</div>
+
+{% for groupe, libelle, emoji in [('hommes','Hommes','👨'), ('femmes','Femmes','👩'), ('enfants','Enfants','🧒')] %}
+<div class="bloc-stat">
+  <h2>{{ emoji }} Catégories — {{ libelle }}</h2>
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="action" value="modifier_categories">
+    <div class="tableau-enveloppe">
+      <table class="tableau tableau-parametres">
+        <thead><tr><th>Nom</th><th>Âge min</th><th>Âge max</th><th>Ordre</th><th>Actif</th></tr></thead>
+        <tbody>
+          {% for cat in par_groupe.get(groupe, []) %}
+          <tr>
+            <td><input type="text" name="cat_nom_{{ cat.id }}" value="{{ cat.nom }}" maxlength="100" required></td>
+            <td><input type="number" min="0" name="cat_age_min_{{ cat.id }}" value="{{ cat.age_min if cat.age_min is not none else '' }}"></td>
+            <td><input type="number" min="0" name="cat_age_max_{{ cat.id }}" value="{{ cat.age_max if cat.age_max is not none else '' }}"></td>
+            <td><input type="number" name="cat_ordre_{{ cat.id }}" value="{{ cat.ordre_affichage }}"></td>
+            <td><input type="checkbox" name="cat_actif_{{ cat.id }}" {% if cat.is_active %}checked{% endif %}></td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="discret">Aucune catégorie pour ce groupe.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="actions-formulaire" style="margin-top:.9rem;">
+      <button type="submit" class="bouton bouton-principal">Enregistrer les catégories « {{ libelle }} »</button>
+    </p>
+  </form>
+
+  <form method="post" class="grille" style="margin-top:1rem; align-items:end;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="action" value="ajouter_categorie">
+    <input type="hidden" name="groupe" value="{{ groupe }}">
+    <label>Nouvelle catégorie
+      <input type="text" name="nom" maxlength="100" placeholder="Ex. Étudiants" required>
+    </label>
+    <label>Âge min <input type="number" min="0" name="age_min"></label>
+    <label>Âge max <input type="number" min="0" name="age_max"></label>
+    <button type="submit" class="bouton">+ Ajouter</button>
+  </form>
+</div>
+{% endfor %}
+
+{% endblock %}

@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block titre %}{{ 'Modifier une présence' if record else 'Nouvelle présence' }} — ICM{% endblock %}
+
+{% macro val(nom, defaut='') -%}
+{%- if valeurs and valeurs.get(nom) is not none -%}{{ valeurs.get(nom) }}
+{%- else -%}{{ defaut }}
+{%- endif -%}
+{%- endmacro %}
+
+{% block contenu %}
+
+<div class="titre-page">
+  <h1>{{ 'Modifier la présence' if record else 'Nouvelle présence' }}</h1>
+  {% if record %}<p class="discret">{{ record.date_culte | jj_mm_aaaa }} — {{ record.service_type.nom if record.service_type else '' }}</p>{% endif %}
+</div>
+
+<form method="post" class="formulaire formulaire-large" id="form-presence">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <fieldset>
+    <legend>Informations générales</legend>
+    <div class="grille">
+      <label class="obligatoire">Date du culte
+        <input type="date" name="date_culte" id="champ-date" required
+               value="{{ val('date_culte') }}">
+      </label>
+      <label>Jour
+        <input type="text" id="champ-jour" readonly disabled placeholder="détecté automatiquement">
+      </label>
+      <label class="obligatoire">Type de culte
+        <select name="service_type_id" required>
+          <option value="">— Choisir —</option>
+          {% for t in types_culte %}
+            <option value="{{ t.id }}" {% if val('service_type_id')|string == t.id|string %}selected{% endif %}>{{ t.nom }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Lieu / Assemblée
+        <input type="text" name="lieu" maxlength="150" value="{{ val('lieu') }}">
+      </label>
+    </div>
+    <label style="margin-top:.9rem">Notes / observations
+      <textarea name="notes" rows="2" maxlength="2000">{{ val('notes') }}</textarea>
+    </label>
+    {% if record %}
+      <p class="aide">Enregistrée par <strong>{{ record.created_by }}</strong>
+        le {{ record.created_at | jj_mm_aaaa_hhmm }}.</p>
+    {% endif %}
+  </fieldset>
+
+  {% for groupe, libelle, emoji in [('hommes','Hommes','👨'), ('femmes','Femmes','👩'), ('enfants','Enfants','🧒')] %}
+  <fieldset>
+    <legend>{{ emoji }} {{ libelle }}</legend>
+    <div class="groupe-presence" data-groupe="{{ groupe }}">
+      {% for cat in par_groupe.get(groupe, []) %}
+      <div class="compteur">
+        <span class="compteur-nom">{{ cat.nom }}{% if cat.libelle_age %}<small>{{ cat.libelle_age }}</small>{% endif %}</span>
+        <span class="compteur-controles">
+          <button type="button" class="compteur-bouton" data-delta="-1" data-cible="cat-{{ cat.id }}" aria-label="Diminuer">−</button>
+          <input type="number" min="0" step="1" name="cat_{{ cat.id }}" id="cat-{{ cat.id }}"
+                 class="compteur-valeur compteur-groupe" data-groupe="{{ groupe }}"
+                 value="{{ val('cat_' ~ cat.id, 0) }}">
+          <button type="button" class="compteur-bouton" data-delta="1" data-cible="cat-{{ cat.id }}" aria-label="Augmenter">+</button>
+        </span>
+      </div>
+      {% else %}
+      <p class="discret">Aucune catégorie active pour ce groupe — voir <a href="{{ url_for('presences_parametres') }}">Paramètres</a>.</p>
+      {% endfor %}
+      <div class="groupe-presence-total">
+        <span>Total {{ libelle }}</span>
+        <span id="total-{{ groupe }}">0</span>
+      </div>
+    </div>
+  </fieldset>
+  {% endfor %}
+
+  <div class="total-general">
+    <span>TOTAL GÉNÉRAL</span>
+    <span id="total-general">0</span>
+  </div>
+
+  <div class="actions-formulaire">
+    <button type="submit" class="bouton bouton-principal bouton-large">Enregistrer</button>
+    <a class="bouton bouton-discret" href="{{ url_for('presences_historique') }}">Annuler</a>
+  </div>
+</form>
+
+<script>
+(function(){
+  var JOURS = ["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
+
+  function detecterJour(){
+    var champDate = document.getElementById("champ-date");
+    var champJour = document.getElementById("champ-jour");
+    if (!champDate.value) { champJour.value = ""; return; }
+    // new Date("AAAA-MM-JJ") est interprétée en UTC par le navigateur : on
+    // reconstruit en local pour éviter qu'un décalage de fuseau ne fasse
+    // basculer sur la veille (même précaution que aujourdhuiLocalISO() côté
+    // web/index.html).
+    var parties = champDate.value.split("-").map(Number);
+    var d = new Date(parties[0], parties[1]-1, parties[2]);
+    champJour.value = JOURS[d.getDay()];
+  }
+
+  function recalculerTotaux(){
+    var totalGeneral = 0;
+    ["hommes","femmes","enfants"].forEach(function(groupe){
+      var somme = 0;
+      document.querySelectorAll('.compteur-groupe[data-groupe="' + groupe + '"]').forEach(function(champ){
+        somme += parseInt(champ.value, 10) || 0;
+      });
+      document.getElementById("total-" + groupe).textContent = somme;
+      totalGeneral += somme;
+    });
+    document.getElementById("total-general").textContent = totalGeneral;
+  }
+
+  document.querySelectorAll(".compteur-bouton").forEach(function(bouton){
+    bouton.addEventListener("click", function(){
+      var champ = document.getElementById(bouton.dataset.cible);
+      var valeur = (parseInt(champ.value, 10) || 0) + parseInt(bouton.dataset.delta, 10);
+      champ.value = Math.max(0, valeur);
+      recalculerTotaux();
+    });
+  });
+  document.querySelectorAll(".compteur-valeur").forEach(function(champ){
+    champ.addEventListener("input", function(){
+      if (champ.value !== "" && parseInt(champ.value, 10) < 0) champ.value = 0;
+      recalculerTotaux();
+    });
+  });
+  document.getElementById("champ-date").addEventListener("change", detecterJour);
+
+  detecterJour();
+  recalculerTotaux();
+})();
+</script>
+
+{% endblock %}

@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block titre %}Présences du {{ record.date_culte | jj_mm_aaaa }} — ICM{% endblock %}
+
+{% block contenu %}
+{% set peut_ecrire = session.get('role') in ('secretaire', 'pasteur') %}
+
+<div class="titre-page">
+  <h1>{{ record.date_culte | jj_mm_aaaa }} — {{ record.jour_semaine }}</h1>
+  <p class="discret">{{ record.service_type.nom if record.service_type else '—' }}
+    {% if record.lieu %} · {{ record.lieu }}{% endif %}</p>
+  <p class="provenance">
+    Enregistrée par <strong>{{ record.created_by }}</strong> le {{ record.created_at | jj_mm_aaaa_hhmm }}
+    {% if record.updated_by %}
+      · modifiée par <strong>{{ record.updated_by }}</strong> le {{ record.updated_at | jj_mm_aaaa_hhmm }}
+    {% endif %}
+  </p>
+</div>
+
+<div class="actions-formulaire" style="margin-bottom:1.2rem;">
+  <a class="bouton bouton-discret" href="{{ url_for('presences_historique') }}">← Retour à l'historique</a>
+  {% if peut_ecrire %}
+    <a class="bouton" href="{{ url_for('presences_modifier', record_id=record.id) }}">✏ Modifier</a>
+    <form method="post" action="{{ url_for('presences_supprimer', record_id=record.id) }}"
+          onsubmit="return confirm('Supprimer définitivement cette présence ?');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="bouton bouton-danger">🗑 Supprimer</button>
+    </form>
+  {% endif %}
+</div>
+
+{% for groupe, libelle, emoji, total in [
+  ('hommes','Hommes','👨', record.total_hommes),
+  ('femmes','Femmes','👩', record.total_femmes),
+  ('enfants','Enfants','🧒', record.total_enfants)] %}
+<div class="bloc-stat">
+  <h2>{{ emoji }} {{ libelle }} — {{ total }}</h2>
+  <div class="tableau-enveloppe">
+    <table class="tableau">
+      <tbody>
+        {% for v in par_groupe.get(groupe, []) %}
+        <tr><td>{{ v.category.nom }}</td><td style="text-align:right"><strong>{{ v.effectif }}</strong></td></tr>
+        {% else %}
+        <tr><td class="discret">Aucun détail enregistré.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endfor %}
+
+<div class="total-general">
+  <span>TOTAL GÉNÉRAL</span>
+  <span>{{ record.total_general }}</span>
+</div>
+
+{% if record.notes %}
+<div class="bloc-stat">
+  <h2>Notes</h2>
+  <p style="white-space:pre-wrap; margin:0;">{{ record.notes }}</p>
+</div>
+{% endif %}
+
+{% endblock %}

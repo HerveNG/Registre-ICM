@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ titre }} — {{ paroisse }}</title>
+<style>
+  :root{
+    --or:#b8912f; --encre:#12203a; --encre-douce:#41526e; --trait:#dde3ec;
+    --fond:#f4f6f9; --rayon:8px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--fond); color:var(--encre);
+    font-family:"Segoe UI",Calibri,system-ui,sans-serif; line-height:1.5;
+  }
+
+  .barre{
+    position:sticky; top:0; z-index:5; display:flex; gap:.6rem; align-items:center;
+    padding:.9rem 1.2rem; background:var(--encre); color:#fff;
+  }
+  .barre p{margin:0 auto 0 0; font-size:.9rem;}
+  .barre button,.barre a{
+    font:inherit; font-size:.85rem; padding:.5rem .9rem; border-radius:6px;
+    border:1px solid rgba(255,255,255,.35); background:transparent; color:#fff;
+    text-decoration:none; cursor:pointer;
+  }
+  .barre .principal{background:var(--or); border-color:var(--or); font-weight:600;}
+
+  .feuille{max-width:210mm; margin:1.2rem auto; padding:12mm; background:#fff;
+    box-shadow:0 6px 24px rgba(18,32,58,.15);}
+  .entete-rapport{border-bottom:2px solid var(--or); padding-bottom:.8rem; margin-bottom:1.2rem;}
+  .entete-rapport h1{margin:0 0 .2rem; font-size:1.4rem;}
+  .entete-rapport p{margin:0; color:var(--encre-douce); font-size:.9rem;}
+
+  h2{font-size:1rem; border-left:3px solid var(--or); padding-left:.6rem; margin:1.6rem 0 .8rem;}
+  table{width:100%; border-collapse:collapse; font-size:.88rem; margin-bottom:.5rem;}
+  th,td{padding:.45rem .6rem; border-bottom:1px solid var(--trait); text-align:left;}
+  th{background:#eef1f6; font-size:.72rem; text-transform:uppercase; letter-spacing:.04em;
+    color:var(--encre-douce);}
+  td.numerique, th.numerique{text-align:right;}
+
+  .kpis{display:flex; gap:.8rem; flex-wrap:wrap; margin-bottom:.5rem;}
+  .kpi{flex:1; min-width:110px; background:var(--fond); border:1px solid var(--trait);
+    border-radius:var(--rayon); padding:.7rem .9rem;}
+  .kpi span{display:block;}
+  .kpi .libelle{font-size:.7rem; text-transform:uppercase; color:var(--encre-douce);}
+  .kpi .valeur{font-size:1.3rem; font-weight:700;}
+
+  ul.analyses{margin:0; padding-left:1.2rem;}
+  ul.analyses li{margin-bottom:.4rem;}
+
+  .vide{color:var(--encre-douce); font-style:italic;}
+
+  @page{ size:A4 portrait; margin:12mm; }
+  @media print{
+    body{background:#fff;}
+    .barre{display:none;}
+    .feuille{max-width:none; margin:0; padding:0; box-shadow:none;}
+  }
+</style>
+</head>
+<body>
+
+<div class="barre">
+  <p><strong>{{ titre }}</strong> — {{ paroisse }}</p>
+  <a href="{{ url_for('presences_rapports') }}">Retour</a>
+  <button class="principal" onclick="window.print()">Imprimer / Enregistrer en PDF</button>
+</div>
+
+<div class="feuille">
+  <div class="entete-rapport">
+    <h1>{{ titre }}</h1>
+    <p>{{ paroisse }} —
+      {% if debut and fin %}du {{ debut | jj_mm_aaaa }} au {{ fin | jj_mm_aaaa }}
+      {% elif debut %}depuis le {{ debut | jj_mm_aaaa }}
+      {% elif fin %}jusqu'au {{ fin | jj_mm_aaaa }}
+      {% else %}toutes périodes confondues{% endif %}
+      · généré le {{ aujourdhui | jj_mm_aaaa }}
+    </p>
+  </div>
+
+  {% if resume.nb_cultes == 0 %}
+  <p class="vide">Aucune présence enregistrée sur cette période.</p>
+  {% else %}
+
+  <div class="kpis">
+    <div class="kpi"><span class="libelle">Cultes</span><span class="valeur">{{ resume.nb_cultes }}</span></div>
+    <div class="kpi"><span class="libelle">Présence totale</span><span class="valeur">{{ resume.total }}</span></div>
+    <div class="kpi"><span class="libelle">Moyenne</span><span class="valeur">{{ resume.moyenne }}</span></div>
+    <div class="kpi"><span class="libelle">Maximum</span><span class="valeur">{{ resume.maximum }}</span></div>
+    <div class="kpi"><span class="libelle">Minimum</span><span class="valeur">{{ resume.minimum }}</span></div>
+  </div>
+
+  <h2>Répartition</h2>
+  <table>
+    <thead><tr><th>Groupe</th><th class="numerique">Effectif</th><th class="numerique">Part</th></tr></thead>
+    <tbody>
+      {% for part in repartition %}
+      <tr><td>{{ part.libelle }}</td><td class="numerique">{{ part.valeur }}</td><td class="numerique">{{ part.pourcentage }} %</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h2>Comparaison des cultes</h2>
+  <table>
+    <thead><tr><th>Type de culte</th><th class="numerique">Nb</th><th class="numerique">Moyenne</th><th class="numerique">Max</th><th class="numerique">Min</th></tr></thead>
+    <tbody>
+      {% for c in comparaison_types %}
+      <tr><td>{{ c.nom }}</td><td class="numerique">{{ c.nb }}</td><td class="numerique">{{ c.moyenne }}</td><td class="numerique">{{ c.maximum }}</td><td class="numerique">{{ c.minimum }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h2>Analyse par jour</h2>
+  <table>
+    <thead><tr><th>Jour</th><th class="numerique">Moyenne</th><th class="numerique">Nb cultes</th></tr></thead>
+    <tbody>
+      {% for j in analyse_jours %}
+      <tr><td>{{ j.jour }}</td><td class="numerique">{{ j.moyenne }}</td><td class="numerique">{{ j.nb }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if analyses %}
+  <h2>🔎 Ce que disent les chiffres</h2>
+  <ul class="analyses">
+    {% for texte in analyses %}<li>{{ texte }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+
+  <h2>Détail par culte</h2>
+  <table>
+    <thead><tr><th>Date</th><th>Jour</th><th>Type</th><th class="numerique">Hommes</th><th class="numerique">Femmes</th><th class="numerique">Enfants</th><th class="numerique">Total</th></tr></thead>
+    <tbody>
+      {% for r in enregistrements %}
+      <tr>
+        <td>{{ r.date_culte | jj_mm_aaaa }}</td><td>{{ r.jour_semaine }}</td>
+        <td>{{ r.service_type.nom if r.service_type else '—' }}</td>
+        <td class="numerique">{{ r.total_hommes }}</td><td class="numerique">{{ r.total_femmes }}</td>
+        <td class="numerique">{{ r.total_enfants }}</td><td class="numerique"><strong>{{ r.total_general }}</strong></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% endif %}
+</div>
+
+</body>
+</html>

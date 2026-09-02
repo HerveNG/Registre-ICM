@@ -108,6 +108,56 @@ label input,label select,label textarea{margin-top:.25rem;font-weight:400;}
   padding:.9rem 1.4rem;min-width:150px;}
 .stat b{display:block;font-size:1.6rem;}
 .stat span{font-size:.8rem;color:var(--encre-douce);text-transform:uppercase;letter-spacing:.05em;}
+.stat small.evolution{display:block;font-size:.8rem;font-weight:700;margin-top:.3rem;text-transform:none;letter-spacing:0;}
+.evolution-hausse{color:var(--succes);}
+.evolution-baisse{color:var(--erreur);}
+.evolution-stable{color:var(--encre-douce);}
+
+/* ---------- Présences : compteurs, camembert, barres ---------- */
+.groupe-presence{margin-bottom:1.1rem;}
+.groupe-presence:last-child{margin-bottom:0;}
+.groupe-presence-titre{font-weight:700;font-size:.8rem;text-transform:uppercase;
+  letter-spacing:.06em;color:var(--encre-douce);margin:0 0 .6rem;}
+.compteur{display:flex;align-items:center;justify-content:space-between;gap:.8rem;
+  padding:.55rem 0;border-bottom:1px solid var(--trait);}
+.compteur:last-of-type{border-bottom:none;}
+.compteur-nom small{display:block;color:var(--encre-douce);font-size:.76rem;}
+.compteur-controles{display:flex;align-items:center;gap:.5rem;flex:none;}
+.compteur-bouton{width:34px;height:34px;border-radius:8px;border:1px solid var(--trait);
+  background:var(--blanc);font-size:1.1rem;font-weight:700;line-height:1;cursor:pointer;
+  color:var(--encre);flex:none;}
+.compteur-bouton:hover{border-color:var(--or);color:var(--or);}
+.compteur-valeur{width:56px;text-align:center;font-weight:700;font-size:1rem;padding:.4rem .3rem;}
+.groupe-presence-total{display:flex;justify-content:space-between;font-weight:700;
+  padding-top:.6rem;margin-top:.2rem;border-top:2px solid var(--trait);}
+.total-general{display:flex;justify-content:space-between;align-items:baseline;
+  background:var(--encre);color:#fff;border-radius:var(--rayon);
+  padding:1rem 1.3rem;margin:0 0 1.2rem;font-weight:700;}
+.total-general span:last-child{font-size:1.6rem;}
+
+.bloc-stat{background:var(--blanc);border:1px solid var(--trait);border-radius:var(--rayon);
+  padding:1.2rem 1.4rem;margin-bottom:1.4rem;}
+.bloc-stat h2{margin:0 0 1rem;font-size:1rem;}
+
+.camembert-enveloppe{display:flex;align-items:center;gap:1.6rem;flex-wrap:wrap;}
+.camembert{width:150px;height:150px;border-radius:50%;flex:none;}
+.camembert-legende{display:grid;gap:.5rem;list-style:none;margin:0;padding:0;}
+.camembert-legende li{display:flex;align-items:center;gap:.5rem;font-size:.88rem;}
+.camembert-pastille{width:12px;height:12px;border-radius:3px;flex:none;}
+
+.barres{display:grid;gap:.7rem;}
+.barre-ligne{display:grid;grid-template-columns:minmax(90px,auto) 1fr auto;gap:.7rem;align-items:center;}
+.barre-etiquette{font-size:.85rem;color:var(--encre-douce);white-space:nowrap;}
+.barre-piste{background:#eef1f6;border-radius:999px;height:12px;overflow:hidden;}
+.barre-remplissage{background:var(--or);height:100%;border-radius:999px;}
+.barre-valeur{font-size:.85rem;font-weight:700;text-align:right;min-width:2.4em;}
+
+.filtres-periode{display:flex;gap:.55rem;flex-wrap:wrap;align-items:center;
+  background:var(--blanc);border:1px solid var(--trait);border-radius:var(--rayon);
+  padding:.8rem;margin-bottom:1.4rem;}
+
+.tableau-parametres input[type=text],.tableau-parametres input[type=number]{padding:.4rem .5rem;}
+.tableau-parametres input[type=number]{width:75px;}
 
 /* ---------- Recherche ---------- */
 .barre-recherche{display:flex;gap:.55rem;flex-wrap:wrap;align-items:center;
@@ -259,6 +309,7 @@ h1.titre{margin:0 0 1rem;font-size:1.5rem;}
       <button data-vue="import" id="btn-import-nav">Importer</button>
       <button id="btn-export">Export Excel</button>
       <button data-vue="journal">Journal</button>
+      <button data-vue="presences">📊 Présences</button>
       <button data-vue="apropos">À propos</button>
       <button data-vue="reglages">Réglages</button>
       <span class="utilisateur" id="etiquette-utilisateur"></span>
@@ -404,6 +455,163 @@ h1.titre{margin:0 0 1rem;font-size:1.5rem;}
     <p class="discret" style="margin-top:1.5rem;">
       ElMan &copy; 2026 — développé par NGOOH Cédric Hervé.
     </p>
+  </section>
+
+  <!-- ================= PRÉSENCES : TABLEAU DE BORD ================= -->
+  <section id="vue-presences" hidden>
+    <h1 class="titre">📊 Présences &amp; Statistiques</h1>
+    <p class="discret" style="margin-top:-.8rem;margin-bottom:1.2rem">
+      Vue d'ensemble de la fréquentation des cultes.</p>
+
+    <div class="barre-recherche">
+      <button class="bouton" onclick="ouvrirPresencesHistorique()">Historique</button>
+      <button class="bouton" onclick="ouvrirPresencesStatistiques()">Statistiques</button>
+      <button class="bouton" onclick="ouvrirPresencesComparaison()">Comparer deux périodes</button>
+      <button class="bouton" onclick="ouvrirPresencesStatistiques()">Rapports</button>
+      <button class="bouton bouton-discret" id="btn-presences-parametres" onclick="ouvrirPresencesParametres()" hidden>Paramètres</button>
+      <button class="bouton bouton-principal" id="btn-presences-nouvelle" onclick="ouvrirPresencesForm(null)" hidden>+ Enregistrer une présence</button>
+    </div>
+
+    <div id="presences-dashboard-contenu"></div>
+  </section>
+
+  <!-- ================= PRÉSENCES : SAISIE ================= -->
+  <section id="vue-presences-form" hidden>
+    <h1 class="titre" id="titre-presence-form">Nouvelle présence</h1>
+    <form id="form-presence">
+      <input type="hidden" id="presence-id">
+
+      <fieldset>
+        <legend>Informations générales</legend>
+        <div class="grille">
+          <label class="obligatoire">Date du culte
+            <input type="date" id="presence-date" required>
+          </label>
+          <label>Jour
+            <input type="text" id="presence-jour" readonly disabled placeholder="détecté automatiquement">
+          </label>
+          <label class="obligatoire">Type de culte
+            <select id="presence-type" required></select>
+          </label>
+          <label>Lieu / Assemblée
+            <input type="text" id="presence-lieu" maxlength="150">
+          </label>
+        </div>
+        <label style="margin-top:.9rem">Notes / observations
+          <textarea id="presence-notes" rows="2" maxlength="2000"></textarea>
+        </label>
+        <p class="aide" id="presence-provenance" hidden></p>
+      </fieldset>
+
+      <div id="presence-groupes"></div>
+
+      <div class="total-general">
+        <span>TOTAL GÉNÉRAL</span>
+        <span id="presence-total-general">0</span>
+      </div>
+
+      <div class="actions-formulaire">
+        <button type="submit" class="bouton bouton-principal bouton-large" id="btn-presence-enregistrer">Enregistrer</button>
+        <button type="button" class="bouton bouton-discret" onclick="ouvrirPresencesHistorique()">Annuler</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- ================= PRÉSENCES : HISTORIQUE ================= -->
+  <section id="vue-presences-historique" hidden>
+    <h1 class="titre">Historique des présences</h1>
+
+    <form class="barre-recherche" id="form-recherche-presences">
+      <input type="search" id="presences-recherche" placeholder="Rechercher par lieu ou note…">
+      <select id="presences-filtre-type"><option value="">Tous les types</option></select>
+      <label class="discret" style="display:flex;align-items:center;gap:.4rem;margin:0;">Du
+        <input type="date" id="presences-filtre-debut" style="width:auto">
+      </label>
+      <label class="discret" style="display:flex;align-items:center;gap:.4rem;margin:0;">au
+        <input type="date" id="presences-filtre-fin" style="width:auto">
+      </label>
+      <select id="presences-tri">
+        <option value="date_desc">Date (récent → ancien)</option>
+        <option value="date_asc">Date (ancien → récent)</option>
+        <option value="total_desc">Total (décroissant)</option>
+        <option value="total_asc">Total (croissant)</option>
+      </select>
+      <button type="submit" class="bouton">Filtrer</button>
+      <button type="button" class="bouton bouton-discret" id="btn-presences-reinit">Réinitialiser</button>
+      <button type="button" class="bouton bouton-discret" onclick="exporterPresencesCsv()">Export Excel</button>
+      <button type="button" class="bouton bouton-principal" id="btn-presences-nouvelle-2" onclick="ouvrirPresencesForm(null)" hidden>+ Nouvelle présence</button>
+    </form>
+
+    <div class="tableau-enveloppe">
+      <table>
+        <thead><tr>
+          <th>Date</th><th>Jour</th><th>Type de culte</th>
+          <th>Hommes</th><th>Femmes</th><th>Enfants</th><th>Total</th><th>Actions</th>
+        </tr></thead>
+        <tbody id="corps-tableau-presences"></tbody>
+      </table>
+    </div>
+    <div id="zone-vide-presences"></div>
+
+    <nav class="pagination" id="pagination-presences" hidden>
+      <button class="bouton bouton-petit" id="btn-precedent-presences">‹ Précédent</button>
+      <span class="discret" id="info-page-presences"></span>
+      <button class="bouton bouton-petit" id="btn-suivant-presences">Suivant ›</button>
+    </nav>
+  </section>
+
+  <!-- ================= PRÉSENCES : DÉTAIL ================= -->
+  <section id="vue-presences-detail" hidden>
+    <div id="presence-detail-contenu"></div>
+  </section>
+
+  <!-- ================= PRÉSENCES : STATISTIQUES ================= -->
+  <section id="vue-presences-statistiques" hidden>
+    <h1 class="titre">Statistiques</h1>
+    <p class="discret" id="presences-stats-periode-texte" style="margin-top:-.8rem;margin-bottom:1.2rem"></p>
+
+    <form class="filtres-periode" id="form-periode-stats">
+      <select id="stats-periode">
+        <option value="aujourdhui">Aujourd'hui</option>
+        <option value="semaine">Cette semaine</option>
+        <option value="mois" selected>Ce mois</option>
+        <option value="trimestre">Ce trimestre</option>
+        <option value="annee">Cette année</option>
+        <option value="tout">Tout l'historique</option>
+        <option value="personnalise">Période personnalisée…</option>
+      </select>
+      <span id="stats-bloc-personnalise" hidden>
+        Du <input type="date" id="stats-debut" style="width:auto;display:inline-block;">
+        au <input type="date" id="stats-fin" style="width:auto;display:inline-block;">
+        <button type="submit" class="bouton bouton-petit">Appliquer</button>
+      </span>
+      <button type="button" class="bouton bouton-discret" id="btn-rapport-periode">🖨 Rapport imprimable</button>
+    </form>
+
+    <div id="presences-stats-contenu"></div>
+  </section>
+
+  <!-- ================= PRÉSENCES : COMPARAISON ================= -->
+  <section id="vue-presences-comparaison" hidden>
+    <h1 class="titre">Comparer deux périodes</h1>
+    <p class="discret" style="margin-top:-.8rem;margin-bottom:1.2rem">Par défaut : ce mois-ci contre le mois précédent.</p>
+
+    <form class="filtres-periode" id="form-comparaison" style="flex-wrap:wrap;">
+      <span><strong>A</strong> du <input type="date" id="comparaison-a-debut" style="width:auto;display:inline-block;">
+        au <input type="date" id="comparaison-a-fin" style="width:auto;display:inline-block;"></span>
+      <span><strong>B</strong> du <input type="date" id="comparaison-b-debut" style="width:auto;display:inline-block;">
+        au <input type="date" id="comparaison-b-fin" style="width:auto;display:inline-block;"></span>
+      <button type="submit" class="bouton bouton-principal">Comparer</button>
+    </form>
+
+    <div id="presences-comparaison-contenu"></div>
+  </section>
+
+  <!-- ================= PRÉSENCES : PARAMÈTRES ================= -->
+  <section id="vue-presences-parametres" hidden>
+    <h1 class="titre">Paramètres — Présences</h1>
+    <p class="discret" style="margin-top:-.8rem;margin-bottom:1.2rem">Types de culte et catégories d'âge, communs à toute l'application.</p>
+    <div id="presences-parametres-contenu"></div>
   </section>
 
   <!-- ================= FORMULAIRE ================= -->
@@ -1006,7 +1214,9 @@ function dateHeureFr(iso){
 }
 
 function afficherVue(nom){
-  ["reglages","connexion","liste","formulaire","import","journal","apropos"].forEach(v=>{
+  ["reglages","connexion","liste","formulaire","import","journal","apropos",
+   "presences","presences-form","presences-historique","presences-detail",
+   "presences-statistiques","presences-comparaison","presences-parametres"].forEach(v=>{
     $("vue-"+v).hidden = (v !== nom);
   });
   const connecte = !!etat.session;
@@ -1020,6 +1230,10 @@ function afficherVue(nom){
   $("btn-nouveau").hidden     = !ecriture;
   $("btn-import-nav").hidden  = !ecriture;
   $("btn-export").hidden      = !ecriture;
+  ["btn-presences-nouvelle", "btn-presences-nouvelle-2", "btn-presences-parametres"].forEach(id=>{
+    const el = $(id);
+    if (el) el.hidden = !ecriture;
+  });
 
   effacerMessage();
 }
@@ -2015,7 +2229,1032 @@ function telechargerModeleImport(){
 }
 
 /* ==========================================================
-   8. SESSION
+   8. PRÉSENCES & STATISTIQUES DES CULTES
+   ----------------------------------------------------------
+   Miroir de app.py (version Flask) contre Supabase au lieu de
+   SQLite/SQLAlchemy : mêmes règles (totaux dénormalisés recalculés côté
+   client puis écrits, catégorie désactivée jamais supprimée d'une fiche
+   existante, doublon date+type refusé par défaut), même design (compteurs
+   +/-, camembert et barres en CSS pur — aucune bibliothèque de graphiques).
+   ========================================================== */
+const GROUPE_HOMMES = "hommes", GROUPE_FEMMES = "femmes", GROUPE_ENFANTS = "enfants";
+const GROUPES_P = [GROUPE_HOMMES, GROUPE_FEMMES, GROUPE_ENFANTS];
+const LIBELLES_GROUPES_P = { hommes:"Hommes", femmes:"Femmes", enfants:"Enfants" };
+const EMOJIS_GROUPES_P   = { hommes:"👨", femmes:"👩", enfants:"🧒" };
+const COULEURS_GROUPES_P = { hommes:"var(--encre)", femmes:"var(--or)", enfants:"var(--succes)" };
+const JOURS_SEMAINE_P = ["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
+const LIBELLES_RAPPORTS_P = {
+  semaine:"Rapport hebdomadaire", mois:"Rapport mensuel", trimestre:"Rapport trimestriel",
+  annee:"Rapport annuel", personnalise:"Rapport personnalisé", tout:"Rapport — tout l'historique"
+};
+
+etat.presences = {
+  categories: [], types: [],
+  historique: { page:1, total:0, q:"", type:"", debut:"", fin:"", tri:"date_desc" }
+};
+const PAR_PAGE_PRESENCES = 25;
+
+/* --- Référentiel (types de culte + catégories), chargé une fois --- */
+async function chargerReferentielPresences(force){
+  if (!force && etat.presences.categories.length && etat.presences.types.length) return;
+  const [cats, types] = await Promise.all([
+    api("attendance_category?select=*&order=groupe.asc,ordre_affichage.asc"),
+    api("service_type?select=*&order=ordre_affichage.asc")
+  ]);
+  etat.presences.categories = cats.donnees || [];
+  etat.presences.types = types.donnees || [];
+}
+
+/* Catégories actives, plus celles indiquées en supplément (catégories
+   utilisées par une fiche mais depuis désactivées — jamais perdues à
+   l'affichage). Miroir de categories_pour_edition() côté Flask. */
+function categoriesParGroupe(supplementaires){
+  const parGroupe = { hommes:[], femmes:[], enfants:[] };
+  const vues = new Set();
+  const ajouter = cat=>{ if (cat && !vues.has(cat.id)){ vues.add(cat.id); parGroupe[cat.groupe].push(cat); } };
+  etat.presences.categories.filter(c=>c.is_active).forEach(ajouter);
+  (supplementaires || []).forEach(ajouter);
+  GROUPES_P.forEach(g => parGroupe[g].sort((a,b)=>a.ordre_affichage - b.ordre_affichage));
+  return parGroupe;
+}
+
+function jourSemainePresence(iso){
+  if (!iso) return "";
+  const [a,m,j] = iso.split("-").map(Number);
+  return JOURS_SEMAINE_P[new Date(a, m-1, j).getDay()];
+}
+
+function libelleEvolution(valeur){
+  if (valeur === null || valeur === undefined)
+    return `<span class="evolution evolution-stable">— pas de comparaison possible</span>`;
+  if (valeur > 0) return `<span class="evolution evolution-hausse">▲ +${valeur} %</span>`;
+  if (valeur < 0) return `<span class="evolution evolution-baisse">▼ ${valeur} %</span>`;
+  return `<span class="evolution evolution-stable">→ stable</span>`;
+}
+
+/* ---------------------------------------------------------------
+   TABLEAU DE BORD
+   --------------------------------------------------------------- */
+async function ouvrirPresencesDashboard(){
+  afficherVue("presences");
+  const zone = $("presences-dashboard-contenu");
+  zone.innerHTML = `<p class="discret">Chargement…</p>`;
+  try{
+    await chargerReferentielPresences();
+    const { donnees } = await api(
+      "attendance_record?select=*,service_type(nom)&order=date_culte.desc,id.desc&limit=8");
+    const lignes = donnees || [];
+    if (!lignes.length){
+      zone.innerHTML = `<div class="vide"><p>Aucune présence enregistrée pour le moment.</p>${
+        peutEcrire() ? `<button class="bouton bouton-principal" onclick="ouvrirPresencesForm(null)">Enregistrer la première présence</button>` : ""
+      }</div>`;
+      return;
+    }
+    const dernier = lignes[0];
+    let evolution = null;
+    const { donnees: precedents } = await api(
+      `attendance_record?select=total_general&service_type_id=eq.${dernier.service_type_id}`
+      + `&or=(date_culte.lt.${dernier.date_culte},and(date_culte.eq.${dernier.date_culte},id.lt.${dernier.id}))`
+      + `&order=date_culte.desc,id.desc&limit=1`);
+    if (precedents && precedents[0] && precedents[0].total_general){
+      evolution = Math.round(
+        (dernier.total_general - precedents[0].total_general) / precedents[0].total_general * 100);
+    }
+
+    zone.innerHTML = `
+      <div class="stats">
+        <div class="stat"><b>${dateFr(dernier.date_culte)}</b>
+          <span>${echapper((dernier.service_type && dernier.service_type.nom) || "—")}</span></div>
+        <div class="stat"><b>${dernier.total_general}</b><span>Présence totale</span>
+          <small class="evolution-inline">${libelleEvolution(evolution)}</small></div>
+        <div class="stat"><b>${dernier.total_hommes}</b><span>👨 Hommes</span></div>
+        <div class="stat"><b>${dernier.total_femmes}</b><span>👩 Femmes</span></div>
+        <div class="stat"><b>${dernier.total_enfants}</b><span>🧒 Enfants</span></div>
+      </div>
+      <div class="bloc-stat">
+        <h2>Derniers cultes enregistrés</h2>
+        <div class="tableau-enveloppe"><table>
+          <thead><tr><th>Date</th><th>Jour</th><th>Type</th><th>Hommes</th><th>Femmes</th><th>Enfants</th><th>Total</th></tr></thead>
+          <tbody>${lignes.map(r=>`
+            <tr>
+              <td><button type="button" class="lien-carte-journal" onclick="ouvrirPresencesDetail('${r.id}')">${dateFr(r.date_culte)}</button></td>
+              <td>${jourSemainePresence(r.date_culte)}</td>
+              <td>${echapper((r.service_type && r.service_type.nom) || "—")}</td>
+              <td>${r.total_hommes}</td><td>${r.total_femmes}</td><td>${r.total_enfants}</td>
+              <td><strong>${r.total_general}</strong></td>
+            </tr>`).join("")}</tbody>
+        </table></div>
+      </div>`;
+  }catch(e){ zone.innerHTML = ""; message(e.message, "erreur"); }
+}
+
+/* ---------------------------------------------------------------
+   SAISIE (création / modification)
+   --------------------------------------------------------------- */
+function construireGroupesFormulairePresence(parGroupe, valeurs){
+  valeurs = valeurs || {};
+  $("presence-groupes").innerHTML = GROUPES_P.map(groupe=>`
+    <fieldset>
+      <legend>${EMOJIS_GROUPES_P[groupe]} ${LIBELLES_GROUPES_P[groupe]}</legend>
+      <div class="groupe-presence" data-groupe="${groupe}">
+        ${parGroupe[groupe].length ? parGroupe[groupe].map(cat=>{
+          const age = cat.age_min == null && cat.age_max == null ? "" :
+            cat.age_max == null ? `${cat.age_min} ans et plus` :
+            cat.age_min == null ? `jusqu'à ${cat.age_max} ans` :
+            `${cat.age_min}–${cat.age_max} ans`;
+          const val = valeurs[cat.id] || 0;
+          return `<div class="compteur">
+            <span class="compteur-nom">${echapper(cat.nom)}${age ? `<small>${echapper(age)}</small>` : ""}</span>
+            <span class="compteur-controles">
+              <button type="button" class="compteur-bouton" data-delta="-1" data-cible="cat-${cat.id}">−</button>
+              <input type="number" min="0" step="1" class="compteur-valeur compteur-groupe"
+                data-groupe="${groupe}" id="cat-${cat.id}" value="${val}">
+              <button type="button" class="compteur-bouton" data-delta="1" data-cible="cat-${cat.id}">+</button>
+            </span>
+          </div>`;
+        }).join("") : `<p class="discret">Aucune catégorie active pour ce groupe — voir Paramètres.</p>`}
+        <div class="groupe-presence-total"><span>Total ${LIBELLES_GROUPES_P[groupe]}</span><span id="total-${groupe}">0</span></div>
+      </div>
+    </fieldset>`).join("");
+
+  $("presence-groupes").querySelectorAll(".compteur-bouton").forEach(bouton=>{
+    bouton.addEventListener("click", ()=>{
+      const champ = $(bouton.dataset.cible);
+      champ.value = Math.max(0, (parseInt(champ.value, 10) || 0) + parseInt(bouton.dataset.delta, 10));
+      recalculerTotauxPresenceForm();
+    });
+  });
+  $("presence-groupes").querySelectorAll(".compteur-valeur").forEach(champ=>{
+    champ.addEventListener("input", ()=>{
+      if (champ.value !== "" && parseInt(champ.value, 10) < 0) champ.value = 0;
+      recalculerTotauxPresenceForm();
+    });
+  });
+  recalculerTotauxPresenceForm();
+}
+
+function recalculerTotauxPresenceForm(){
+  let totalGeneral = 0;
+  GROUPES_P.forEach(groupe=>{
+    let somme = 0;
+    document.querySelectorAll(`.compteur-groupe[data-groupe="${groupe}"]`).forEach(champ=>{
+      somme += parseInt(champ.value, 10) || 0;
+    });
+    const cible = $("total-" + groupe);
+    if (cible) cible.textContent = somme;
+    totalGeneral += somme;
+  });
+  $("presence-total-general").textContent = totalGeneral;
+}
+
+function detecterJourPresenceForm(){
+  $("presence-jour").value = jourSemainePresence($("presence-date").value);
+}
+
+async function ouvrirPresencesForm(id){
+  if (!peutEcrire()){ message("Accès réservé au secrétariat et au pasteur.", "erreur"); return; }
+  afficherVue("presences-form");
+  $("form-presence").reset();
+  $("presence-groupes").innerHTML = "";
+  $("presence-id").value = id || "";
+  $("titre-presence-form").textContent = id ? "Modifier la présence" : "Nouvelle présence";
+  $("presence-provenance").hidden = true;
+
+  try{
+    await chargerReferentielPresences();
+
+    let record = null, valeursExistantes = {}, categoriesSupplementaires = [];
+    if (id){
+      const { donnees } = await api(`attendance_record?id=eq.${id}&select=*,service_type(nom)`);
+      record = donnees && donnees[0];
+      if (!record){ message("Présence introuvable.", "erreur"); ouvrirPresencesHistorique(); return; }
+      const { donnees: valeurs } = await api(
+        `attendance_value?attendance_record_id=eq.${id}&select=*,category:attendance_category(*)`);
+      (valeurs || []).forEach(v=>{
+        valeursExistantes[v.category_id] = v.effectif;
+        if (v.category && !etat.presences.categories.some(c=>c.id === v.category.id))
+          categoriesSupplementaires.push(v.category);
+      });
+    }
+
+    construireGroupesFormulairePresence(categoriesParGroupe(categoriesSupplementaires), valeursExistantes);
+
+    let types = etat.presences.types.filter(t=>t.is_active);
+    if (record && record.service_type_id && !types.some(t=>t.id === record.service_type_id)){
+      types = types.concat([{ id: record.service_type_id, nom:(record.service_type && record.service_type.nom) || "?" }]);
+    }
+    $("presence-type").innerHTML = `<option value="">— Choisir —</option>`
+      + types.map(t=>`<option value="${t.id}">${echapper(t.nom)}</option>`).join("");
+
+    if (record){
+      $("presence-date").value = record.date_culte;
+      $("presence-type").value = record.service_type_id;
+      $("presence-lieu").value = record.lieu || "";
+      $("presence-notes").value = record.notes || "";
+      if (record.created_by){
+        $("presence-provenance").hidden = false;
+        $("presence-provenance").innerHTML = `Enregistrée par <strong>${echapper(record.created_by)}</strong> le ${dateHeureFr(record.created_at)}`
+          + (record.updated_by ? ` · modifiée par <strong>${echapper(record.updated_by)}</strong> le ${dateHeureFr(record.updated_at)}` : "");
+      }
+    }
+    detecterJourPresenceForm();
+  }catch(e){ message(e.message, "erreur"); }
+}
+
+async function soumettrePresenceFormulaire(evt){
+  evt.preventDefault();
+  if (!peutEcrire()){ message("Accès réservé au secrétariat et au pasteur.", "erreur"); return; }
+
+  const id = $("presence-id").value || null;
+  const dateCulte = $("presence-date").value;
+  const serviceTypeId = $("presence-type").value;
+  const lieu = $("presence-lieu").value.trim();
+  const notes = $("presence-notes").value.trim();
+
+  const erreurs = [];
+  if (!dateCulte) erreurs.push("La date du culte est obligatoire.");
+  else if (dateCulte > aujourdhuiLocalISO()) erreurs.push("La date du culte ne peut pas être dans le futur.");
+  if (!serviceTypeId) erreurs.push("Le type de culte est obligatoire.");
+  if (notes.length > 2000) erreurs.push("Les notes sont trop longues (2 000 caractères maximum).");
+
+  const valeursParCategorie = {};
+  document.querySelectorAll("#presence-groupes .compteur-valeur").forEach(champ=>{
+    const catId = champ.id.replace(/^cat-/, "");
+    const v = parseInt(champ.value, 10);
+    if (isNaN(v) || v < 0) erreurs.push("Un effectif ne peut pas être négatif.");
+    else valeursParCategorie[catId] = v;
+  });
+  if (erreurs.length){ message(erreurs.join(" "), "erreur"); return; }
+
+  const bouton = $("btn-presence-enregistrer");
+  bouton.disabled = true;
+  try{
+    // Doublon date + type (règle par défaut, désactivable en modifiant ce
+    // contrôle — voir AUTORISER_DOUBLONS_PRESENCE côté Flask, app.py).
+    const { donnees: doublons } = await api(
+      `attendance_record?date_culte=eq.${dateCulte}&service_type_id=eq.${serviceTypeId}&select=id`);
+    if ((doublons || []).some(d => d.id !== id)){
+      message("Une présence est déjà enregistrée pour cette date et ce type de culte — "
+        + "modifiez plutôt la fiche existante.", "erreur");
+      return;
+    }
+
+    const totaux = { hommes:0, femmes:0, enfants:0 };
+    const toutesCategories = [...etat.presences.categories];
+    document.querySelectorAll("#presence-groupes .compteur-valeur").forEach(champ=>{
+      const catId = champ.id.replace(/^cat-/, "");
+      let cat = toutesCategories.find(c=>c.id === catId);
+      if (!cat){
+        const el = champ.closest(".groupe-presence");
+        cat = { id: catId, groupe: el.dataset.groupe };
+      }
+      totaux[cat.groupe] += valeursParCategorie[catId] || 0;
+    });
+    const totalGeneral = totaux.hommes + totaux.femmes + totaux.enfants;
+
+    const donnees = {
+      date_culte: dateCulte, service_type_id: serviceTypeId,
+      lieu: lieu || null, notes: notes || null,
+      total_hommes: totaux.hommes, total_femmes: totaux.femmes,
+      total_enfants: totaux.enfants, total_general: totalGeneral,
+    };
+
+    let idRecord = id;
+    if (id){
+      donnees.updated_by = (etat.session.user && etat.session.user.email) || "";
+      await api(`attendance_record?id=eq.${id}`, { method:"PATCH", body:donnees });
+    }else{
+      donnees.created_by = (etat.session.user && etat.session.user.email) || "";
+      const { donnees: cree } = await api("attendance_record",
+        { method:"POST", body:donnees, headers:{ "Prefer":"return=representation" } });
+      idRecord = cree && cree[0] && cree[0].id;
+    }
+
+    const valeurs = Object.keys(valeursParCategorie).map(catId=>(
+      { attendance_record_id: idRecord, category_id: catId, effectif: valeursParCategorie[catId] }));
+    if (valeurs.length){
+      await api("attendance_value?on_conflict=attendance_record_id,category_id", {
+        method:"POST", body: valeurs,
+        headers:{ "Prefer":"resolution=merge-duplicates,return=minimal" },
+      });
+    }
+
+    message(`Présences du ${dateFr(dateCulte)} enregistrées (${totalGeneral} personnes).`, "succes");
+    ouvrirPresencesHistorique();
+  }catch(e){ message(e.message, "erreur"); }
+  finally{ bouton.disabled = false; }
+}
+
+async function supprimerPresence(id, texte){
+  if (!peutEcrire()){ message("Accès réservé au secrétariat et au pasteur.", "erreur"); return; }
+  if (!confirm(`Supprimer définitivement les présences du ${texte} ?`)) return;
+  try{
+    await api(`attendance_record?id=eq.${id}`, { method:"DELETE" });
+    message(`Présences du ${texte} supprimées.`, "succes");
+    ouvrirPresencesHistorique();
+  }catch(e){ message(e.message, "erreur"); }
+}
+
+/* ---------------------------------------------------------------
+   DÉTAIL
+   --------------------------------------------------------------- */
+async function ouvrirPresencesDetail(id){
+  afficherVue("presences-detail");
+  const zone = $("presence-detail-contenu");
+  zone.innerHTML = `<p class="discret">Chargement…</p>`;
+  try{
+    const { donnees } = await api(`attendance_record?id=eq.${id}&select=*,service_type(nom)`);
+    const r = donnees && donnees[0];
+    if (!r){ message("Présence introuvable.", "erreur"); ouvrirPresencesHistorique(); return; }
+    const { donnees: valeurs } = await api(
+      `attendance_value?attendance_record_id=eq.${id}&select=*,category:attendance_category(*)`
+      + `&order=category(groupe).asc,category(ordre_affichage).asc`);
+
+    const parGroupe = { hommes:[], femmes:[], enfants:[] };
+    (valeurs || []).forEach(v=>{ if (v.category) parGroupe[v.category.groupe].push(v); });
+
+    const texteConfirm = `${dateFr(r.date_culte)} (${(r.service_type && r.service_type.nom) || ""})`.replace(/'/g,"\\'");
+    zone.innerHTML = `
+      <div class="titre-page-libre">
+        <h1 class="titre">${dateFr(r.date_culte)} — ${jourSemainePresence(r.date_culte)}</h1>
+        <p class="discret">${echapper((r.service_type && r.service_type.nom) || "—")}${r.lieu ? " · " + echapper(r.lieu) : ""}</p>
+        <p class="provenance">Enregistrée par <strong>${echapper(r.created_by || "?")}</strong> le ${dateHeureFr(r.created_at)}
+          ${r.updated_by ? ` · modifiée par <strong>${echapper(r.updated_by)}</strong> le ${dateHeureFr(r.updated_at)}` : ""}</p>
+      </div>
+      <div class="actions-formulaire" style="margin-bottom:1.2rem;">
+        <button type="button" class="bouton bouton-discret" onclick="ouvrirPresencesHistorique()">← Retour à l'historique</button>
+        ${peutEcrire() ? `
+          <button type="button" class="bouton" onclick="ouvrirPresencesForm('${id}')">✏ Modifier</button>
+          <button type="button" class="bouton bouton-danger" onclick="supprimerPresence('${id}', '${texteConfirm}')">🗑 Supprimer</button>` : ""}
+      </div>
+      ${GROUPES_P.map(groupe=>`
+        <div class="bloc-stat">
+          <h2>${EMOJIS_GROUPES_P[groupe]} ${LIBELLES_GROUPES_P[groupe]} — ${r["total_"+groupe]}</h2>
+          <div class="tableau-enveloppe"><table><tbody>
+            ${parGroupe[groupe].length ? parGroupe[groupe].map(v=>
+              `<tr><td>${echapper(v.category.nom)}</td><td style="text-align:right"><strong>${v.effectif}</strong></td></tr>`
+            ).join("") : `<tr><td class="discret">Aucun détail enregistré.</td></tr>`}
+          </tbody></table></div>
+        </div>`).join("")}
+      <div class="total-general"><span>TOTAL GÉNÉRAL</span><span>${r.total_general}</span></div>
+      ${r.notes ? `<div class="bloc-stat"><h2>Notes</h2><p style="white-space:pre-wrap;margin:0;">${echapper(r.notes)}</p></div>` : ""}`;
+  }catch(e){ zone.innerHTML=""; message(e.message, "erreur"); }
+}
+
+/* ---------------------------------------------------------------
+   HISTORIQUE
+   --------------------------------------------------------------- */
+function ouvrirPresencesHistorique(){
+  afficherVue("presences-historique");
+  $("presences-recherche").value = etat.presences.historique.q;
+  $("presences-filtre-debut").value = etat.presences.historique.debut;
+  $("presences-filtre-fin").value = etat.presences.historique.fin;
+  $("presences-tri").value = etat.presences.historique.tri;
+  chargerReferentielPresences().then(()=>{
+    $("presences-filtre-type").innerHTML = `<option value="">Tous les types</option>`
+      + etat.presences.types.map(t=>`<option value="${t.id}">${echapper(t.nom)}</option>`).join("");
+    $("presences-filtre-type").value = etat.presences.historique.type;
+  });
+  chargerHistoriquePresences();
+}
+
+function construireRequeteHistoriquePresences(){
+  const h = etat.presences.historique;
+  const params = new URLSearchParams();
+  params.set("select", "*,service_type(nom)");
+  const ordres = {
+    date_desc:"date_culte.desc", date_asc:"date_culte.asc",
+    total_desc:"total_general.desc", total_asc:"total_general.asc"
+  };
+  params.set("order", (ordres[h.tri] || ordres.date_desc) + ",id.desc");
+  if (h.q){
+    const motif = "*" + h.q.replace(/[,()*"\\]/g, " ").trim() + "*";
+    params.set("or", `(lieu.ilike.${motif},notes.ilike.${motif})`);
+  }
+  if (h.type) params.set("service_type_id", `eq.${h.type}`);
+  if (h.debut) params.set("date_culte", `gte.${h.debut}`);   // combiné à "fin" ci-dessous si besoin
+  if (h.fin){
+    const cle = h.debut ? "and" : "date_culte";
+    if (h.debut){
+      params.delete("date_culte");
+      params.set("and", `(date_culte.gte.${h.debut},date_culte.lte.${h.fin})`);
+    }else{
+      params.set("date_culte", `lte.${h.fin}`);
+    }
+  }
+  return params;
+}
+
+async function chargerHistoriquePresences(){
+  const h = etat.presences.historique;
+  const params = construireRequeteHistoriquePresences();
+  const debut = (h.page - 1) * PAR_PAGE_PRESENCES;
+  const fin = debut + PAR_PAGE_PRESENCES - 1;
+  try{
+    const { donnees, total } = await api(`attendance_record?${params}`, {
+      headers:{ "Range-Unit":"items", "Range":`${debut}-${fin}`, "Prefer":"count=exact" }
+    });
+    dessinerHistoriquePresences(donnees || [], total ?? (donnees || []).length);
+  }catch(e){ message(e.message, "erreur"); }
+}
+
+function dessinerHistoriquePresences(lignes, total){
+  const h = etat.presences.historique;
+  const corps = $("corps-tableau-presences");
+  const pages = Math.max(Math.ceil(total / PAR_PAGE_PRESENCES), 1);
+  const ecriture = peutEcrire();
+
+  if (!lignes.length){
+    corps.innerHTML = "";
+    document.querySelector("#vue-presences-historique .tableau-enveloppe").hidden = true;
+    $("pagination-presences").hidden = true;
+    const filtre = h.q || h.type || h.debut || h.fin;
+    $("zone-vide-presences").innerHTML = filtre
+      ? `<div class="vide"><p>Aucune présence ne correspond à cette recherche.</p></div>`
+      : `<div class="vide"><p>Aucune présence enregistrée pour le moment.</p>${
+          ecriture ? `<button class="bouton bouton-principal" onclick="ouvrirPresencesForm(null)">Enregistrer la première présence</button>` : ""}</div>`;
+    return;
+  }
+
+  document.querySelector("#vue-presences-historique .tableau-enveloppe").hidden = false;
+  $("zone-vide-presences").innerHTML = "";
+  corps.innerHTML = lignes.map(r=>{
+    const texteConfirm = `${dateFr(r.date_culte)} (${(r.service_type && r.service_type.nom) || ""})`.replace(/'/g,"\\'");
+    return `<tr>
+      <td>${dateFr(r.date_culte)}</td><td>${jourSemainePresence(r.date_culte)}</td>
+      <td>${echapper((r.service_type && r.service_type.nom) || "—")}</td>
+      <td>${r.total_hommes}</td><td>${r.total_femmes}</td><td>${r.total_enfants}</td>
+      <td><strong>${r.total_general}</strong></td>
+      <td class="col-actions">
+        <button type="button" class="bouton bouton-petit" onclick="ouvrirPresencesDetail('${r.id}')">👁 Voir</button>
+        ${ecriture ? `
+          <button type="button" class="bouton bouton-petit" onclick="ouvrirPresencesForm('${r.id}')">✏ Modifier</button>
+          <button type="button" class="bouton bouton-petit bouton-danger" onclick="supprimerPresence('${r.id}', '${texteConfirm}')">🗑 Supprimer</button>` : ""}
+      </td>
+    </tr>`;
+  }).join("");
+
+  $("pagination-presences").hidden = pages <= 1;
+  $("info-page-presences").textContent = `Page ${h.page} sur ${pages}`;
+  $("btn-precedent-presences").disabled = h.page <= 1;
+  $("btn-suivant-presences").disabled = h.page >= pages;
+}
+
+async function exporterPresencesCsv(){
+  try{
+    message("Préparation de l'export…", "info");
+    const params = construireRequeteHistoriquePresences();
+    const { donnees } = await api(`attendance_record?${params}`, {
+      headers:{ "Range-Unit":"items", "Range":"0-9999" }
+    });
+    const lignes = donnees || [];
+    await chargerReferentielPresences();
+    const categories = etat.presences.categories.filter(c=>c.is_active)
+      .sort((a,b)=> a.groupe===b.groupe ? a.ordre_affichage-b.ordre_affichage : a.groupe<b.groupe?-1:1);
+
+    const ids = lignes.map(r=>r.id);
+    let valeursParRecord = {};
+    if (ids.length){
+      const { donnees: valeurs } = await api(
+        `attendance_value?attendance_record_id=in.(${ids.join(",")})&select=*`,
+        { headers:{ "Range-Unit":"items", "Range":"0-99999" } });
+      (valeurs || []).forEach(v=>{
+        valeursParRecord[v.attendance_record_id] = valeursParRecord[v.attendance_record_id] || {};
+        valeursParRecord[v.attendance_record_id][v.category_id] = v.effectif;
+      });
+    }
+
+    const entetes = ["Date","Jour","Type de culte","Lieu"]
+      .concat(categories.map(c=>c.nom))
+      .concat(["Total Hommes","Total Femmes","Total Enfants","Total Général","Notes"]);
+    const csvLignes = [entetes.map(celluleCsv).join(";")];
+    lignes.forEach(r=>{
+      const v = valeursParRecord[r.id] || {};
+      const ligne = [dateFr(r.date_culte), jourSemainePresence(r.date_culte),
+        (r.service_type && r.service_type.nom) || "", r.lieu || ""]
+        .concat(categories.map(c=>v[c.id] || 0))
+        .concat([r.total_hommes, r.total_femmes, r.total_enfants, r.total_general, r.notes || ""]);
+      csvLignes.push(ligne.map(celluleCsv).join(";"));
+    });
+
+    const blob = new Blob(["\uFEFF" + csvLignes.join("\r\n")], { type:"text/csv;charset=utf-8;" });
+    const lien = document.createElement("a");
+    lien.href = URL.createObjectURL(blob);
+    lien.download = `presences_icm_${aujourdhuiLocalISO()}.csv`;
+    document.body.appendChild(lien); lien.click(); lien.remove();
+    setTimeout(()=>URL.revokeObjectURL(lien.href), 2000);
+    message(`Export de ${lignes.length} enregistrement(s) terminé.`, "succes");
+  }catch(e){ message(e.message, "erreur"); }
+}
+
+/* ---------------------------------------------------------------
+   STATISTIQUES — période, agrégation, analyse intelligente
+   --------------------------------------------------------------- */
+/* Formate un Date en "AAAA-MM-JJ" d'après ses composants LOCAUX — jamais
+   .toISOString() ici, qui convertit en UTC et peut faire reculer d'un
+   jour la date affichée dans un fuseau en avance sur UTC (même piège que
+   corrigé pour aujourdhuiLocalISO(), voir la régression de calendrier
+   documentée plus haut dans ce fichier). */
+function formatDateLocale(dt){
+  const p = n => String(n).padStart(2, "0");
+  return `${dt.getFullYear()}-${p(dt.getMonth()+1)}-${p(dt.getDate())}`;
+}
+function dateLocaleDepuisIso(iso){ return new Date(iso + "T00:00:00"); }
+
+function bornesPeriodePresence(periode, debutBrut, finBrut){
+  const aujourdhui = aujourdhuiLocalISO();
+  const d = dateLocaleDepuisIso(aujourdhui);
+  const ajouterJours = (iso, n)=>{ const dt = dateLocaleDepuisIso(iso); dt.setDate(dt.getDate()+n); return formatDateLocale(dt); };
+  const premierJourMois = (annee, mois)=> `${annee}-${String(mois).padStart(2,"0")}-01`;
+
+  if (periode === "aujourdhui") return [aujourdhui, aujourdhui];
+  if (periode === "semaine"){
+    const jourSemaineIso = (d.getDay() + 6) % 7;   // 0 = lundi
+    return [ajouterJours(aujourdhui, -jourSemaineIso), aujourdhui];
+  }
+  if (periode === "mois") return [premierJourMois(d.getFullYear(), d.getMonth()+1), aujourdhui];
+  if (periode === "trimestre"){
+    const premierMois = Math.floor(d.getMonth()/3)*3 + 1;
+    return [premierJourMois(d.getFullYear(), premierMois), aujourdhui];
+  }
+  if (periode === "annee") return [`${d.getFullYear()}-01-01`, aujourdhui];
+  if (periode === "personnalise") return [debutBrut || null, finBrut || null];
+  return [null, null];   // "tout"
+}
+
+function periodePrecedentePresence(periode, debut, fin){
+  if (!debut || !fin) return [null, null];
+  const veille = iso=>{ const dt = dateLocaleDepuisIso(iso); dt.setDate(dt.getDate()-1); return formatDateLocale(dt); };
+  const premierJourMoisIso = iso=> iso.slice(0,8) + "01";
+
+  if (periode === "aujourdhui"){ const v = veille(debut); return [v, v]; }
+  if (periode === "semaine"){
+    const duree = Math.round((dateLocaleDepuisIso(fin) - dateLocaleDepuisIso(debut)) / 86400000) + 1;
+    const finPrec = veille(debut);
+    const dt = dateLocaleDepuisIso(finPrec); dt.setDate(dt.getDate() - (duree - 1));
+    return [formatDateLocale(dt), finPrec];
+  }
+  if (periode === "mois"){ const finPrec = veille(debut); return [premierJourMoisIso(finPrec), finPrec]; }
+  if (periode === "trimestre"){
+    const finPrec = veille(debut);
+    const dt = dateLocaleDepuisIso(finPrec);
+    const premierMois = Math.floor(dt.getMonth()/3)*3;
+    return [`${dt.getFullYear()}-${String(premierMois+1).padStart(2,"0")}-01`, finPrec];
+  }
+  if (periode === "annee"){
+    const an = parseInt(debut.slice(0,4),10) - 1;
+    return [`${an}-01-01`, `${an}-${fin.slice(5)}`];
+  }
+  return [null, null];
+}
+
+async function calculerStatistiquesPeriodePresence(debut, fin){
+  let filtre = "";
+  if (debut && fin) filtre = `&and=(date_culte.gte.${debut},date_culte.lte.${fin})`;
+  else if (debut) filtre = `&date_culte=gte.${debut}`;
+  else if (fin) filtre = `&date_culte=lte.${fin}`;
+
+  const { donnees } = await api(
+    `attendance_record?select=*,service_type(nom)&order=date_culte.asc,id.asc${filtre}`,
+    { headers:{ "Range-Unit":"items", "Range":"0-9999" } });
+  const enregistrements = donnees || [];
+
+  const resume = {
+    nb_cultes: enregistrements.length,
+    total: enregistrements.reduce((s,r)=>s+r.total_general,0),
+    hommes: enregistrements.reduce((s,r)=>s+r.total_hommes,0),
+    femmes: enregistrements.reduce((s,r)=>s+r.total_femmes,0),
+    enfants: enregistrements.reduce((s,r)=>s+r.total_enfants,0),
+  };
+  resume.moyenne = resume.nb_cultes ? Math.round(resume.total / resume.nb_cultes) : 0;
+  resume.maximum = enregistrements.length ? Math.max(...enregistrements.map(r=>r.total_general)) : 0;
+  resume.minimum = enregistrements.length ? Math.min(...enregistrements.map(r=>r.total_general)) : 0;
+
+  const repartition = [];
+  if (resume.total){
+    GROUPES_P.forEach(groupe=>{
+      const valeur = resume[groupe];
+      repartition.push({ groupe, libelle: LIBELLES_GROUPES_P[groupe], valeur,
+        couleur: COULEURS_GROUPES_P[groupe], pourcentage: Math.round(valeur/resume.total*1000)/10 });
+    });
+  }
+
+  const parType = {};
+  enregistrements.forEach(r=>{
+    const nom = (r.service_type && r.service_type.nom) || "?";
+    (parType[nom] = parType[nom] || []).push(r.total_general);
+  });
+  const comparaisonTypes = Object.keys(parType).map(nom=>{
+    const valeurs = parType[nom];
+    return { nom, nb: valeurs.length, moyenne: Math.round(valeurs.reduce((a,b)=>a+b,0)/valeurs.length),
+      maximum: Math.max(...valeurs), minimum: Math.min(...valeurs) };
+  }).sort((a,b)=>b.moyenne - a.moyenne);
+  const maxComparaison = comparaisonTypes.length ? Math.max(...comparaisonTypes.map(c=>c.moyenne)) : 0;
+
+  const parJour = {};
+  enregistrements.forEach(r=>{
+    const jour = jourSemainePresence(r.date_culte);
+    (parJour[jour] = parJour[jour] || []).push(r.total_general);
+  });
+  const analyseJours = Object.keys(parJour).map(jour=>{
+    const valeurs = parJour[jour];
+    return { jour, moyenne: Math.round(valeurs.reduce((a,b)=>a+b,0)/valeurs.length), nb: valeurs.length };
+  }).sort((a,b)=>b.moyenne - a.moyenne);
+  const maxJour = analyseJours.length ? Math.max(...analyseJours.map(j=>j.moyenne)) : 0;
+
+  const evolution = enregistrements.slice(-20).map(r=>({ date: r.date_culte, total: r.total_general }));
+  const maxEvolution = evolution.length ? Math.max(...evolution.map(e=>e.total)) : 0;
+
+  return { enregistrements, resume, repartition, comparaisonTypes, maxComparaison, analyseJours, maxJour, evolution, maxEvolution };
+}
+
+function genererAnalysesPresence(resume, repartition, analyseJours, enregistrements, resumePrecedent){
+  const analyses = [];
+  if (!resume.nb_cultes) return analyses;
+
+  if (resumePrecedent && resumePrecedent.total){
+    const variation = Math.round((resume.total - resumePrecedent.total) / resumePrecedent.total * 100);
+    if (variation > 0) analyses.push(`📈 La fréquentation a augmenté de ${variation} % par rapport à la période précédente.`);
+    else if (variation < 0) analyses.push(`📉 La fréquentation a diminué de ${Math.abs(variation)} % par rapport à la période précédente.`);
+    else analyses.push(`➡️ La fréquentation est stable par rapport à la période précédente.`);
+  }
+  if (repartition.length){
+    const principal = repartition.reduce((a,b)=> b.valeur > a.valeur ? b : a);
+    analyses.push(`${EMOJIS_GROUPES_P[principal.groupe]} Les ${principal.libelle.toLowerCase()} représentent ${principal.pourcentage} % de la fréquentation totale.`);
+  }
+  if (analyseJours.length){
+    const jourTop = analyseJours.reduce((a,b)=> b.moyenne > a.moyenne ? b : a);
+    analyses.push(`📅 ${jourTop.jour} est le jour ayant la plus forte affluence (en moyenne ${jourTop.moyenne} personnes).`);
+  }
+  if (enregistrements.length >= 6){
+    const recents = enregistrements.slice(-3), avant = enregistrements.slice(-6,-3);
+    const moyRecents = recents.reduce((s,r)=>s+r.total_general,0)/3;
+    const moyAvant = avant.reduce((s,r)=>s+r.total_general,0)/3;
+    if (moyAvant){
+      const variation = (moyRecents - moyAvant) / moyAvant;
+      if (variation <= -0.1) analyses.push(`📉 Une baisse de fréquentation a été observée au cours des trois derniers cultes.`);
+      else if (variation >= 0.1) analyses.push(`📈 Une hausse de fréquentation a été observée au cours des trois derniers cultes.`);
+    }
+  }
+  if (enregistrements.length){
+    const recordMax = enregistrements.reduce((a,b)=> b.total_general > a.total_general ? b : a);
+    analyses.push(`🔥 Le culte du ${dateFr(recordMax.date_culte)} a enregistré la plus forte participation de la période, avec ${recordMax.total_general} personnes.`);
+  }
+  return analyses;
+}
+
+async function ouvrirPresencesStatistiques(periode, debutBrut, finBrut){
+  afficherVue("presences-statistiques");
+  periode = periode || $("stats-periode").value || "mois";
+  debutBrut = debutBrut || $("stats-debut").value || "";
+  finBrut = finBrut || $("stats-fin").value || "";
+  $("stats-periode").value = periode;
+  $("stats-bloc-personnalise").hidden = periode !== "personnalise";
+  if (periode === "personnalise"){ $("stats-debut").value = debutBrut; $("stats-fin").value = finBrut; }
+
+  const zone = $("presences-stats-contenu");
+  zone.innerHTML = `<p class="discret">Chargement…</p>`;
+  try{
+    const [debut, fin] = bornesPeriodePresence(periode, debutBrut, finBrut);
+    $("presences-stats-periode-texte").textContent =
+      debut && fin ? `Du ${dateFr(debut)} au ${dateFr(fin)}` :
+      debut ? `Depuis le ${dateFr(debut)}` : fin ? `Jusqu'au ${dateFr(fin)}` : "Toutes périodes confondues";
+
+    const stats = await calculerStatistiquesPeriodePresence(debut, fin);
+    const [debutPrec, finPrec] = periodePrecedentePresence(periode, debut, fin);
+    const resumePrecedent = debutPrec ? (await calculerStatistiquesPeriodePresence(debutPrec, finPrec)).resume : null;
+    const analyses = genererAnalysesPresence(stats.resume, stats.repartition, stats.analyseJours, stats.enregistrements, resumePrecedent);
+
+    $("btn-rapport-periode").onclick = ()=> genererRapportPresences(periode, debutBrut, finBrut);
+    dessinerStatistiquesPresences(zone, stats, analyses);
+  }catch(e){ zone.innerHTML=""; message(e.message, "erreur"); }
+}
+
+function camembertHtml(repartition){
+  let cumul = 0;
+  const degres = repartition.map(part=>{
+    const debut = cumul; cumul += part.pourcentage/100*360;
+    return `${part.couleur} ${debut}deg ${cumul}deg`;
+  }).join(", ");
+  return `
+    <div class="camembert-enveloppe">
+      <div class="camembert" style="background:conic-gradient(${degres});"></div>
+      <ul class="camembert-legende">${repartition.map(part=>
+        `<li><span class="camembert-pastille" style="background:${part.couleur};"></span>
+          ${echapper(part.libelle)} — <strong>${part.valeur}</strong> (${part.pourcentage} %)</li>`).join("")}</ul>
+    </div>`;
+}
+
+function barresHtml(items, cleEtiquette, cleValeur, max){
+  return `<div class="barres">${items.map(it=>`
+    <div class="barre-ligne">
+      <span class="barre-etiquette">${echapper(String(it[cleEtiquette]))}</span>
+      <span class="barre-piste"><span class="barre-remplissage" style="width:${max ? it[cleValeur]/max*100 : 0}%;"></span></span>
+      <span class="barre-valeur">${it[cleValeur]}</span>
+    </div>`).join("")}</div>`;
+}
+
+function dessinerStatistiquesPresences(zone, stats, analyses){
+  const { resume, repartition, comparaisonTypes, maxComparaison, analyseJours, maxJour, evolution, maxEvolution } = stats;
+
+  if (!resume.nb_cultes){
+    zone.innerHTML = `<div class="vide"><p>Aucune présence enregistrée sur cette période.</p></div>`;
+    return;
+  }
+
+  zone.innerHTML = `
+    <div class="stats">
+      <div class="stat"><b>${resume.nb_cultes}</b><span>Cultes enregistrés</span></div>
+      <div class="stat"><b>${resume.total}</b><span>Présence totale</span></div>
+      <div class="stat"><b>${resume.moyenne}</b><span>Moyenne / culte</span></div>
+      <div class="stat"><b>${resume.maximum}</b><span>Maximum</span></div>
+      <div class="stat"><b>${resume.minimum}</b><span>Minimum</span></div>
+    </div>
+    ${analyses.length ? `
+      <div class="bloc-stat"><h2>🔎 Ce que disent les chiffres</h2>
+        <ul style="margin:0;padding-left:1.2rem;display:grid;gap:.5rem;">
+          ${analyses.map(a=>`<li>${a}</li>`).join("")}</ul></div>` : ""}
+    <div class="bloc-stat"><h2>Répartition Hommes / Femmes / Enfants</h2>${camembertHtml(repartition)}</div>
+    <div class="bloc-stat"><h2>Évolution des présences${evolution.length===20?` <small class="discret">(20 derniers cultes)</small>`:""}</h2>
+      ${barresHtml(evolution.map(e=>({...e, dateFr: dateFr(e.date)})), "dateFr", "total", maxEvolution)}</div>
+    <div class="bloc-stat"><h2>Comparaison des cultes</h2>
+      ${barresHtml(comparaisonTypes, "nom", "moyenne", maxComparaison)}
+      <div class="tableau-enveloppe" style="margin-top:1rem;"><table>
+        <thead><tr><th>Type de culte</th><th>Nb cultes</th><th>Moyenne</th><th>Maximum</th><th>Minimum</th></tr></thead>
+        <tbody>${comparaisonTypes.map(c=>`<tr><td>${echapper(c.nom)}</td><td>${c.nb}</td><td>${c.moyenne}</td><td>${c.maximum}</td><td>${c.minimum}</td></tr>`).join("")}</tbody>
+      </table></div></div>
+    <div class="bloc-stat"><h2>Analyse par jour de la semaine</h2>${barresHtml(analyseJours, "jour", "moyenne", maxJour)}</div>`;
+}
+
+/* ---------------------------------------------------------------
+   COMPARAISON DE DEUX PÉRIODES
+   --------------------------------------------------------------- */
+async function ouvrirPresencesComparaison(aDebut, aFin, bDebut, bFin){
+  afficherVue("presences-comparaison");
+  const [moisDebut, moisFin] = bornesPeriodePresence("mois");
+  const [moisPrecDebut, moisPrecFin] = periodePrecedentePresence("mois", moisDebut, moisFin);
+  aDebut = aDebut || $("comparaison-a-debut").value || moisDebut;
+  aFin   = aFin   || $("comparaison-a-fin").value   || moisFin;
+  bDebut = bDebut || $("comparaison-b-debut").value || moisPrecDebut;
+  bFin   = bFin   || $("comparaison-b-fin").value   || moisPrecFin;
+  $("comparaison-a-debut").value = aDebut; $("comparaison-a-fin").value = aFin;
+  $("comparaison-b-debut").value = bDebut; $("comparaison-b-fin").value = bFin;
+
+  const zone = $("presences-comparaison-contenu");
+  zone.innerHTML = `<p class="discret">Chargement…</p>`;
+  try{
+    const [statsA, statsB] = await Promise.all([
+      calculerStatistiquesPeriodePresence(aDebut, aFin),
+      calculerStatistiquesPeriodePresence(bDebut, bFin)
+    ]);
+    const comparer = (cle, libelle)=>{
+      const a = statsA.resume[cle] || 0, b = statsB.resume[cle] || 0;
+      const evolution = b ? Math.round((a-b)/b*100) : (a ? 100 : 0);
+      return { libelle, a, b, evolution };
+    };
+    const indicateurs = [
+      comparer("total","Présence totale"), comparer("moyenne","Moyenne par culte"),
+      comparer("hommes","Hommes"), comparer("femmes","Femmes"), comparer("enfants","Enfants")
+    ];
+    zone.innerHTML = `
+      <div class="bloc-stat"><div class="tableau-enveloppe"><table>
+        <thead><tr><th>Indicateur</th>
+          <th>Période A<br><span class="discret">${dateFr(aDebut)} – ${dateFr(aFin)}</span></th>
+          <th>Période B<br><span class="discret">${dateFr(bDebut)} – ${dateFr(bFin)}</span></th>
+          <th>Évolution</th></tr></thead>
+        <tbody>
+          ${indicateurs.map(i=>`<tr><td>${i.libelle}</td><td><strong>${i.a}</strong></td><td>${i.b}</td><td>${libelleEvolution(i.evolution)}</td></tr>`).join("")}
+          <tr><td>Cultes enregistrés</td><td><strong>${statsA.resume.nb_cultes}</strong></td><td>${statsB.resume.nb_cultes}</td><td>—</td></tr>
+        </tbody>
+      </table></div></div>
+      ${!statsA.resume.nb_cultes && !statsB.resume.nb_cultes ? `<div class="vide"><p>Aucune présence enregistrée sur l'une ou l'autre période.</p></div>` : ""}`;
+  }catch(e){ zone.innerHTML=""; message(e.message, "erreur"); }
+}
+
+/* ---------------------------------------------------------------
+   RAPPORTS — page imprimable indépendante (impression navigateur -> PDF,
+   même principe que la carte de baptême ; aucune bibliothèque PDF).
+   --------------------------------------------------------------- */
+async function genererRapportPresences(periode, debutBrut, finBrut){
+  try{
+    const [debut, fin] = bornesPeriodePresence(periode, debutBrut, finBrut);
+    const stats = await calculerStatistiquesPeriodePresence(debut, fin);
+    const [debutPrec, finPrec] = periodePrecedentePresence(periode, debut, fin);
+    const resumePrecedent = debutPrec ? (await calculerStatistiquesPeriodePresence(debutPrec, finPrec)).resume : null;
+    const analyses = genererAnalysesPresence(stats.resume, stats.repartition, stats.analyseJours, stats.enregistrements, resumePrecedent);
+    const eglise = (etat.config && etat.config.eglise) || "In Christ Ministries";
+    const titre = LIBELLES_RAPPORTS_P[periode] || "Rapport";
+    const periodeTexte = debut && fin ? `du ${dateFr(debut)} au ${dateFr(fin)}` :
+      debut ? `depuis le ${dateFr(debut)}` : fin ? `jusqu'au ${dateFr(fin)}` : "toutes périodes confondues";
+
+    const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8">
+<title>${echapper(titre)} — ${echapper(eglise)}</title>
+<style>
+  :root{--or:#b8912f;--encre:#12203a;--encre-douce:#41526e;--trait:#dde3ec;--fond:#f4f6f9;--rayon:8px;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--fond);color:var(--encre);font-family:"Segoe UI",Calibri,system-ui,sans-serif;line-height:1.5;}
+  .barre{position:sticky;top:0;z-index:5;display:flex;gap:.6rem;align-items:center;padding:.9rem 1.2rem;background:var(--encre);color:#fff;}
+  .barre p{margin:0 auto 0 0;font-size:.9rem;}
+  .barre button{font:inherit;font-size:.85rem;padding:.5rem .9rem;border-radius:6px;border:1px solid var(--or);background:var(--or);color:#fff;font-weight:600;cursor:pointer;}
+  .feuille{max-width:210mm;margin:1.2rem auto;padding:12mm;background:#fff;box-shadow:0 6px 24px rgba(18,32,58,.15);}
+  .entete-rapport{border-bottom:2px solid var(--or);padding-bottom:.8rem;margin-bottom:1.2rem;}
+  .entete-rapport h1{margin:0 0 .2rem;font-size:1.4rem;}
+  .entete-rapport p{margin:0;color:var(--encre-douce);font-size:.9rem;}
+  h2{font-size:1rem;border-left:3px solid var(--or);padding-left:.6rem;margin:1.6rem 0 .8rem;}
+  table{width:100%;border-collapse:collapse;font-size:.88rem;margin-bottom:.5rem;}
+  th,td{padding:.45rem .6rem;border-bottom:1px solid var(--trait);text-align:left;}
+  th{background:#eef1f6;font-size:.72rem;text-transform:uppercase;color:var(--encre-douce);}
+  .num{text-align:right;}
+  .kpis{display:flex;gap:.8rem;flex-wrap:wrap;margin-bottom:.5rem;}
+  .kpi{flex:1;min-width:110px;background:var(--fond);border:1px solid var(--trait);border-radius:var(--rayon);padding:.7rem .9rem;}
+  .kpi span{display:block;} .kpi .l{font-size:.7rem;text-transform:uppercase;color:var(--encre-douce);} .kpi .v{font-size:1.3rem;font-weight:700;}
+  ul.analyses{margin:0;padding-left:1.2rem;} ul.analyses li{margin-bottom:.4rem;}
+  .vide{color:var(--encre-douce);font-style:italic;}
+  @page{size:A4 portrait;margin:12mm;}
+  @media print{ body{background:#fff;} .barre{display:none;} .feuille{max-width:none;margin:0;padding:0;box-shadow:none;} }
+</style></head><body>
+<div class="barre"><p><strong>${echapper(titre)}</strong> — ${echapper(eglise)}</p>
+  <button onclick="window.print()">Imprimer / Enregistrer en PDF</button></div>
+<div class="feuille">
+  <div class="entete-rapport"><h1>${echapper(titre)}</h1>
+    <p>${echapper(eglise)} — ${periodeTexte} · généré le ${dateFr(aujourdhuiLocalISO())}</p></div>
+  ${!stats.resume.nb_cultes ? `<p class="vide">Aucune présence enregistrée sur cette période.</p>` : `
+  <div class="kpis">
+    <div class="kpi"><span class="l">Cultes</span><span class="v">${stats.resume.nb_cultes}</span></div>
+    <div class="kpi"><span class="l">Présence totale</span><span class="v">${stats.resume.total}</span></div>
+    <div class="kpi"><span class="l">Moyenne</span><span class="v">${stats.resume.moyenne}</span></div>
+    <div class="kpi"><span class="l">Maximum</span><span class="v">${stats.resume.maximum}</span></div>
+    <div class="kpi"><span class="l">Minimum</span><span class="v">${stats.resume.minimum}</span></div>
+  </div>
+  <h2>Répartition</h2>
+  <table><thead><tr><th>Groupe</th><th class="num">Effectif</th><th class="num">Part</th></tr></thead><tbody>
+    ${stats.repartition.map(p=>`<tr><td>${p.libelle}</td><td class="num">${p.valeur}</td><td class="num">${p.pourcentage} %</td></tr>`).join("")}
+  </tbody></table>
+  <h2>Comparaison des cultes</h2>
+  <table><thead><tr><th>Type</th><th class="num">Nb</th><th class="num">Moyenne</th><th class="num">Max</th><th class="num">Min</th></tr></thead><tbody>
+    ${stats.comparaisonTypes.map(c=>`<tr><td>${echapper(c.nom)}</td><td class="num">${c.nb}</td><td class="num">${c.moyenne}</td><td class="num">${c.maximum}</td><td class="num">${c.minimum}</td></tr>`).join("")}
+  </tbody></table>
+  <h2>Analyse par jour</h2>
+  <table><thead><tr><th>Jour</th><th class="num">Moyenne</th><th class="num">Nb cultes</th></tr></thead><tbody>
+    ${stats.analyseJours.map(j=>`<tr><td>${j.jour}</td><td class="num">${j.moyenne}</td><td class="num">${j.nb}</td></tr>`).join("")}
+  </tbody></table>
+  ${analyses.length ? `<h2>🔎 Ce que disent les chiffres</h2><ul class="analyses">${analyses.map(a=>`<li>${a}</li>`).join("")}</ul>` : ""}
+  <h2>Détail par culte</h2>
+  <table><thead><tr><th>Date</th><th>Jour</th><th>Type</th><th class="num">Hommes</th><th class="num">Femmes</th><th class="num">Enfants</th><th class="num">Total</th></tr></thead><tbody>
+    ${stats.enregistrements.map(r=>`<tr><td>${dateFr(r.date_culte)}</td><td>${jourSemainePresence(r.date_culte)}</td>
+      <td>${echapper((r.service_type&&r.service_type.nom)||"—")}</td><td class="num">${r.total_hommes}</td>
+      <td class="num">${r.total_femmes}</td><td class="num">${r.total_enfants}</td><td class="num"><strong>${r.total_general}</strong></td></tr>`).join("")}
+  </tbody></table>`}
+</div></body></html>`;
+
+    const blob = new Blob([html], { type:"text/html" });
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank");
+    setTimeout(()=>URL.revokeObjectURL(url), 60000);
+  }catch(e){ message(e.message, "erreur"); }
+}
+
+/* ---------------------------------------------------------------
+   PARAMÈTRES — types de culte et catégories d'âge
+   --------------------------------------------------------------- */
+async function ouvrirPresencesParametres(){
+  if (!peutEcrire()){ message("Accès réservé au secrétariat et au pasteur.", "erreur"); return; }
+  afficherVue("presences-parametres");
+  await chargerReferentielPresences(true);
+  dessinerParametresPresences();
+}
+
+function dessinerParametresPresences(){
+  const types = etat.presences.types.slice().sort((a,b)=>a.ordre_affichage-b.ordre_affichage);
+  const parGroupe = { hommes:[], femmes:[], enfants:[] };
+  etat.presences.categories.forEach(c=>parGroupe[c.groupe].push(c));
+  GROUPES_P.forEach(g=>parGroupe[g].sort((a,b)=>a.ordre_affichage-b.ordre_affichage));
+
+  $("presences-parametres-contenu").innerHTML = `
+    <div class="bloc-stat">
+      <h2>Types de culte</h2>
+      <div class="tableau-enveloppe"><table class="tableau-parametres">
+        <thead><tr><th>Nom</th><th>Ordre</th><th>Actif</th></tr></thead>
+        <tbody>${types.map(t=>`<tr>
+          <td><input type="text" data-champ="nom" value="${echapper(t.nom)}" id="type-nom-${t.id}"></td>
+          <td><input type="number" data-champ="ordre" value="${t.ordre_affichage}" id="type-ordre-${t.id}"></td>
+          <td><input type="checkbox" id="type-actif-${t.id}" ${t.is_active?"checked":""}></td>
+        </tr>`).join("")}</tbody>
+      </table></div>
+      <p class="actions-formulaire" style="margin-top:.9rem;">
+        <button type="button" class="bouton bouton-principal" onclick="enregistrerTypesCultePresences()">Enregistrer les types de culte</button>
+      </p>
+      <form class="grille" style="margin-top:1rem;align-items:end;" onsubmit="ajouterTypeCultePresences(event)">
+        <label>Nouveau type de culte<input type="text" id="nouveau-type-nom" placeholder="Ex. Veillée de prière" required></label>
+        <button type="submit" class="bouton">+ Ajouter</button>
+      </form>
+    </div>
+    ${GROUPES_P.map(groupe=>`
+    <div class="bloc-stat">
+      <h2>${EMOJIS_GROUPES_P[groupe]} Catégories — ${LIBELLES_GROUPES_P[groupe]}</h2>
+      <div class="tableau-enveloppe"><table class="tableau-parametres">
+        <thead><tr><th>Nom</th><th>Âge min</th><th>Âge max</th><th>Ordre</th><th>Actif</th></tr></thead>
+        <tbody>${parGroupe[groupe].map(c=>`<tr>
+          <td><input type="text" value="${echapper(c.nom)}" id="cat-nom-${c.id}"></td>
+          <td><input type="number" min="0" value="${c.age_min ?? ""}" id="cat-age-min-${c.id}"></td>
+          <td><input type="number" min="0" value="${c.age_max ?? ""}" id="cat-age-max-${c.id}"></td>
+          <td><input type="number" value="${c.ordre_affichage}" id="cat-ordre-${c.id}"></td>
+          <td><input type="checkbox" id="cat-actif-${c.id}" ${c.is_active?"checked":""}></td>
+        </tr>`).join("")}</tbody>
+      </table></div>
+      <p class="actions-formulaire" style="margin-top:.9rem;">
+        <button type="button" class="bouton bouton-principal" onclick="enregistrerCategoriesPresences('${groupe}')">Enregistrer les catégories « ${LIBELLES_GROUPES_P[groupe]} »</button>
+      </p>
+      <form class="grille" style="margin-top:1rem;align-items:end;" onsubmit="ajouterCategoriePresences(event, '${groupe}')">
+        <label>Nouvelle catégorie<input type="text" class="nouvelle-cat-nom" placeholder="Ex. Étudiants" required></label>
+        <label>Âge min<input type="number" min="0" class="nouvelle-cat-age-min"></label>
+        <label>Âge max<input type="number" min="0" class="nouvelle-cat-age-max"></label>
+        <button type="submit" class="bouton">+ Ajouter</button>
+      </form>
+    </div>`).join("")}`;
+}
+
+async function ajouterTypeCultePresences(evt){
+  evt.preventDefault();
+  const nom = $("nouveau-type-nom").value.trim();
+  if (!nom) return;
+  try{
+    if (etat.presences.types.some(t=>t.nom.toLowerCase() === nom.toLowerCase())){
+      message(`Un type de culte « ${nom} » existe déjà.`, "erreur"); return;
+    }
+    const ordreMax = etat.presences.types.reduce((m,t)=>Math.max(m,t.ordre_affichage), 0);
+    await api("service_type", { method:"POST", body:{ nom, ordre_affichage: ordreMax + 1 } });
+    message(`Type de culte « ${nom} » ajouté.`, "succes");
+    await chargerReferentielPresences(true);
+    dessinerParametresPresences();
+  }catch(e){ message(e.message, "erreur"); }
+}
+
+async function enregistrerTypesCultePresences(){
+  try{
+    await Promise.all(etat.presences.types.map(t=>{
+      const nom = $("type-nom-" + t.id).value.trim();
+      const ordre = parseInt($("type-ordre-" + t.id).value, 10) || 0;
+      const actif = $("type-actif-" + t.id).checked;
+      return api(`service_type?id=eq.${t.id}`, {
+        method:"PATCH",
+        body:{ nom: nom || t.nom, ordre_affichage: ordre, is_active: actif }
+      });
+    }));
+    message("Types de culte mis à jour.", "succes");
+    await chargerReferentielPresences(true);
+    dessinerParametresPresences();
+  }catch(e){ message(e.message, "erreur"); }
+}
+
+async function ajouterCategoriePresences(evt, groupe){
+  evt.preventDefault();
+  const form = evt.target;
+  const nom = form.querySelector(".nouvelle-cat-nom").value.trim();
+  if (!nom) return;
+  const ageMin = form.querySelector(".nouvelle-cat-age-min").value;
+  const ageMax = form.querySelector(".nouvelle-cat-age-max").value;
+  try{
+    const ordreMax = etat.presences.categories.filter(c=>c.groupe===groupe)
+      .reduce((m,c)=>Math.max(m,c.ordre_affichage), 0);
+    await api("attendance_category", {
+      method:"POST",
+      body:{ nom, groupe, age_min: ageMin === "" ? null : parseInt(ageMin,10),
+             age_max: ageMax === "" ? null : parseInt(ageMax,10), ordre_affichage: ordreMax + 1 }
+    });
+    message(`Catégorie « ${nom} » ajoutée.`, "succes");
+    await chargerReferentielPresences(true);
+    dessinerParametresPresences();
+  }catch(e){ message(e.message, "erreur"); }
+}
+
+async function enregistrerCategoriesPresences(groupe){
+  try{
+    const categories = etat.presences.categories.filter(c=>c.groupe === groupe);
+    await Promise.all(categories.map(c=>{
+      const nom = $("cat-nom-" + c.id).value.trim();
+      const ageMinBrut = $("cat-age-min-" + c.id).value;
+      const ageMaxBrut = $("cat-age-max-" + c.id).value;
+      const ordre = parseInt($("cat-ordre-" + c.id).value, 10) || 0;
+      const actif = $("cat-actif-" + c.id).checked;
+      return api(`attendance_category?id=eq.${c.id}`, {
+        method:"PATCH",
+        body:{
+          nom: nom || c.nom,
+          age_min: ageMinBrut === "" ? null : Math.max(0, parseInt(ageMinBrut,10) || 0),
+          age_max: ageMaxBrut === "" ? null : Math.max(0, parseInt(ageMaxBrut,10) || 0),
+          ordre_affichage: ordre, is_active: actif
+        }
+      });
+    }));
+    message(`Catégories « ${LIBELLES_GROUPES_P[groupe]} » mises à jour.`, "succes");
+    await chargerReferentielPresences(true);
+    dessinerParametresPresences();
+  }catch(e){ message(e.message, "erreur"); }
+}
+
+/* ==========================================================
+   9. SESSION
    ========================================================== */
 function deconnexion(raison){
   etat.session = null;
@@ -2091,6 +3330,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       }
       else if (vue === "journal"){ ouvrirJournal(""); }
       else if (vue === "apropos"){ afficherVue("apropos"); }
+      else if (vue === "presences"){ ouvrirPresencesDashboard(); }
       else { afficherVue(vue); chargerListe(); }
     });
   });
@@ -2165,6 +3405,45 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       if (donnees && donnees[0]) afficherCarte(donnees[0]);
       else message("Cette fiche n'existe plus — elle a peut-être été supprimée depuis.", "info");
     }catch(err){ message(err.message, "erreur"); }
+  });
+
+  // --- Présences & Statistiques
+  $("form-presence").addEventListener("submit", soumettrePresenceFormulaire);
+  $("presence-date").addEventListener("change", detecterJourPresenceForm);
+
+  $("form-recherche-presences").addEventListener("submit", (e)=>{
+    e.preventDefault();
+    const h = etat.presences.historique;
+    h.q = $("presences-recherche").value.trim();
+    h.type = $("presences-filtre-type").value;
+    h.debut = $("presences-filtre-debut").value;
+    h.fin = $("presences-filtre-fin").value;
+    h.tri = $("presences-tri").value;
+    h.page = 1;
+    chargerHistoriquePresences();
+  });
+  $("btn-presences-reinit").addEventListener("click", ()=>{
+    etat.presences.historique = { page:1, total:0, q:"", type:"", debut:"", fin:"", tri:"date_desc" };
+    ouvrirPresencesHistorique();
+  });
+  $("btn-precedent-presences").addEventListener("click", ()=>{ etat.presences.historique.page--; chargerHistoriquePresences(); });
+  $("btn-suivant-presences").addEventListener("click",   ()=>{ etat.presences.historique.page++; chargerHistoriquePresences(); });
+
+  $("stats-periode").addEventListener("change", ()=>{
+    const p = $("stats-periode").value;
+    $("stats-bloc-personnalise").hidden = p !== "personnalise";
+    if (p !== "personnalise") ouvrirPresencesStatistiques(p);
+  });
+  $("form-periode-stats").addEventListener("submit", (e)=>{
+    e.preventDefault();
+    ouvrirPresencesStatistiques($("stats-periode").value, $("stats-debut").value, $("stats-fin").value);
+  });
+
+  $("form-comparaison").addEventListener("submit", (e)=>{
+    e.preventDefault();
+    ouvrirPresencesComparaison(
+      $("comparaison-a-debut").value, $("comparaison-a-fin").value,
+      $("comparaison-b-debut").value, $("comparaison-b-fin").value);
   });
 
   // --- Volet photo

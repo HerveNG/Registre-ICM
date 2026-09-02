@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block titre %}Comparer deux périodes — ICM{% endblock %}
+
+{% macro fleche(evolution) -%}
+{%- if evolution > 0 -%}<span class="evolution-hausse">▲ +{{ evolution }} %</span>
+{%- elif evolution < 0 -%}<span class="evolution-baisse">▼ {{ evolution }} %</span>
+{%- else -%}<span class="evolution-stable">→ stable</span>
+{%- endif -%}
+{%- endmacro %}
+
+{% block contenu %}
+
+<div class="titre-page">
+  <h1>Comparer deux périodes</h1>
+  <p class="discret">Par défaut : ce mois-ci contre le mois précédent.</p>
+</div>
+
+<form class="filtres-periode" method="get" action="{{ url_for('presences_comparaison') }}" style="flex-wrap:wrap;">
+  <span><strong>A</strong> du <input type="date" name="a_debut" value="{{ a_debut | iso }}" style="width:auto; display:inline-block;">
+    au <input type="date" name="a_fin" value="{{ a_fin | iso }}" style="width:auto; display:inline-block;"></span>
+  <span><strong>B</strong> du <input type="date" name="b_debut" value="{{ b_debut | iso }}" style="width:auto; display:inline-block;">
+    au <input type="date" name="b_fin" value="{{ b_fin | iso }}" style="width:auto; display:inline-block;"></span>
+  <button type="submit" class="bouton bouton-principal">Comparer</button>
+</form>
+
+<div class="bloc-stat">
+  <div class="tableau-enveloppe">
+    <table class="tableau">
+      <thead>
+        <tr>
+          <th>Indicateur</th>
+          <th>Période A<br><span class="discret">{{ a_debut | jj_mm_aaaa }} – {{ a_fin | jj_mm_aaaa }}</span></th>
+          <th>Période B<br><span class="discret">{{ b_debut | jj_mm_aaaa }} – {{ b_fin | jj_mm_aaaa }}</span></th>
+          <th>Évolution</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for i in indicateurs %}
+        <tr>
+          <td>{{ i.libelle }}</td>
+          <td><strong>{{ i.a }}</strong></td>
+          <td>{{ i.b }}</td>
+          <td>{{ fleche(i.evolution) }}</td>
+        </tr>
+        {% endfor %}
+        <tr>
+          <td>Cultes enregistrés</td>
+          <td><strong>{{ stats_a.resume.nb_cultes }}</strong></td>
+          <td>{{ stats_b.resume.nb_cultes }}</td>
+          <td>—</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if stats_a.resume.nb_cultes == 0 and stats_b.resume.nb_cultes == 0 %}
+<div class="vide"><p>Aucune présence enregistrée sur l'une ou l'autre période.</p></div>
+{% endif %}
+
+{% endblock %}

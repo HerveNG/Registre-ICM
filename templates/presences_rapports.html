@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block titre %}Rapports — Présences ICM{% endblock %}
+
+{% block contenu %}
+
+<div class="titre-page">
+  <h1>Rapports</h1>
+  <p class="discret">Choisissez une période : le rapport s'ouvre prêt à imprimer ou à enregistrer en PDF.</p>
+</div>
+
+<div class="bloc-stat">
+  <h2>Périodes prédéfinies</h2>
+  <div class="actions-formulaire">
+    <a class="bouton bouton-principal" href="{{ url_for('presences_rapport', periode='semaine') }}">Rapport hebdomadaire</a>
+    <a class="bouton bouton-principal" href="{{ url_for('presences_rapport', periode='mois') }}">Rapport mensuel</a>
+    <a class="bouton bouton-principal" href="{{ url_for('presences_rapport', periode='trimestre') }}">Rapport trimestriel</a>
+    <a class="bouton bouton-principal" href="{{ url_for('presences_rapport', periode='annee') }}">Rapport annuel</a>
+    <a class="bouton" href="{{ url_for('presences_rapport', periode='tout') }}">Tout l'historique</a>
+  </div>
+</div>
+
+<div class="bloc-stat">
+  <h2>Période personnalisée</h2>
+  <form method="get" action="{{ url_for('presences_rapport') }}" class="grille" style="align-items:end;">
+    <input type="hidden" name="periode" value="personnalise">
+    <label>Du <input type="date" name="debut"></label>
+    <label>Au <input type="date" name="fin"></label>
+    <button type="submit" class="bouton bouton-principal">Générer le rapport</button>
+  </form>
+</div>
+
+<div class="bloc-stat">
+  <h2>Export des données</h2>
+  <p class="discret">Exporte les présences au format CSV (compatible Excel) — voir aussi les filtres de <a href="{{ url_for('presences_historique') }}">l'historique</a>.</p>
+  <a class="bouton" href="{{ url_for('presences_export_csv') }}">Export Excel — tout l'historique</a>
+</div>
+
+{% endblock %}

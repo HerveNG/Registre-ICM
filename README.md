@@ -1,6 +1,6 @@
 # Registre numérique des Baptêmes & Mariages — In Christ Ministries
 
-**Version V.1** — développé par NGOOH Cédric Hervé ([ElMan](#14-à-propos)).
+**Version V.1** — développé par NGOOH Cédric Hervé ([ElMan](#15-à-propos)).
 
 MVP construit à partir de la carte papier ICM (baptême / mariage).
 Quatre façons d'y accéder sont livrées ; les trois premières partagent le
@@ -88,14 +88,16 @@ mvp_registre_bapteme_mariage/
 │   ├── migration_03_journal.sql   ← si la base existait AVANT le journal d'audit
 │   ├── migration_04_durcissement_securite.sql
 │   │                               ← si la base existait AVANT l'audit de sécurité
-│   │                                 du 25/08/2026 (§ 13) — déjà inclus dans
+│   │                                 du 25/08/2026 (§ 14) — déjà inclus dans
 │   │                                 schema_supabase.sql pour une base neuve
+│   ├── migration_05_presences.sql ← si la base existait AVANT le module Présences (§ 11)
 │   └── schema_sqlite.sql          ← documentation du schéma local
 │
 ├── app.py                         ← APPLICATION FLASK
 ├── requirements.txt
 ├── .env.example                   ← à copier en « .env »
-├── templates/                     ← pages (connexion, liste, formulaire, carte, import, journal)
+├── templates/                     ← pages (connexion, liste, formulaire, carte, import, journal,
+│                                     à propos, présences — voir § 11)
 ├── static/
 │   ├── style.css
 │   ├── photo.js                   ← recadrage et compression des photos
@@ -123,11 +125,13 @@ mvp_registre_bapteme_mariage/
 4. **Project Settings → API** : noter l'`URL` du projet et la clé `anon`.
 
 > **Vous aviez déjà créé la base avant les photos, avant les rôles, avant
-> le journal d'audit, ou avant l'audit de sécurité du 25/08/2026 (§ 13) ?**
+> le journal d'audit, avant l'audit de sécurité du 25/08/2026 (§ 14), ou
+> avant le module Présences (§ 11) ?**
 > Ne rejouez pas le script complet : exécutez, dans cet ordre,
 > `database/migration_01_photo.sql` puis `database/migration_02_roles.sql`
 > puis `database/migration_03_journal.sql` puis
-> `database/migration_04_durcissement_securite.sql` — chacun ajoute
+> `database/migration_04_durcissement_securite.sql` puis
+> `database/migration_05_presences.sql` — chacun ajoute
 > seulement ce qui manque, sans toucher à vos données. Une base créée à
 > partir du `schema_supabase.sql` actuel n'a besoin d'aucune de ces
 > migrations : tout est déjà dedans.
@@ -366,7 +370,68 @@ C'est la seule sauvegarde qui vous appartienne vraiment.
 
 ---
 
-## 11. Ce qui reste à faire pour une version 2
+## 11. Présences & Statistiques des cultes
+
+*Disponible sur la version Flask et sur la version en ligne (Supabase) —
+voir `database/schema_supabase.sql` § 13 / `database/migration_05_presences.sql`.
+La version bureau et la version Android en héritent automatiquement (elles
+encapsulent `web/index.html`) dès qu'elles sont reconstruites — voir
+`desktop/construire.ps1` et `docs/ANDROID-BUILD.md`.*
+
+Un module séparé du registre des baptêmes/mariages, accessible depuis
+l'en-tête (**📊 Présences**), pour suivre la fréquentation des cultes :
+
+- **Enregistrer une présence** : date (le jour de la semaine est détecté
+  automatiquement), type de culte, effectifs par catégorie d'âge (compteurs
+  +/-), avec calcul des totaux Hommes / Femmes / Enfants et du total général
+  en temps réel avant même l'enregistrement.
+- **Tableau de bord** : dernier culte enregistré, évolution par rapport au
+  culte précédent de même type, derniers cultes.
+- **Historique** : recherche, filtre par type de culte et par période, tri,
+  pagination, consultation/modification/suppression (avec confirmation).
+- **Statistiques** : filtres par période (aujourd'hui, semaine, mois,
+  trimestre, année, personnalisée), répartition Hommes/Femmes/Enfants,
+  évolution, comparaison entre types de culte, analyse par jour de la
+  semaine — graphiques en CSS pur (camembert, barres), sans bibliothèque
+  externe, cohérent avec la CSP du reste de l'application (§14).
+- **Paramètres** (secrétariat/pasteur) : types de culte et catégories d'âge
+  entièrement configurables — nom, tranche d'âge, ordre d'affichage,
+  activation/désactivation. Une catégorie désactivée reste visible sur les
+  fiches déjà enregistrées qui l'utilisaient (rien n'est jamais perdu),
+  seulement retirée des nouvelles saisies.
+- **Comparer deux périodes** : deux plages de dates libres (par défaut, ce
+  mois-ci contre le mois précédent), indicateur par indicateur, avec
+  évolution (▲/▼/stable).
+- **Analyse intelligente** : sur la page Statistiques et dans chaque
+  rapport, quelques observations en langage naturel déduites des chiffres
+  réels de la période (évolution vs période précédente, groupe dominant,
+  jour le plus fréquenté, tendance des derniers cultes, record de
+  fréquentation) — jamais générées quand les données sont insuffisantes.
+- **Rapports** : hebdomadaire / mensuel / trimestriel / annuel / période
+  personnalisée — une page imprimable (même principe que la carte de
+  baptême, §7 : impression navigateur → PDF, aucune bibliothèque PDF
+  ajoutée) reprenant KPI, répartition, comparaison des cultes, analyses et
+  détail culte par culte.
+- **Export** : CSV (compatible Excel, avec l'anti-injection de formule du
+  §14) respectant les filtres actifs de l'historique — type de culte,
+  période, recherche.
+
+Mêmes rôles que le reste de l'application (§5) : secrétaire et pasteur ont
+accès complet, le visiteur consulte sans modifier.
+
+**Différences entre les deux versions.** Le calcul des statistiques (§8),
+l'analyse intelligente et la comparaison de périodes tournent côté serveur
+en Flask, côté navigateur (JavaScript) dans la version en ligne — même
+logique, mêmes résultats, sources différentes. Le rapport imprimable de la
+version en ligne s'ouvre dans un nouvel onglet généré localement (pas de
+route serveur dédiée), pour rester cohérent avec le principe d'un fichier
+unique sans backend. `created_by`/`updated_by` y sont l'adresse e-mail du
+compte Supabase (texte simple, pas une clé étrangère vers `auth.users` —
+cette table n'est pas exposée par l'API REST).
+
+---
+
+## 12. Ce qui reste à faire pour une version 2
 
 - signature scannée du célébrant sur la carte ;
 - séparation des personnes et des actes (un mariage = deux fidèles liés) ;
@@ -375,7 +440,7 @@ C'est la seule sauvegarde qui vous appartienne vraiment.
 
 ---
 
-## 12. Modèle de données
+## 13. Modèle de données
 
 Un enregistrement = une carte = un fidèle. Le bloc mariage reste vide tant
 que la personne n'est pas mariée, exactement comme sur la carte papier.
@@ -399,7 +464,7 @@ que la personne n'est pas mariée, exactement comme sur la carte papier.
 
 ---
 
-## 13. Sécurité
+## 14. Sécurité
 
 Un audit complet des deux versions a été mené le 25/08/2026, avec correction
 et **test systématique de chaque correctif** (y compris en simulant des
@@ -456,7 +521,7 @@ pour lancer les tests en local : voir `tests/README.md`.
 
 ---
 
-## 14. À propos
+## 15. À propos
 
 | | |
 |---|---|

@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block titre %}Présences — ICM{% endblock %}
+
+{% set peut_ecrire = session.get('role') in ('secretaire', 'pasteur') %}
+
+{% macro badge_evolution(valeur) -%}
+{%- if valeur is none -%}
+  <span class="carte-kpi-evolution evolution-stable">— pas de comparaison possible</span>
+{%- elif valeur > 0 -%}
+  <span class="carte-kpi-evolution evolution-hausse">▲ +{{ valeur }} % vs culte précédent</span>
+{%- elif valeur < 0 -%}
+  <span class="carte-kpi-evolution evolution-baisse">▼ {{ valeur }} % vs culte précédent</span>
+{%- else -%}
+  <span class="carte-kpi-evolution evolution-stable">→ stable vs culte précédent</span>
+{%- endif -%}
+{%- endmacro %}
+
+{% block contenu %}
+
+<div class="titre-page">
+  <h1>📊 Présences &amp; Statistiques</h1>
+  <p class="discret">Vue d'ensemble de la fréquentation des cultes.</p>
+</div>
+
+<form class="barre-recherche" method="get" action="{{ url_for('presences_historique') }}">
+  <a class="bouton" href="{{ url_for('presences_historique') }}">Historique</a>
+  <a class="bouton" href="{{ url_for('presences_statistiques') }}">Statistiques</a>
+  <a class="bouton" href="{{ url_for('presences_comparaison') }}">Comparer deux périodes</a>
+  <a class="bouton" href="{{ url_for('presences_rapports') }}">Rapports</a>
+  {% if peut_ecrire %}
+    <a class="bouton bouton-discret" href="{{ url_for('presences_parametres') }}">Paramètres</a>
+    <a class="bouton bouton-principal" href="{{ url_for('presences_nouvelle') }}">+ Enregistrer une présence</a>
+  {% endif %}
+</form>
+
+{% if dernier %}
+<div class="cartes-tableau-bord">
+  <div class="carte-kpi">
+    <span class="carte-kpi-libelle">Dernier culte</span>
+    <span class="carte-kpi-valeur" style="font-size:1.1rem;">{{ dernier.date_culte | jj_mm_aaaa }}</span>
+    <span class="discret">{{ dernier.service_type.nom if dernier.service_type else '—' }}</span>
+  </div>
+  <div class="carte-kpi">
+    <span class="carte-kpi-libelle">Présence totale</span>
+    <span class="carte-kpi-valeur">{{ dernier.total_general }}</span>
+    {{ badge_evolution(evolution) }}
+  </div>
+  <div class="carte-kpi">
+    <span class="carte-kpi-libelle">👨 Hommes</span>
+    <span class="carte-kpi-valeur">{{ dernier.total_hommes }}</span>
+  </div>
+  <div class="carte-kpi">
+    <span class="carte-kpi-libelle">👩 Femmes</span>
+    <span class="carte-kpi-valeur">{{ dernier.total_femmes }}</span>
+  </div>
+  <div class="carte-kpi">
+    <span class="carte-kpi-libelle">🧒 Enfants</span>
+    <span class="carte-kpi-valeur">{{ dernier.total_enfants }}</span>
+  </div>
+</div>
+
+<div class="bloc-stat">
+  <h2>Derniers cultes enregistrés</h2>
+  <div class="tableau-enveloppe">
+    <table class="tableau">
+      <thead>
+        <tr><th>Date</th><th>Jour</th><th>Type</th><th>Hommes</th><th>Femmes</th><th>Enfants</th><th>Total</th></tr>
+      </thead>
+      <tbody>
+        {% for r in recents %}
+        <tr>
+          <td><a href="{{ url_for('presences_detail', record_id=r.id) }}">{{ r.date_culte | jj_mm_aaaa }}</a></td>
+          <td>{{ r.jour_semaine }}</td>
+          <td>{{ r.service_type.nom if r.service_type else '—' }}</td>
+          <td>{{ r.total_hommes }}</td>
+          <td>{{ r.total_femmes }}</td>
+          <td>{{ r.total_enfants }}</td>
+          <td><strong>{{ r.total_general }}</strong></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% else %}
+<div class="vide">
+  <p>Aucune présence enregistrée pour le moment.</p>
+  {% if peut_ecrire %}
+    <a class="bouton bouton-principal" href="{{ url_for('presences_nouvelle') }}">Enregistrer la première présence</a>
+  {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}
