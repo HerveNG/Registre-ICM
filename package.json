@@ -1,0 +1,22 @@
+{
+  "name": "registre-icm-android",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Coquille Android (Capacitor) de la version en ligne du Registre ICM — encapsule web/index.html tel quel, sans bundler ni framework. Voir docs/ANDROID-BUILD.md.",
+  "scripts": {
+    "android:sync": "cap sync android",
+    "android:open": "cap open android",
+    "android:apk": "cd android && gradlew.bat assembleDebug",
+    "android:apk:release": "cd android && gradlew.bat assembleRelease",
+    "android:aab": "cd android && gradlew.bat bundleRelease"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.4.4",
+    "@capacitor/app": "^7.1.0",
+    "@capacitor/core": "^7.4.4"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^7.4.4"
+  }
+}

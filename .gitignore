@@ -39,6 +39,16 @@ desktop/*.spec
 desktop/icone.ico
 pip_install_log.txt
 
+# Version Android (Capacitor) : dépendances et artefacts de build, jamais le
+# résultat compilé — voir docs/ANDROID-BUILD.md pour reconstruire l'APK/AAB.
+# Le dossier android/ lui-même EST versionné (projet natif généré une seule
+# fois par `npx cap add android`, puis synchronisé, pas régénéré à chaque
+# build) ; seuls ses propres artefacts de compilation sont ignorés via
+# android/.gitignore (build/, .gradle/, local.properties, *.jks, *.keystore,
+# signing.properties...).
+node_modules/
+npm-debug.log*
+
 # Fichiers système
 .DS_Store
 Thumbs.db

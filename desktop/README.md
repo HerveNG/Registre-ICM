@@ -27,7 +27,9 @@ Ce script :
 1. installe `pywebview` et `pyinstaller` dans `.venv` (build uniquement,
    jamais nécessaires pour faire tourner l'exécutable une fois construit) ;
 2. convertit `static/logo.png` en icône Windows (`desktop/icone.ico`) ;
-3. produit `desktop\dist\ICM Registre.exe`.
+3. produit `desktop\dist\ICM Registre.exe`, avec les métadonnées Windows
+   (développeur, société, version) définies dans `desktop/version_info.txt`
+   — visibles par un clic droit sur le `.exe` → *Propriétés* → *Détails*.
 
 ## Installer sur un autre poste
 

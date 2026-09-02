@@ -123,6 +123,18 @@ app.config.update(
 csrf = CSRFProtect(app)
 
 
+@app.context_processor
+def injecter_identite_app():
+    """Rend développeur / société / version disponibles dans tous les
+    templates (pied de page, page « À propos ») sans les répéter à chaque
+    render_template."""
+    return {
+        "version_app": VERSION_APP,
+        "developpeur": DEVELOPPEUR,
+        "entreprise": ENTREPRISE,
+    }
+
+
 @app.after_request
 def ajouter_entetes_securite(reponse):
     """En-têtes de sécurité HTTP appliqués à toutes les réponses : anti
@@ -214,6 +226,13 @@ app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 PAROISSE = os.getenv("PAROISSE", "In Christ Ministries")
+
+# Identité de l'application (page « À propos », pied de page, journal de
+# démarrage) : développeur et société éditrice, distincts de la paroisse
+# (PAROISSE) qui est l'organisation utilisatrice, pas l'auteur du logiciel.
+VERSION_APP = "V.1"
+DEVELOPPEUR = "NGOOH Cédric Hervé"
+ENTREPRISE = "ElMan"
 
 # Dossier des photos d'identité, volontairement HORS de static/ : tout ce qui
 # se trouve dans static/ est servi sans aucune authentification par Flask.
@@ -1077,6 +1096,16 @@ def journal():
 
     return render_template("journal.html", pagination=pagination,
                            entrees=pagination.items, q=q, paroisse=PAROISSE)
+
+
+# ------------------------------------------------------------------
+#  À propos — identité de l'application, ouverte aux trois rôles (lecture
+#  seule, aucune donnée du registre).
+# ------------------------------------------------------------------
+@app.route("/a-propos")
+@login_requis
+def a_propos():
+    return render_template("apropos.html", paroisse=PAROISSE)
 
 
 # ------------------------------------------------------------------

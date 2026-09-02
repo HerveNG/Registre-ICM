@@ -38,7 +38,7 @@ def chemin_index_html():
 def principal():
     fichier = chemin_index_html()
     webview.create_window(
-        "Registre ICM — Baptêmes & Mariages",
+        "Registre ICM — Baptêmes & Mariages (V.1)",
         f"file://{fichier}",
         width=1200,
         height=800,

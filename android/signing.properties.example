@@ -1,0 +1,19 @@
+# Signature Android Release — copier ce fichier en "signing.properties"
+# (à côté de celui-ci, dans android/) et renseigner vos propres valeurs.
+# Ce fichier d'exemple ne contient aucun secret réel ; "signing.properties"
+# est ignoré par git (voir .gitignore) et ne doit JAMAIS être commité.
+#
+# Voir docs/ANDROID-BUILD.md § 14 pour générer le keystore et comprendre
+# chaque valeur.
+
+# Chemin vers le fichier .jks/.keystore, relatif au dossier android/
+storeFile=../keystore/icm-registre-release.jks
+
+# Mot de passe du keystore
+storePassword=changez-moi
+
+# Alias de la clé à l'intérieur du keystore
+keyAlias=icm-registre
+
+# Mot de passe de la clé (peut être identique à storePassword)
+keyPassword=changez-moi

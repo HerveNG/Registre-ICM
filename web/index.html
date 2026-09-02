@@ -2,7 +2,9 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="author" content="NGOOH Cédric Hervé — ElMan">
+<meta name="application-version" content="V.1">
 <title>Registre ICM — Baptêmes &amp; Mariages</title>
 
 <!-- ==========================================================
@@ -37,8 +39,13 @@ body{margin:0;font-family:"Segoe UI",Calibri,system-ui,-apple-system,sans-serif;
   background:var(--fond);color:var(--encre);line-height:1.55;}
 [hidden]{display:none !important;}
 
+/* ---------- Zones de sécurité (encoches / barres système Android) ----------
+   env(safe-area-inset-*) vaut 0 hors app native : sans effet sur le Web ou
+   la version Windows (pywebview). */
+body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);}
+
 /* ---------- En-tête ---------- */
-.entete{background:var(--encre);color:#fff;}
+.entete{background:var(--encre);color:#fff;padding-top:env(safe-area-inset-top);}
 .entete-inner{max-width:1180px;margin:0 auto;padding:.9rem 1.5rem;
   display:flex;align-items:center;gap:1.2rem;flex-wrap:wrap;}
 .marque{display:flex;align-items:center;gap:.85rem;}
@@ -53,8 +60,8 @@ body{margin:0;font-family:"Segoe UI",Calibri,system-ui,-apple-system,sans-serif;
 .nav .utilisateur{font-size:.8rem;opacity:.65;margin-right:.3rem;}
 
 .conteneur{max-width:1180px;margin:0 auto;padding:1.8rem 1.5rem 3rem;}
-.pied{text-align:center;padding:1.5rem;font-size:.8rem;color:var(--encre-douce);
-  border-top:1px solid var(--trait);}
+.pied{text-align:center;padding:1.5rem;padding-bottom:calc(1.5rem + env(safe-area-inset-bottom));
+  font-size:.8rem;color:var(--encre-douce);border-top:1px solid var(--trait);}
 
 /* ---------- Messages ---------- */
 .message{padding:.7rem 1rem;border-radius:var(--rayon);font-size:.92rem;margin-bottom:1rem;}
@@ -252,6 +259,7 @@ h1.titre{margin:0 0 1rem;font-size:1.5rem;}
       <button data-vue="import" id="btn-import-nav">Importer</button>
       <button id="btn-export">Export Excel</button>
       <button data-vue="journal">Journal</button>
+      <button data-vue="apropos">À propos</button>
       <button data-vue="reglages">Réglages</button>
       <span class="utilisateur" id="etiquette-utilisateur"></span>
       <button id="btn-deconnexion">Déconnexion</button>
@@ -374,6 +382,28 @@ h1.titre{margin:0 0 1rem;font-size:1.5rem;}
       <span class="discret" id="info-page-journal"></span>
       <button class="bouton bouton-petit" id="btn-suivant-journal">Suivant ›</button>
     </nav>
+  </section>
+
+  <!-- ================= À PROPOS ================= -->
+  <section id="vue-apropos" hidden>
+    <h1 class="titre">À propos</h1>
+    <p class="discret" style="margin-top:-.8rem;margin-bottom:1.2rem">
+      Identité et version de l'application.</p>
+
+    <div class="tableau-enveloppe">
+      <table>
+        <tbody>
+          <tr><th>Application</th><td>Registre numérique des Baptêmes &amp; Mariages</td></tr>
+          <tr><th>Version</th><td>V.1</td></tr>
+          <tr><th>Développeur</th><td>NGOOH Cédric Hervé</td></tr>
+          <tr><th>Société</th><td>ElMan</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="discret" style="margin-top:1.5rem;">
+      ElMan &copy; 2026 — développé par NGOOH Cédric Hervé.
+    </p>
   </section>
 
   <!-- ================= FORMULAIRE ================= -->
@@ -510,7 +540,8 @@ h1.titre{margin:0 0 1rem;font-size:1.5rem;}
 </main>
 
 <footer class="pied" id="pied" hidden>
-  <span id="pied-eglise">In Christ Ministries</span> — Registre numérique · MVP
+  <span id="pied-eglise">In Christ Ministries</span> — Registre numérique · V.1 ·
+  <button type="button" data-vue="apropos" style="background:none;border:0;padding:0;font:inherit;color:inherit;text-decoration:underline;cursor:pointer;">ElMan</button>
 </footer>
 
 <!-- ================= CARTE IMPRIMABLE ================= -->
@@ -975,7 +1006,7 @@ function dateHeureFr(iso){
 }
 
 function afficherVue(nom){
-  ["reglages","connexion","liste","formulaire","import","journal"].forEach(v=>{
+  ["reglages","connexion","liste","formulaire","import","journal","apropos"].forEach(v=>{
     $("vue-"+v).hidden = (v !== nom);
   });
   const connecte = !!etat.session;
@@ -2059,6 +2090,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         reinitialiserImport(); afficherVue("import");
       }
       else if (vue === "journal"){ ouvrirJournal(""); }
+      else if (vue === "apropos"){ afficherVue("apropos"); }
       else { afficherVue(vue); chargerListe(); }
     });
   });
@@ -2199,6 +2231,42 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   }
   afficherVue("connexion");
 });
+
+/* ==========================================================
+   VERSION ANDROID (Capacitor) — ce bloc ne s'exécute que dans la
+   coquille native : window.Capacitor n'existe ni sur le Web (navigateur
+   normal) ni dans la version Windows (pywebview). Aucun effet sur les
+   deux autres versions.
+   ========================================================== */
+if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+  const AppPlugin = window.Capacitor.Plugins && window.Capacitor.Plugins.App;
+
+  // Bouton retour matériel Android : ferme la carte imprimable ou revient
+  // à la liste depuis une sous-vue, plutôt que de quitter l'app d'un coup ;
+  // ne quitte réellement l'app que depuis la liste ou l'écran de connexion.
+  if (AppPlugin) {
+    AppPlugin.addListener("backButton", () => {
+      const zoneCarte = document.getElementById("zone-carte");
+      if (zoneCarte && !zoneCarte.hidden) { document.getElementById("btn-fermer-carte").click(); return; }
+      const vueActive = ["formulaire", "import", "journal", "apropos", "reglages"]
+        .find(v => { const el = document.getElementById("vue-" + v); return el && !el.hidden; });
+      if (vueActive) { afficherVue("liste"); chargerListe(); return; }
+      AppPlugin.exitApp();
+    });
+  }
+
+  // Impression : la WebView Android n'ouvre pas de boîte de dialogue
+  // d'impression native (contrairement à un vrai navigateur) — un clic sur
+  // window.print() y resterait silencieusement sans effet. On remplace par
+  // un message clair plutôt que de laisser un bouton qui semble ne rien
+  // faire.
+  document.querySelectorAll('.barre-carte button[onclick="window.print()"]').forEach(bouton => {
+    bouton.removeAttribute("onclick");
+    bouton.addEventListener("click", () => {
+      alert("Impression indisponible sur mobile : ouvrez la carte depuis la version web ou bureau pour l'imprimer ou l'enregistrer en PDF.");
+    });
+  });
+}
 </script>
 </body>
 </html>

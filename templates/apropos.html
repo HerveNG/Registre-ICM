@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block titre %}À propos — ICM{% endblock %}
+
+{% block contenu %}
+
+<div class="titre-page">
+  <h1>À propos</h1>
+  <p class="discret">Identité et version de l'application.</p>
+</div>
+
+<div class="tableau-enveloppe">
+<table class="tableau">
+  <tbody>
+    <tr><th>Application</th><td>Registre numérique des Baptêmes &amp; Mariages — {{ paroisse }}</td></tr>
+    <tr><th>Version</th><td>{{ version_app }}</td></tr>
+    <tr><th>Développeur</th><td>{{ developpeur }}</td></tr>
+    <tr><th>Société</th><td>{{ entreprise }}</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p class="discret" style="margin-top: 1.5rem;">
+  {{ entreprise }} &copy; 2026 — développé par {{ developpeur }}.
+</p>
+
+{% endblock %}

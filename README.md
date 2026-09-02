@@ -1,23 +1,31 @@
 # Registre numérique des Baptêmes & Mariages — In Christ Ministries
 
-MVP construit à partir de la carte papier ICM (baptême / mariage).
-Trois façons d'y accéder sont livrées ; les deux premières partagent le
-**même modèle de données** (Supabase) et donc le même registre partagé —
-la troisième n'est qu'un habillage de la première :
+**Version V.1** — développé par NGOOH Cédric Hervé ([ElMan](#14-à-propos)).
 
-| | `web/index.html` — **version en ligne** | `app.py` — **version locale (Flask)** | `desktop/` — **version bureau (.exe)** |
-|---|---|---|---|
-| Installation | aucune : un fichier HTML à ouvrir | Python + `pip install` | copier un `.exe`, rien d'autre |
-| Base de données | Supabase (PostgreSQL, gratuit) | SQLite, fichier sur le PC | Supabase — la même que la version en ligne |
-| Nombre de postes | illimité, chacun avec son compte | un seul poste | illimité, chacun avec son compte |
-| Sauvegarde | assurée par Supabase | à faire à la main | assurée par Supabase |
-| À utiliser quand… | le registre est en service | pour tester, ou sans internet | pour une icône bureau plutôt qu'un onglet de navigateur |
+MVP construit à partir de la carte papier ICM (baptême / mariage).
+Quatre façons d'y accéder sont livrées ; les trois premières partagent le
+**même modèle de données** (Supabase) et donc le même registre partagé —
+les deux dernières ne sont qu'un habillage de la première :
+
+| | `web/index.html` — **version en ligne** | `app.py` — **version locale (Flask)** | `desktop/` — **version bureau (.exe)** | `android/` — **version mobile (APK/AAB)** |
+|---|---|---|---|---|
+| Installation | aucune : un fichier HTML à ouvrir | Python + `pip install` | copier un `.exe`, rien d'autre | installer l'APK, ou via le Play Store |
+| Base de données | Supabase (PostgreSQL, gratuit) | SQLite, fichier sur le PC | Supabase — la même que la version en ligne | Supabase — la même que la version en ligne |
+| Nombre de postes | illimité, chacun avec son compte | un seul poste | illimité, chacun avec son compte | illimité, chacun avec son compte |
+| Sauvegarde | assurée par Supabase | à faire à la main | assurée par Supabase | assurée par Supabase |
+| À utiliser quand… | le registre est en service | pour tester, ou sans internet | pour une icône bureau plutôt qu'un onglet de navigateur | pour une icône sur le téléphone plutôt qu'un onglet de navigateur |
 
 > **Version bureau.** Un exécutable Windows autonome (fenêtre native, sans
 > navigateur visible) autour de la version en ligne — mêmes comptes, mêmes
 > rôles, même base Supabase partagée par tous les postes, accessible dès
 > que le PC a Internet. Voir `desktop/README.md` pour le construire et
 > l'installer.
+
+> **Version mobile (Android).** La version en ligne encapsulée dans une
+> application Android native via Capacitor — mêmes comptes, mêmes rôles,
+> même base Supabase partagée avec les autres versions. Voir
+> `docs/ANDROID-BUILD.md` pour construire l'APK (installation directe) et
+> l'AAB (Google Play Store).
 
 > **Par où commencer ?** Ouvrez la version Flask pour prendre l'application
 > en main hors ligne. Passez à la version en ligne dès que plusieurs personnes
@@ -63,6 +71,15 @@ mvp_registre_bapteme_mariage/
 │   ├── README.md                  ← comment construire et installer l'exécutable
 │   ├── app_bureau.py
 │   └── construire.ps1
+│
+├── android/                       ← VERSION MOBILE (Capacitor autour de web/index.html)
+│   ├── signing.properties.example ← modèle pour la signature Release (voir docs/ANDROID-BUILD.md)
+│   └── ...                        ← projet Android natif généré par `npx cap add android`
+├── capacitor.config.json          ← config Capacitor (appId, nom, dossier web encapsulé)
+├── package.json                   ← dépendances Capacitor et scripts `npm run android:*`
+├── assets/                        ← logo source pour la génération des icônes Android
+├── docs/
+│   └── ANDROID-BUILD.md           ← comment construire l'APK et l'AAB
 │
 ├── database/
 │   ├── schema_supabase.sql        ← à exécuter dans Supabase
@@ -436,3 +453,19 @@ relisent le texte du script SQL (RLS, `revoke`, trigger d'immuabilité du
 rôle) plutôt que d'attaquer une vraie base — un vrai projet Supabase en
 CI dépasserait la portée de ce dépôt. Détail, limites et instructions
 pour lancer les tests en local : voir `tests/README.md`.
+
+---
+
+## 14. À propos
+
+| | |
+|---|---|
+| Application | Registre numérique des Baptêmes & Mariages — In Christ Ministries |
+| Version | **V.1** |
+| Développeur | NGOOH Cédric Hervé |
+| Société | ElMan |
+
+Ces informations sont aussi visibles dans l'application elle-même : page
+**À propos** (versions Flask et en ligne, lien dans l'en-tête et le pied de
+page) et propriétés du fichier pour l'exécutable de la version bureau
+(clic droit → *Propriétés* → onglet *Détails*).

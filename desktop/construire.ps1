@@ -29,6 +29,7 @@ $racine = (Get-Location).Path
     --name "ICM Registre" `
     --icon "$racine\desktop\icone.ico" `
     --add-data "$racine\web\index.html;web" `
+    --version-file "$racine\desktop\version_info.txt" `
     --distpath "desktop\dist" `
     --workpath "desktop\build" `
     --specpath "desktop" `

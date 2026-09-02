@@ -3,6 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="author" content="{{ developpeur }} — {{ entreprise }}">
+  <meta name="application-version" content="{{ version_app }}">
   <title>{% block titre %}Registre ICM{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
@@ -26,6 +28,7 @@
         <a href="{{ url_for('export_csv') }}">Export Excel</a>
       {% endif %}
       <a href="{{ url_for('journal') }}">Journal</a>
+      <a href="{{ url_for('a_propos') }}">À propos</a>
       <span class="nav-compte">
         {{ session.get('utilisateur') }}
         <span class="etiquette-role">{{ {'secretaire':'Secrétaire','pasteur':'Pasteur','visiteur':'Visiteur'}[session.get('role')] }}</span>
@@ -51,7 +54,8 @@
 </main>
 
 <footer class="pied">
-  {{ paroisse }} — Registre numérique · MVP
+  {{ paroisse }} — Registre numérique · {{ version_app }} ·
+  <a href="{{ url_for('a_propos') }}">{{ entreprise }}</a>
 </footer>
 
 </body>
