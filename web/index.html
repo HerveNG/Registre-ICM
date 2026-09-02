@@ -5,6 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="author" content="NGOOH Cédric Hervé — ElMan">
 <meta name="application-version" content="V.1">
+<meta name="theme-color" content="#12203a">
+<!-- « Ajouter à l'écran d'accueil » (iPhone/iPad, Safari) : lancement en
+     plein écran (sans barre d'adresse) et nom court sous l'icône. L'icône
+     elle-même (apple-touch-icon) est ajoutée dynamiquement en JS — voir
+     configurerEcranAccueilIos() — pour réutiliser le logo déjà encodé
+     dans --logo-icm plutôt que de le dupliquer en dur ici. -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ICM Registre">
 <title>Registre ICM — Baptêmes &amp; Mariages</title>
 
 <!-- ==========================================================
@@ -3271,6 +3280,22 @@ function appliquerNomEglise(){
   $("titre-connexion").textContent = nom;
 }
 
+/* « Ajouter à l'écran d'accueil » sur iPhone/iPad (Safari) : icône et
+   lancement plein écran, sans passer par un vrai projet iOS natif (qui
+   exigerait Xcode, donc un Mac — voir docs/ANDROID-BUILD.md pour la
+   contrepartie Android). Réutilise le logo déjà encodé dans --logo-icm
+   (CSS) plutôt que de le dupliquer en dur dans le HTML. */
+function configurerEcranAccueilIos(){
+  const brut = getComputedStyle(document.documentElement).getPropertyValue("--logo-icm").trim();
+  const correspondance = brut.match(/^url\((["']?)(.*)\1\)$/);
+  if (correspondance){
+    const lien = document.createElement("link");
+    lien.rel = "apple-touch-icon";
+    lien.href = correspondance[2];
+    document.head.appendChild(lien);
+  }
+}
+
 /* ==========================================================
    9. ÉVÉNEMENTS
    ========================================================== */
@@ -3489,6 +3514,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   $("btn-fermer-carte").addEventListener("click", ()=>{ $("zone-carte").hidden = true; });
 
   // --- Démarrage
+  configurerEcranAccueilIos();
   etat.config = chargerConfig();
   appliquerNomEglise();
   if (!etat.config){ afficherVue("reglages"); return; }
