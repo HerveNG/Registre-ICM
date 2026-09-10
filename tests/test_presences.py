@@ -339,6 +339,71 @@ def test_ajouter_une_categorie_refuse_un_groupe_retire(client_secretaire):
         assert icm_app.AttendanceCategory.query.filter_by(nom="Test").count() == 0
 
 
+def test_supprimer_un_type_de_culte_non_utilise(client_secretaire, icm_app):
+    with icm_app.app.app_context():
+        icm_app.db.session.add(icm_app.ServiceType(nom="Type jetable", ordre_affichage=99))
+        icm_app.db.session.commit()
+        id_type = icm_app.ServiceType.query.filter_by(nom="Type jetable").one().id
+
+    reponse = client_secretaire.post(
+        "/presences/parametres", data={"action": "supprimer_type", "id": str(id_type)})
+    assert reponse.status_code == 302
+    with icm_app.app.app_context():
+        assert icm_app.db.session.get(icm_app.ServiceType, id_type) is None
+
+
+def test_supprimer_un_type_de_culte_utilise_refuse(client_secretaire, icm_app):
+    client_secretaire.post("/presences/nouvelle", data=_donnees_exemple(icm_app))
+    id_type = _id_type_dimanche(icm_app)
+
+    reponse = client_secretaire.post(
+        "/presences/parametres", data={"action": "supprimer_type", "id": str(id_type)},
+        follow_redirects=True)
+    assert b"Impossible de supprimer" in reponse.data
+    with icm_app.app.app_context():
+        assert icm_app.db.session.get(icm_app.ServiceType, id_type) is not None
+
+
+def test_supprimer_une_categorie_non_utilisee(client_secretaire, icm_app):
+    client_secretaire.post(
+        "/presences/parametres",
+        data={"action": "ajouter_categorie", "groupe": "hommes", "nom": "Jetable"},
+    )
+    id_cat = _id_categorie(icm_app, "Jetable", "hommes")
+
+    reponse = client_secretaire.post(
+        "/presences/parametres", data={"action": "supprimer_categorie", "id": str(id_cat)})
+    assert reponse.status_code == 302
+    with icm_app.app.app_context():
+        assert icm_app.db.session.get(icm_app.AttendanceCategory, id_cat) is None
+
+
+def test_supprimer_une_categorie_utilisee_refuse(client_secretaire, icm_app):
+    client_secretaire.post("/presences/nouvelle", data=_donnees_exemple(icm_app))
+    id_cat = _id_categorie(icm_app, "Adultes", "hommes")
+
+    reponse = client_secretaire.post(
+        "/presences/parametres", data={"action": "supprimer_categorie", "id": str(id_cat)},
+        follow_redirects=True)
+    assert b"Impossible de supprimer" in reponse.data
+    with icm_app.app.app_context():
+        assert icm_app.db.session.get(icm_app.AttendanceCategory, id_cat) is not None
+
+
+def test_visiteur_ne_peut_pas_supprimer_un_type_ou_une_categorie(client_visiteur, icm_app):
+    id_type = _id_type_dimanche(icm_app)
+    id_cat = _id_categorie(icm_app, "Adultes", "hommes")
+    reponse = client_visiteur.post(
+        "/presences/parametres", data={"action": "supprimer_type", "id": str(id_type)})
+    assert reponse.status_code == 302
+    reponse = client_visiteur.post(
+        "/presences/parametres", data={"action": "supprimer_categorie", "id": str(id_cat)})
+    assert reponse.status_code == 302
+    with icm_app.app.app_context():
+        assert icm_app.db.session.get(icm_app.ServiceType, id_type) is not None
+        assert icm_app.db.session.get(icm_app.AttendanceCategory, id_cat) is not None
+
+
 def test_categorie_modifiee_desactivee_reste_visible_sur_fiche_existante(
         client_secretaire, icm_app):
     """§4 : une catégorie désactivée après coup ne doit jamais faire perdre

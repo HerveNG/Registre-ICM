@@ -405,11 +405,14 @@ l'en-tête (**📊 Présences**), pour suivre la fréquentation des cultes :
   Nouveaux, évolution, comparaison entre types de culte, analyse par jour de
   la semaine — graphiques en CSS pur (camembert, barres), sans bibliothèque
   externe, cohérent avec la CSP du reste de l'application (§14).
-- **Paramètres** (secrétariat/pasteur) : types de culte et catégories d'âge
+- **Paramètres** (secrétariat/pasteur) : types de culte et catégories
   entièrement configurables — nom, tranche d'âge, ordre d'affichage,
   activation/désactivation. Une catégorie désactivée reste visible sur les
   fiches déjà enregistrées qui l'utilisaient (rien n'est jamais perdu),
-  seulement retirée des nouvelles saisies.
+  seulement retirée des nouvelles saisies. **Suppression définitive** :
+  un bouton dédié permet aussi d'effacer complètement une catégorie ou un
+  type de culte inutile — refusé avec un message clair tant qu'au moins une
+  présence enregistrée s'en sert encore (pour ne jamais casser l'historique).
 - **Comparer deux périodes** : deux plages de dates libres (par défaut, ce
   mois-ci contre le mois précédent), indicateur par indicateur, avec
   évolution (▲/▼/stable).

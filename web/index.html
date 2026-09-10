@@ -3193,11 +3193,13 @@ function dessinerParametresPresences(){
     <div class="bloc-stat">
       <h2>Types de culte</h2>
       <div class="tableau-enveloppe"><table class="tableau-parametres">
-        <thead><tr><th>Nom</th><th>Ordre</th><th>Actif</th></tr></thead>
+        <thead><tr><th>Nom</th><th>Ordre</th><th>Actif</th><th>Actions</th></tr></thead>
         <tbody>${types.map(t=>`<tr>
           <td><input type="text" data-champ="nom" value="${echapper(t.nom)}" id="type-nom-${t.id}"></td>
           <td><input type="number" data-champ="ordre" value="${t.ordre_affichage}" id="type-ordre-${t.id}"></td>
           <td><input type="checkbox" id="type-actif-${t.id}" ${t.is_active?"checked":""}></td>
+          <td><button type="button" class="bouton bouton-petit bouton-danger btn-supprimer-type"
+                data-id="${t.id}" data-nom="${echapper(t.nom)}">🗑 Supprimer</button></td>
         </tr>`).join("")}</tbody>
       </table></div>
       <p class="actions-formulaire" style="margin-top:.9rem;">
@@ -3215,13 +3217,15 @@ function dessinerParametresPresences(){
     <div class="bloc-stat">
       <h2>${EMOJIS_GROUPES_P[groupe]} Catégories — ${libelle}</h2>
       <div class="tableau-enveloppe"><table class="tableau-parametres">
-        <thead><tr><th>Nom</th><th>Âge min</th><th>Âge max</th><th>Ordre</th><th>Actif</th></tr></thead>
+        <thead><tr><th>Nom</th><th>Âge min</th><th>Âge max</th><th>Ordre</th><th>Actif</th><th>Actions</th></tr></thead>
         <tbody>${parGroupe[groupe].map(c=>`<tr>
           <td><input type="text" value="${echapper(c.nom)}" id="cat-nom-${c.id}"></td>
           <td><input type="number" min="0" value="${c.age_min ?? ""}" id="cat-age-min-${c.id}"></td>
           <td><input type="number" min="0" value="${c.age_max ?? ""}" id="cat-age-max-${c.id}"></td>
           <td><input type="number" value="${c.ordre_affichage}" id="cat-ordre-${c.id}"></td>
           <td><input type="checkbox" id="cat-actif-${c.id}" ${c.is_active?"checked":""}></td>
+          <td><button type="button" class="bouton bouton-petit bouton-danger btn-supprimer-categorie"
+                data-id="${c.id}" data-nom="${echapper(c.nom)}">🗑 Supprimer</button></td>
         </tr>`).join("")}</tbody>
       </table></div>
       <p class="actions-formulaire" style="margin-top:.9rem;">
@@ -3239,6 +3243,47 @@ function dessinerParametresPresences(){
         pas complétées par une nouvelle entrée.</p>`}
     </div>`;
     }).join("")}`;
+
+  document.querySelectorAll(".btn-supprimer-type").forEach(bouton=>{
+    bouton.addEventListener("click", ()=>supprimerTypeCultePresences(bouton.dataset.id, bouton.dataset.nom));
+  });
+  document.querySelectorAll(".btn-supprimer-categorie").forEach(bouton=>{
+    bouton.addEventListener("click", ()=>supprimerCategoriePresences(bouton.dataset.id, bouton.dataset.nom));
+  });
+}
+
+async function supprimerTypeCultePresences(id, nom){
+  if (!confirm(`Supprimer définitivement le type de culte « ${nom} » ? Impossible si une `
+    + `présence l'utilise encore — cette action est irréversible.`)) return;
+  try{
+    const { donnees: enUsage } = await api(`attendance_record?service_type_id=eq.${id}&select=id&limit=1`);
+    if (enUsage && enUsage.length){
+      message(`Impossible de supprimer « ${nom} » : au moins une présence enregistrée `
+        + `l'utilise encore — désactivez-le plutôt.`, "erreur");
+      return;
+    }
+    await api(`service_type?id=eq.${id}`, { method:"DELETE" });
+    message(`Type de culte « ${nom} » supprimé définitivement.`, "succes");
+    await chargerReferentielPresences(true);
+    dessinerParametresPresences();
+  }catch(e){ message(e.message, "erreur"); }
+}
+
+async function supprimerCategoriePresences(id, nom){
+  if (!confirm(`Supprimer définitivement la catégorie « ${nom} » ? Impossible si une `
+    + `présence l'utilise encore — cette action est irréversible.`)) return;
+  try{
+    const { donnees: enUsage } = await api(`attendance_value?category_id=eq.${id}&select=id&limit=1`);
+    if (enUsage && enUsage.length){
+      message(`Impossible de supprimer « ${nom} » : au moins une présence enregistrée `
+        + `l'utilise encore — désactivez-la plutôt.`, "erreur");
+      return;
+    }
+    await api(`attendance_category?id=eq.${id}`, { method:"DELETE" });
+    message(`Catégorie « ${nom} » supprimée définitivement.`, "succes");
+    await chargerReferentielPresences(true);
+    dessinerParametresPresences();
+  }catch(e){ message(e.message, "erreur"); }
 }
 
 async function ajouterTypeCultePresences(evt){

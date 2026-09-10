@@ -1833,6 +1833,44 @@ def presences_parametres():
                 flash(f"Catégorie « {nom} » ajoutée.", "success")
             return redirect(url_for("presences_parametres"))
 
+        if action == "supprimer_type":
+            st = db.session.get(ServiceType, request.form.get("id", type=int))
+            if not st:
+                flash("Type de culte introuvable.", "error")
+            elif AttendanceRecord.query.filter_by(service_type_id=st.id).first():
+                flash(f"Impossible de supprimer « {st.nom} » : au moins une présence "
+                      "enregistrée l'utilise encore — désactivez-le plutôt.", "error")
+            else:
+                nom = st.nom
+                try:
+                    db.session.delete(st)
+                    db.session.commit()
+                except IntegrityError:
+                    db.session.rollback()
+                    flash(f"Impossible de supprimer « {nom} » : il est encore utilisé.", "error")
+                else:
+                    flash(f"Type de culte « {nom} » supprimé définitivement.", "success")
+            return redirect(url_for("presences_parametres"))
+
+        if action == "supprimer_categorie":
+            cat = db.session.get(AttendanceCategory, request.form.get("id", type=int))
+            if not cat:
+                flash("Catégorie introuvable.", "error")
+            elif AttendanceValue.query.filter_by(category_id=cat.id).first():
+                flash(f"Impossible de supprimer « {cat.nom} » : au moins une présence "
+                      "enregistrée l'utilise encore — désactivez-la plutôt.", "error")
+            else:
+                nom = cat.nom
+                try:
+                    db.session.delete(cat)
+                    db.session.commit()
+                except IntegrityError:
+                    db.session.rollback()
+                    flash(f"Impossible de supprimer « {nom} » : elle est encore utilisée.", "error")
+                else:
+                    flash(f"Catégorie « {nom} » supprimée définitivement.", "success")
+            return redirect(url_for("presences_parametres"))
+
         if action == "modifier_categories":
             # Validation légère (bascule silencieuse plutôt que blocage) :
             # ceci reste un écran de configuration, pas la saisie d'un

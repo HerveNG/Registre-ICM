@@ -15,16 +15,18 @@
     <input type="hidden" name="action" value="modifier_types">
     <div class="tableau-enveloppe">
       <table class="tableau tableau-parametres">
-        <thead><tr><th>Nom</th><th>Ordre</th><th>Actif</th></tr></thead>
+        <thead><tr><th>Nom</th><th>Ordre</th><th>Actif</th><th>Actions</th></tr></thead>
         <tbody>
           {% for t in types_culte %}
           <tr>
             <td><input type="text" name="type_nom_{{ t.id }}" value="{{ t.nom }}" maxlength="100" required></td>
             <td><input type="number" name="type_ordre_{{ t.id }}" value="{{ t.ordre_affichage }}"></td>
             <td><input type="checkbox" name="type_actif_{{ t.id }}" {% if t.is_active %}checked{% endif %}></td>
+            <td><button type="button" class="bouton bouton-petit bouton-danger btn-supprimer-type"
+                         data-id="{{ t.id }}" data-nom="{{ t.nom }}">🗑 Supprimer</button></td>
           </tr>
           {% else %}
-          <tr><td colspan="3" class="discret">Aucun type de culte.</td></tr>
+          <tr><td colspan="4" class="discret">Aucun type de culte.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -56,7 +58,7 @@
     <input type="hidden" name="action" value="modifier_categories">
     <div class="tableau-enveloppe">
       <table class="tableau tableau-parametres">
-        <thead><tr><th>Nom</th><th>Âge min</th><th>Âge max</th><th>Ordre</th><th>Actif</th></tr></thead>
+        <thead><tr><th>Nom</th><th>Âge min</th><th>Âge max</th><th>Ordre</th><th>Actif</th><th>Actions</th></tr></thead>
         <tbody>
           {% for cat in categories_du_groupe %}
           <tr>
@@ -65,9 +67,11 @@
             <td><input type="number" min="0" name="cat_age_max_{{ cat.id }}" value="{{ cat.age_max if cat.age_max is not none else '' }}"></td>
             <td><input type="number" name="cat_ordre_{{ cat.id }}" value="{{ cat.ordre_affichage }}"></td>
             <td><input type="checkbox" name="cat_actif_{{ cat.id }}" {% if cat.is_active %}checked{% endif %}></td>
+            <td><button type="button" class="bouton bouton-petit bouton-danger btn-supprimer-categorie"
+                         data-id="{{ cat.id }}" data-nom="{{ cat.nom }}">🗑 Supprimer</button></td>
           </tr>
           {% else %}
-          <tr><td colspan="5" class="discret">Aucune catégorie pour ce groupe.</td></tr>
+          <tr><td colspan="6" class="discret">Aucune catégorie pour ce groupe.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -96,5 +100,39 @@
   {% endif %}
 </div>
 {% endfor %}
+
+<script>
+(function(){
+  function soumettreSuppression(action, id){
+    var f = document.createElement("form");
+    f.method = "post";
+    [["csrf_token", "{{ csrf_token() }}"], ["action", action], ["id", id]].forEach(function(paire){
+      var champ = document.createElement("input");
+      champ.type = "hidden"; champ.name = paire[0]; champ.value = paire[1];
+      f.appendChild(champ);
+    });
+    document.body.appendChild(f);
+    f.submit();
+  }
+
+  document.querySelectorAll(".btn-supprimer-type").forEach(function(bouton){
+    bouton.addEventListener("click", function(){
+      if (!confirm("Supprimer définitivement le type de culte « " + bouton.dataset.nom + " » ? "
+          + "Impossible si une présence l'utilise encore — cette action est irréversible."))
+        return;
+      soumettreSuppression("supprimer_type", bouton.dataset.id);
+    });
+  });
+
+  document.querySelectorAll(".btn-supprimer-categorie").forEach(function(bouton){
+    bouton.addEventListener("click", function(){
+      if (!confirm("Supprimer définitivement la catégorie « " + bouton.dataset.nom + " » ? "
+          + "Impossible si une présence l'utilise encore — cette action est irréversible."))
+        return;
+      soumettreSuppression("supprimer_categorie", bouton.dataset.id);
+    });
+  });
+})();
+</script>
 
 {% endblock %}
