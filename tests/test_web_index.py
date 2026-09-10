@@ -344,20 +344,21 @@ def test_generer_analyses_presence_vide_sans_aucun_culte(page):
 
 
 def test_generer_analyses_presence_reproduit_lexemple_du_cahier_des_charges(page):
-    """Mêmes chiffres que l'exemple du cahier des charges (85/135/95/315)
+    """Mêmes chiffres que l'exemple du cahier des charges (85/120/35/5/245)
     et que test_presences.py côté Flask — les deux versions doivent
     produire des observations cohérentes à partir des mêmes données."""
     resultat = page.evaluate(
         """() => {
-            const resume = {nb_cultes:1, total:315, hommes:85, femmes:135, enfants:95,
-                             moyenne:315, maximum:315, minimum:315};
+            const resume = {nb_cultes:1, total:245, hommes:85, femmes:120, fils_icm:35, nouveaux:5,
+                             moyenne:245, maximum:245, minimum:245};
             const repartition = [
-              {groupe:'hommes', libelle:'Hommes', valeur:85, pourcentage:27.0},
-              {groupe:'femmes', libelle:'Femmes', valeur:135, pourcentage:42.9},
-              {groupe:'enfants', libelle:'Enfants', valeur:95, pourcentage:30.2},
+              {groupe:'hommes', libelle:'Hommes', valeur:85, pourcentage:34.7},
+              {groupe:'femmes', libelle:'Femmes', valeur:120, pourcentage:49.0},
+              {groupe:'fils_icm', libelle:'Fils-ICM', valeur:35, pourcentage:14.3},
+              {groupe:'nouveaux', libelle:'Nouveaux', valeur:5, pourcentage:2.0},
             ];
-            const analyseJours = [{jour:'Dimanche', moyenne:315, nb:1}];
-            const enregistrements = [{date_culte:'2026-08-30', total_general:315}];
+            const analyseJours = [{jour:'Dimanche', moyenne:245, nb:1}];
+            const enregistrements = [{date_culte:'2026-08-30', total_general:245}];
             return genererAnalysesPresence(resume, repartition, analyseJours, enregistrements, null);
         }"""
     )

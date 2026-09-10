@@ -701,7 +701,13 @@ comment on table public.service_type is
 create table if not exists public.attendance_category (
     id               uuid primary key default gen_random_uuid(),
     nom              text not null,
-    groupe           text not null check (groupe in ('hommes', 'femmes', 'enfants')),
+    -- 'enfants' n'est plus proposé à la saisie/configuration depuis la
+    -- reclassification du 10/09/2026 (enfants/adolescents/adultes sont
+    -- désormais des catégories au sein de « hommes » et « femmes ») — gardé
+    -- dans la contrainte uniquement pour que les catégories désactivées
+    -- d'une base créée avant ce changement restent valides et lisibles.
+    groupe           text not null
+        check (groupe in ('hommes', 'femmes', 'fils_icm', 'nouveaux', 'enfants')),
     age_min          integer,
     age_max          integer,
     ordre_affichage  integer not null default 0,
@@ -709,7 +715,7 @@ create table if not exists public.attendance_category (
 );
 
 comment on table public.attendance_category is
-  'Catégories d''âge au sein d''un groupe (hommes/femmes/enfants) — configurable, jamais supprimée.';
+  'Catégories au sein d''un groupe (hommes/femmes/fils_icm/nouveaux — enfants : legacy) — configurable, jamais supprimée.';
 
 create table if not exists public.attendance_record (
     id               uuid primary key default gen_random_uuid(),
@@ -720,6 +726,12 @@ create table if not exists public.attendance_record (
 
     total_hommes     integer not null default 0,
     total_femmes     integer not null default 0,
+    total_fils_icm   integer not null default 0,
+    total_nouveaux   integer not null default 0,
+    -- Conservée pour les présences enregistrées avant la reclassification
+    -- (enfants faisait alors partie du groupe) — jamais renseignée pour une
+    -- nouvelle fiche, où les enfants sont comptés dans total_hommes/
+    -- total_femmes.
     total_enfants    integer not null default 0,
     total_general    integer not null default 0,
 
@@ -736,6 +748,7 @@ create table if not exists public.attendance_record (
 
     constraint attendance_totaux_non_negatifs check (
         total_hommes >= 0 and total_femmes >= 0
+        and total_fils_icm >= 0 and total_nouveaux >= 0
         and total_enfants >= 0 and total_general >= 0
     ),
     constraint attendance_lieu_longueur_raisonnable
@@ -830,18 +843,16 @@ where not exists (select 1 from public.service_type);
 insert into public.attendance_category (nom, groupe, age_min, age_max, ordre_affichage)
 select v.nom, v.groupe, v.age_min, v.age_max, v.ordre
 from (values
-    ('Garçons / adolescents', 'hommes', 13, 17, 0),
-    ('Jeunes hommes',         'hommes', 18, 25, 1),
-    ('Hommes adultes',        'hommes', 26, 59, 2),
-    ('Hommes seniors',        'hommes', 60, null, 3),
-    ('Filles / adolescentes', 'femmes', 13, 17, 0),
-    ('Jeunes femmes',         'femmes', 18, 25, 1),
-    ('Femmes adultes',        'femmes', 26, 59, 2),
-    ('Femmes seniors',        'femmes', 60, null, 3),
-    ('Bébés',                 'enfants', 0, 2, 0),
-    ('Petits enfants',        'enfants', 3, 6, 1),
-    ('Enfants',               'enfants', 7, 9, 2),
-    ('Pré-adolescents',       'enfants', 10, 12, 3)
+    ('Enfants',      'hommes',   0, 12,   0),
+    ('Adolescents',  'hommes',  13, 17,   1),
+    ('Adultes',      'hommes',  18, null, 2),
+    ('Enfants',      'femmes',   0, 12,   0),
+    ('Adolescentes', 'femmes',  13, 17,   1),
+    ('Adultes',      'femmes',  18, null, 2),
+    ('Hommes',       'fils_icm', null, null, 0),
+    ('Femmes',       'fils_icm', null, null, 1),
+    ('Hommes',       'nouveaux', null, null, 0),
+    ('Femmes',       'nouveaux', null, null, 1)
 ) as v(nom, groupe, age_min, age_max, ordre)
 where not exists (select 1 from public.attendance_category);
 

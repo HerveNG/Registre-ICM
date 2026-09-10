@@ -56,7 +56,7 @@ from flask import (
 )
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import CSRFProtect
-from sqlalchemy import or_, and_, func, text
+from sqlalchemy import or_, and_, func, text, inspect as sa_inspect
 from sqlalchemy.exc import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -481,18 +481,34 @@ class JournalAudit(db.Model):
 # ------------------------------------------------------------------
 JOURS_SEMAINE = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
 
-# Groupes fixes (la répartition H/F/E est structurelle) ; les catégories
-# d'âge à l'intérieur de chaque groupe, elles, sont configurables — voir
+# Groupes fixes (la répartition est structurelle) ; les catégories à
+# l'intérieur de chaque groupe, elles, sont configurables — voir
 # AttendanceCategory et /presences/parametres.
 GROUPE_HOMMES = "hommes"
 GROUPE_FEMMES = "femmes"
+GROUPE_FILS_ICM = "fils_icm"     # groupe de disciples « Fils-ICM » (hommes et femmes)
+GROUPE_NOUVEAUX = "nouveaux"     # personnes venues pour la première fois à l'église
+GROUPES = [GROUPE_HOMMES, GROUPE_FEMMES, GROUPE_FILS_ICM, GROUPE_NOUVEAUX]
+
+# "enfants" n'est plus un groupe proposé à la saisie ou à la configuration
+# depuis la reclassification du 10/09/2026 (enfants/adolescents/adultes sont
+# désormais des catégories au sein de « hommes » et « femmes »). Il reste
+# reconnu ici uniquement pour que les présences enregistrées AVANT ce
+# changement restent lisibles (catégories désactivées, colonne total_enfants)
+# — voir recalculer_totaux, categories_pour_edition, calculer_statistiques_periode.
 GROUPE_ENFANTS = "enfants"
-GROUPES = [GROUPE_HOMMES, GROUPE_FEMMES, GROUPE_ENFANTS]
-LIBELLES_GROUPES = {GROUPE_HOMMES: "Hommes", GROUPE_FEMMES: "Femmes", GROUPE_ENFANTS: "Enfants"}
+
+LIBELLES_GROUPES = {
+    GROUPE_HOMMES: "Hommes", GROUPE_FEMMES: "Femmes",
+    GROUPE_FILS_ICM: "Fils-ICM", GROUPE_NOUVEAUX: "Nouveaux",
+    GROUPE_ENFANTS: "Enfants",   # legacy — voir ci-dessus
+}
 # Couleurs du camembert de répartition (presences_statistiques.html) — les
 # mêmes variables CSS que le reste de l'application (static/style.css).
 COULEURS_GROUPES = {
-    GROUPE_HOMMES: "var(--encre)", GROUPE_FEMMES: "var(--or)", GROUPE_ENFANTS: "var(--succes)",
+    GROUPE_HOMMES: "var(--encre)", GROUPE_FEMMES: "var(--or)",
+    GROUPE_FILS_ICM: "var(--succes)", GROUPE_NOUVEAUX: "var(--or-clair)",
+    GROUPE_ENFANTS: "var(--encre-douce)",   # legacy
 }
 
 # Autorise ou non plusieurs présences enregistrées pour la même date et le
@@ -520,16 +536,17 @@ class ServiceType(db.Model):
 
 
 class AttendanceCategory(db.Model):
-    """Catégorie d'âge au sein d'un des trois groupes (hommes/femmes/
-    enfants). age_min/age_max sont indicatifs — une aide à la saisie et à
-    la configuration, pas une contrainte vérifiée contre une date de
-    naissance individuelle : l'application compte des effectifs par
-    catégorie, elle ne suit pas l'identité des personnes présentes."""
+    """Catégorie au sein d'un des groupes (hommes/femmes/fils_icm/nouveaux
+    — « enfants » n'existe plus que sur d'anciennes catégories désactivées,
+    voir GROUPE_ENFANTS). age_min/age_max sont indicatifs — une aide à la
+    saisie et à la configuration, pas une contrainte vérifiée contre une
+    date de naissance individuelle : l'application compte des effectifs
+    par catégorie, elle ne suit pas l'identité des personnes présentes."""
     __tablename__ = "attendance_category"
 
     id = db.Column(db.Integer, primary_key=True)
     nom = db.Column(db.String(100), nullable=False)
-    groupe = db.Column(db.String(10), nullable=False)   # hommes | femmes | enfants
+    groupe = db.Column(db.String(10), nullable=False)   # hommes | femmes | fils_icm | nouveaux
     age_min = db.Column(db.Integer)
     age_max = db.Column(db.Integer)
     ordre_affichage = db.Column(db.Integer, nullable=False, default=0)
@@ -562,6 +579,12 @@ class AttendanceRecord(db.Model):
 
     total_hommes = db.Column(db.Integer, nullable=False, default=0)
     total_femmes = db.Column(db.Integer, nullable=False, default=0)
+    total_fils_icm = db.Column(db.Integer, nullable=False, default=0)
+    total_nouveaux = db.Column(db.Integer, nullable=False, default=0)
+    # Colonne conservée pour les présences enregistrées avant la
+    # reclassification (enfants faisait alors partie du groupe) — jamais
+    # renseignée pour une nouvelle fiche, où les enfants sont comptés dans
+    # total_hommes/total_femmes. Voir GROUPE_ENFANTS.
     total_enfants = db.Column(db.Integer, nullable=False, default=0)
     total_general = db.Column(db.Integer, nullable=False, default=0)
 
@@ -1325,11 +1348,17 @@ def verifier_doublon_presence(date_culte, service_type_id, id_courant=None):
 
 
 def recalculer_totaux(record, valeurs_par_categorie, categories):
-    totaux = {GROUPE_HOMMES: 0, GROUPE_FEMMES: 0, GROUPE_ENFANTS: 0}
+    # GROUPE_ENFANTS est inclus défensivement : une fiche antérieure à la
+    # reclassification peut encore référencer une catégorie désactivée de ce
+    # groupe (voir categories_pour_edition) — sans cette clé, sa
+    # ré-enregistrement lèverait une KeyError.
+    totaux = {g: 0 for g in GROUPES + [GROUPE_ENFANTS]}
     for cat in categories:
         totaux[cat.groupe] += valeurs_par_categorie.get(cat.id, 0)
     record.total_hommes = totaux[GROUPE_HOMMES]
     record.total_femmes = totaux[GROUPE_FEMMES]
+    record.total_fils_icm = totaux[GROUPE_FILS_ICM]
+    record.total_nouveaux = totaux[GROUPE_NOUVEAUX]
     record.total_enfants = totaux[GROUPE_ENFANTS]
     record.total_general = sum(totaux.values())
 
@@ -1584,7 +1613,11 @@ def periode_precedente(periode, debut, fin):
     return None, None
 
 
-EMOJIS_GROUPES = {GROUPE_HOMMES: "👨", GROUPE_FEMMES: "👩", GROUPE_ENFANTS: "🧒"}
+EMOJIS_GROUPES = {
+    GROUPE_HOMMES: "👨", GROUPE_FEMMES: "👩",
+    GROUPE_FILS_ICM: "🤝", GROUPE_NOUVEAUX: "🆕",
+    GROUPE_ENFANTS: "🧒",   # legacy
+}
 
 
 def generer_analyses(resume, repartition, analyse_jours, enregistrements, resume_precedent):
@@ -1663,6 +1696,10 @@ def calculer_statistiques_periode(debut, fin):
         "total": sum(r.total_general for r in enregistrements),
         GROUPE_HOMMES: sum(r.total_hommes for r in enregistrements),
         GROUPE_FEMMES: sum(r.total_femmes for r in enregistrements),
+        GROUPE_FILS_ICM: sum(r.total_fils_icm for r in enregistrements),
+        GROUPE_NOUVEAUX: sum(r.total_nouveaux for r in enregistrements),
+        # Legacy : présent uniquement si la période couvre des fiches
+        # enregistrées avant la reclassification (voir GROUPE_ENFANTS).
         GROUPE_ENFANTS: sum(r.total_enfants for r in enregistrements),
     }
     resume["moyenne"] = round(resume["total"] / resume["nb_cultes"]) if resume["nb_cultes"] else 0
@@ -1671,7 +1708,12 @@ def calculer_statistiques_periode(debut, fin):
 
     repartition = []
     if resume["total"]:
-        for groupe in GROUPES:
+        # + le groupe legacy "enfants", seulement s'il pèse quelque chose sur
+        # la période (anciennes fiches) — pour que les pourcentages du
+        # camembert totalisent toujours 100 %, même sur une période mixte.
+        groupes_repartition = GROUPES + (
+            [GROUPE_ENFANTS] if resume[GROUPE_ENFANTS] else [])
+        for groupe in groupes_repartition:
             valeur = resume[groupe]
             repartition.append({
                 "groupe": groupe, "libelle": LIBELLES_GROUPES[groupe], "valeur": valeur,
@@ -1860,7 +1902,8 @@ def presences_comparaison():
         _comparer("moyenne", "Moyenne par culte"),
         _comparer(GROUPE_HOMMES, "Hommes"),
         _comparer(GROUPE_FEMMES, "Femmes"),
-        _comparer(GROUPE_ENFANTS, "Enfants"),
+        _comparer(GROUPE_FILS_ICM, "Fils-ICM"),
+        _comparer(GROUPE_NOUVEAUX, "Nouveaux"),
     ]
 
     return render_template(
@@ -1953,7 +1996,8 @@ def presences_export_csv():
     writer = csv.writer(tampon, delimiter=";")
     writer.writerow(
         ["Date", "Jour", "Type de culte", "Lieu"] + [c.nom for c in categories]
-        + ["Total Hommes", "Total Femmes", "Total Enfants", "Total Général", "Notes"]
+        + ["Total Hommes", "Total Femmes", "Total Fils-ICM", "Total Nouveaux",
+           "Total Général", "Notes"]
     )
     for r in enregistrements:
         valeurs_par_categorie = {v.category_id: v.effectif for v in r.valeurs}
@@ -1962,8 +2006,8 @@ def presences_export_csv():
             r.service_type.nom if r.service_type else "", neutraliser_formule(r.lieu) or "",
         ]
         ligne += [valeurs_par_categorie.get(c.id, 0) for c in categories]
-        ligne += [r.total_hommes, r.total_femmes, r.total_enfants, r.total_general,
-                  neutraliser_formule(r.notes) or ""]
+        ligne += [r.total_hommes, r.total_femmes, r.total_fils_icm, r.total_nouveaux,
+                  r.total_general, neutraliser_formule(r.notes) or ""]
         writer.writerow(ligne)
 
     nom_fichier = f"presences_icm_{date.today():%Y-%m-%d}.csv"
@@ -2386,18 +2430,16 @@ def initialiser_donnees_presences():
         db.session.add(ServiceType(nom=nom, description=description, ordre_affichage=ordre))
 
     categories_par_defaut = [
-        (GROUPE_HOMMES, "Garçons / adolescents", 13, 17),
-        (GROUPE_HOMMES, "Jeunes hommes", 18, 25),
-        (GROUPE_HOMMES, "Hommes adultes", 26, 59),
-        (GROUPE_HOMMES, "Hommes seniors", 60, None),
-        (GROUPE_FEMMES, "Filles / adolescentes", 13, 17),
-        (GROUPE_FEMMES, "Jeunes femmes", 18, 25),
-        (GROUPE_FEMMES, "Femmes adultes", 26, 59),
-        (GROUPE_FEMMES, "Femmes seniors", 60, None),
-        (GROUPE_ENFANTS, "Bébés", 0, 2),
-        (GROUPE_ENFANTS, "Petits enfants", 3, 6),
-        (GROUPE_ENFANTS, "Enfants", 7, 9),
-        (GROUPE_ENFANTS, "Pré-adolescents", 10, 12),
+        (GROUPE_HOMMES, "Enfants", 0, 12),
+        (GROUPE_HOMMES, "Adolescents", 13, 17),
+        (GROUPE_HOMMES, "Adultes", 18, None),
+        (GROUPE_FEMMES, "Enfants", 0, 12),
+        (GROUPE_FEMMES, "Adolescentes", 13, 17),
+        (GROUPE_FEMMES, "Adultes", 18, None),
+        (GROUPE_FILS_ICM, "Hommes", None, None),
+        (GROUPE_FILS_ICM, "Femmes", None, None),
+        (GROUPE_NOUVEAUX, "Hommes", None, None),
+        (GROUPE_NOUVEAUX, "Femmes", None, None),
     ]
     ordres = defaultdict(int)
     for groupe, nom, age_min, age_max in categories_par_defaut:
@@ -2410,11 +2452,30 @@ def initialiser_donnees_presences():
     db.session.commit()
 
 
+def migrer_colonnes_presences_manquantes():
+    """db.create_all() ne modifie jamais une table déjà existante — seulement
+    les tables manquantes. Une base SQLite locale créée avant l'ajout des
+    groupes Fils-ICM / Nouveaux (10/09/2026) a donc `attendance_record` sans
+    les colonnes total_fils_icm/total_nouveaux : on les ajoute ici une seule
+    fois si besoin, sans toucher aux données déjà présentes."""
+    inspecteur = sa_inspect(db.engine)
+    if "attendance_record" not in inspecteur.get_table_names():
+        return
+    colonnes = {c["name"] for c in inspecteur.get_columns("attendance_record")}
+    manquantes = [c for c in ("total_fils_icm", "total_nouveaux") if c not in colonnes]
+    for colonne in manquantes:
+        db.session.execute(
+            text(f"ALTER TABLE attendance_record ADD COLUMN {colonne} INTEGER NOT NULL DEFAULT 0"))
+    if manquantes:
+        db.session.commit()
+
+
 # ------------------------------------------------------------------
 #  Démarrage
 # ------------------------------------------------------------------
 with app.app_context():
     db.create_all()
+    migrer_colonnes_presences_manquantes()
     initialiser_donnees_presences()
     # Empêche deux fiches de partager le même numéro de registre au niveau
     # de la base elle-même — pas seulement par le contrôle applicatif

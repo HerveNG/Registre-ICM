@@ -91,6 +91,9 @@ mvp_registre_bapteme_mariage/
 │   │                                 du 25/08/2026 (§ 14) — déjà inclus dans
 │   │                                 schema_supabase.sql pour une base neuve
 │   ├── migration_05_presences.sql ← si la base existait AVANT le module Présences (§ 11)
+│   ├── migration_06_categorisation_fils_icm_nouveaux.sql
+│   │                               ← si la base existait AVANT le classement Fils-ICM /
+│   │                                 Nouveaux du 10/09/2026 (§ 11)
 │   └── schema_sqlite.sql          ← documentation du schéma local
 │
 ├── app.py                         ← APPLICATION FLASK
@@ -125,15 +128,17 @@ mvp_registre_bapteme_mariage/
 4. **Project Settings → API** : noter l'`URL` du projet et la clé `anon`.
 
 > **Vous aviez déjà créé la base avant les photos, avant les rôles, avant
-> le journal d'audit, avant l'audit de sécurité du 25/08/2026 (§ 14), ou
-> avant le module Présences (§ 11) ?**
+> le journal d'audit, avant l'audit de sécurité du 25/08/2026 (§ 14), avant
+> le module Présences (§ 11), ou avant le classement Fils-ICM / Nouveaux
+> du 10/09/2026 (§ 11) ?**
 > Ne rejouez pas le script complet : exécutez, dans cet ordre,
 > `database/migration_01_photo.sql` puis `database/migration_02_roles.sql`
 > puis `database/migration_03_journal.sql` puis
 > `database/migration_04_durcissement_securite.sql` puis
-> `database/migration_05_presences.sql` — chacun ajoute
-> seulement ce qui manque, sans toucher à vos données. Une base créée à
-> partir du `schema_supabase.sql` actuel n'a besoin d'aucune de ces
+> `database/migration_05_presences.sql` puis
+> `database/migration_06_categorisation_fils_icm_nouveaux.sql` — chacun
+> ajoute seulement ce qui manque, sans toucher à vos données. Une base créée
+> à partir du `schema_supabase.sql` actuel n'a besoin d'aucune de ces
 > migrations : tout est déjà dedans.
 
 **b) Relier l'application**
@@ -382,17 +387,23 @@ Un module séparé du registre des baptêmes/mariages, accessible depuis
 l'en-tête (**📊 Présences**), pour suivre la fréquentation des cultes :
 
 - **Enregistrer une présence** : date (le jour de la semaine est détecté
-  automatiquement), type de culte, effectifs par catégorie d'âge (compteurs
-  +/-), avec calcul des totaux Hommes / Femmes / Enfants et du total général
-  en temps réel avant même l'enregistrement.
+  automatiquement), type de culte, effectifs par catégorie (compteurs +/-),
+  avec calcul des totaux Hommes / Femmes / Fils-ICM / Nouveaux et du total
+  général en temps réel avant même l'enregistrement. Classement depuis le
+  10/09/2026 : **Hommes** et **Femmes** ont chacun trois catégories
+  (Enfants, Adolescent·e·s, Adultes) ; **Fils-ICM** (le groupe de disciples)
+  et **Nouveaux** (une personne venue pour la première fois) ont chacun
+  deux catégories, Hommes et Femmes, sans tranche d'âge — chaque personne
+  présente n'est comptée qu'une seule fois, dans le groupe qui la décrit le
+  mieux ce jour-là.
 - **Tableau de bord** : dernier culte enregistré, évolution par rapport au
   culte précédent de même type, derniers cultes.
 - **Historique** : recherche, filtre par type de culte et par période, tri,
   pagination, consultation/modification/suppression (avec confirmation).
 - **Statistiques** : filtres par période (aujourd'hui, semaine, mois,
-  trimestre, année, personnalisée), répartition Hommes/Femmes/Enfants,
-  évolution, comparaison entre types de culte, analyse par jour de la
-  semaine — graphiques en CSS pur (camembert, barres), sans bibliothèque
+  trimestre, année, personnalisée), répartition Hommes/Femmes/Fils-ICM/
+  Nouveaux, évolution, comparaison entre types de culte, analyse par jour de
+  la semaine — graphiques en CSS pur (camembert, barres), sans bibliothèque
   externe, cohérent avec la CSP du reste de l'application (§14).
 - **Paramètres** (secrétariat/pasteur) : types de culte et catégories d'âge
   entièrement configurables — nom, tranche d'âge, ordre d'affichage,

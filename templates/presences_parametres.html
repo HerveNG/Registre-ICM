@@ -44,7 +44,11 @@
   </form>
 </div>
 
-{% for groupe, libelle, emoji in [('hommes','Hommes','👨'), ('femmes','Femmes','👩'), ('enfants','Enfants','🧒')] %}
+{% set _libelles_groupes = {'hommes': ('Hommes', '👨'), 'femmes': ('Femmes', '👩'),
+                            'fils_icm': ('Fils-ICM', '🤝'), 'nouveaux': ('Nouveaux', '🆕'),
+                            'enfants': ('Enfants (groupe retiré — historique uniquement)', '🧒')} %}
+{% for groupe, categories_du_groupe in par_groupe.items() %}
+{% set libelle, emoji = _libelles_groupes.get(groupe, (groupe|capitalize, '')) %}
 <div class="bloc-stat">
   <h2>{{ emoji }} Catégories — {{ libelle }}</h2>
   <form method="post">
@@ -54,7 +58,7 @@
       <table class="tableau tableau-parametres">
         <thead><tr><th>Nom</th><th>Âge min</th><th>Âge max</th><th>Ordre</th><th>Actif</th></tr></thead>
         <tbody>
-          {% for cat in par_groupe.get(groupe, []) %}
+          {% for cat in categories_du_groupe %}
           <tr>
             <td><input type="text" name="cat_nom_{{ cat.id }}" value="{{ cat.nom }}" maxlength="100" required></td>
             <td><input type="number" min="0" name="cat_age_min_{{ cat.id }}" value="{{ cat.age_min if cat.age_min is not none else '' }}"></td>
@@ -73,6 +77,7 @@
     </p>
   </form>
 
+  {% if groupe in ['hommes', 'femmes', 'fils_icm', 'nouveaux'] %}
   <form method="post" class="grille" style="margin-top:1rem; align-items:end;">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="action" value="ajouter_categorie">
@@ -84,6 +89,11 @@
     <label>Âge max <input type="number" min="0" name="age_max"></label>
     <button type="submit" class="bouton">+ Ajouter</button>
   </form>
+  {% else %}
+  <p class="discret">Groupe retiré de la configuration active — ces catégories
+    ne peuvent plus qu'être renommées, réordonnées ou désactivées ci-dessus,
+    pas complétées par une nouvelle entrée.</p>
+  {% endif %}
 </div>
 {% endfor %}
 

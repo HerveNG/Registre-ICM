@@ -48,11 +48,15 @@
     {% endif %}
   </fieldset>
 
-  {% for groupe, libelle, emoji in [('hommes','Hommes','👨'), ('femmes','Femmes','👩'), ('enfants','Enfants','🧒')] %}
+  {% set _libelles_groupes = {'hommes': ('Hommes', '👨'), 'femmes': ('Femmes', '👩'),
+                              'fils_icm': ('Fils-ICM', '🤝'), 'nouveaux': ('Nouveaux', '🆕'),
+                              'enfants': ('Enfants (historique)', '🧒')} %}
+  {% for groupe, categories_du_groupe in par_groupe.items() %}
+  {% set libelle, emoji = _libelles_groupes.get(groupe, (groupe|capitalize, '')) %}
   <fieldset>
     <legend>{{ emoji }} {{ libelle }}</legend>
     <div class="groupe-presence" data-groupe="{{ groupe }}">
-      {% for cat in par_groupe.get(groupe, []) %}
+      {% for cat in categories_du_groupe %}
       <div class="compteur">
         <span class="compteur-nom">{{ cat.nom }}{% if cat.libelle_age %}<small>{{ cat.libelle_age }}</small>{% endif %}</span>
         <span class="compteur-controles">
@@ -103,13 +107,21 @@
   }
 
   function recalculerTotaux(){
+    // Les groupes affichés dépendent de par_groupe (voir le gabarit) : on les
+    // lit depuis le DOM plutôt que de les figer ici, pour rester correct même
+    // si une fiche ancienne affiche en plus un groupe historique (enfants).
     var totalGeneral = 0;
-    ["hommes","femmes","enfants"].forEach(function(groupe){
+    var groupes = [];
+    document.querySelectorAll(".groupe-presence").forEach(function(bloc){
+      groupes.push(bloc.dataset.groupe);
+    });
+    groupes.forEach(function(groupe){
       var somme = 0;
       document.querySelectorAll('.compteur-groupe[data-groupe="' + groupe + '"]').forEach(function(champ){
         somme += parseInt(champ.value, 10) || 0;
       });
-      document.getElementById("total-" + groupe).textContent = somme;
+      var cible = document.getElementById("total-" + groupe);
+      if (cible) cible.textContent = somme;
       totalGeneral += somme;
     });
     document.getElementById("total-general").textContent = totalGeneral;

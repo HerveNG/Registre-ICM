@@ -45,7 +45,7 @@
   <thead>
     <tr>
       <th>Date</th><th>Jour</th><th>Type de culte</th>
-      <th>Hommes</th><th>Femmes</th><th>Enfants</th><th>Total</th>
+      <th>Hommes</th><th>Femmes</th><th>Fils-ICM</th><th>Nouveaux</th><th>Total</th>
       <th class="col-actions">Actions</th>
     </tr>
   </thead>
@@ -57,7 +57,8 @@
       <td>{{ r.service_type.nom if r.service_type else '—' }}</td>
       <td>{{ r.total_hommes }}</td>
       <td>{{ r.total_femmes }}</td>
-      <td>{{ r.total_enfants }}</td>
+      <td>{{ r.total_fils_icm }}</td>
+      <td>{{ r.total_nouveaux }}</td>
       <td><strong>{{ r.total_general }}</strong></td>
       <td class="col-actions">
         <a class="bouton bouton-petit" href="{{ url_for('presences_detail', record_id=r.id) }}">👁 Voir</a>

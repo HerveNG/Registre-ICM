@@ -28,16 +28,19 @@
   {% endif %}
 </div>
 
-{% for groupe, libelle, emoji, total in [
-  ('hommes','Hommes','👨', record.total_hommes),
-  ('femmes','Femmes','👩', record.total_femmes),
-  ('enfants','Enfants','🧒', record.total_enfants)] %}
+{% set _libelles_groupes = {'hommes': ('Hommes', '👨', record.total_hommes),
+                            'femmes': ('Femmes', '👩', record.total_femmes),
+                            'fils_icm': ('Fils-ICM', '🤝', record.total_fils_icm),
+                            'nouveaux': ('Nouveaux', '🆕', record.total_nouveaux),
+                            'enfants': ('Enfants (historique)', '🧒', record.total_enfants)} %}
+{% for groupe, valeurs_du_groupe in par_groupe.items() %}
+{% set libelle, emoji, total = _libelles_groupes.get(groupe, (groupe|capitalize, '', 0)) %}
 <div class="bloc-stat">
   <h2>{{ emoji }} {{ libelle }} — {{ total }}</h2>
   <div class="tableau-enveloppe">
     <table class="tableau">
       <tbody>
-        {% for v in par_groupe.get(groupe, []) %}
+        {% for v in valeurs_du_groupe %}
         <tr><td>{{ v.category.nom }}</td><td style="text-align:right"><strong>{{ v.effectif }}</strong></td></tr>
         {% else %}
         <tr><td class="discret">Aucun détail enregistré.</td></tr>
