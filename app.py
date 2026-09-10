@@ -132,6 +132,7 @@ def injecter_identite_app():
         "version_app": VERSION_APP,
         "developpeur": DEVELOPPEUR,
         "entreprise": ENTREPRISE,
+        "indicatifs_telephone": INDICATIFS_TELEPHONE,
     }
 
 
@@ -369,6 +370,134 @@ def normaliser_casse(champ, valeur):
     if champ in CHAMPS_CAPITALISES:
         return valeur[:1].upper() + valeur[1:].lower()
     return valeur
+
+
+def nettoyer_telephone(valeur):
+    """Nettoie/normalise un numéro : ne garde que les chiffres (et un + de
+    tête s'il y en avait un). Générique, utilisé par le registre et par le
+    module Fils (voir fusionner_telephone ci-dessous)."""
+    if not valeur:
+        return None
+    valeur = str(valeur).strip()
+    garde_plus = valeur.startswith("+")
+    chiffres = re.sub(r"[^0-9]", "", valeur)
+    if not chiffres:
+        return None
+    return ("+" if garde_plus else "") + chiffres
+
+
+# Sélecteur d'indicatif téléphonique international — liste des pays triée
+# par ordre alphabétique (nom en français), chacun avec son indicatif E.164.
+# Dupliquée à l'identique côté JS dans web/index.html (aucune bibliothèque
+# externe, aucun appel réseau : l'application reste un fichier autonome).
+# Quelques micro-États nord-américains partagent l'indicatif +1 avec leur
+# propre préfixe régional (ex. +1268 Antigua-et-Barbuda) : c'est volontaire
+# et sans conséquence, voir decouper_telephone() plus bas.
+INDICATIFS_TELEPHONE = [
+    ("Afghanistan", "+93"), ("Afrique du Sud", "+27"), ("Albanie", "+355"),
+    ("Algérie", "+213"), ("Allemagne", "+49"), ("Andorre", "+376"),
+    ("Angola", "+244"), ("Antigua-et-Barbuda", "+1268"),
+    ("Arabie saoudite", "+966"), ("Argentine", "+54"), ("Arménie", "+374"),
+    ("Australie", "+61"), ("Autriche", "+43"), ("Azerbaïdjan", "+994"),
+    ("Bahamas", "+1242"), ("Bahreïn", "+973"), ("Bangladesh", "+880"),
+    ("Barbade", "+1246"), ("Belgique", "+32"), ("Belize", "+501"),
+    ("Bénin", "+229"), ("Bhoutan", "+975"), ("Biélorussie", "+375"),
+    ("Birmanie (Myanmar)", "+95"), ("Bolivie", "+591"),
+    ("Bosnie-Herzégovine", "+387"), ("Botswana", "+267"), ("Brésil", "+55"),
+    ("Brunei", "+673"), ("Bulgarie", "+359"), ("Burkina Faso", "+226"),
+    ("Burundi", "+257"), ("Cambodge", "+855"), ("Cameroun", "+237"),
+    ("Canada", "+1"), ("Cap-Vert", "+238"), ("Chili", "+56"),
+    ("Chine", "+86"), ("Chypre", "+357"), ("Colombie", "+57"),
+    ("Comores", "+269"), ("Congo (République du)", "+242"),
+    ("Congo (République démocratique du)", "+243"),
+    ("Corée du Nord", "+850"), ("Corée du Sud", "+82"),
+    ("Costa Rica", "+506"), ("Côte d'Ivoire", "+225"), ("Croatie", "+385"),
+    ("Cuba", "+53"), ("Danemark", "+45"), ("Djibouti", "+253"),
+    ("Dominique", "+1767"), ("Égypte", "+20"),
+    ("Émirats arabes unis", "+971"), ("Équateur", "+593"),
+    ("Érythrée", "+291"), ("Espagne", "+34"), ("Estonie", "+372"),
+    ("Eswatini", "+268"), ("États-Unis", "+1"), ("Éthiopie", "+251"),
+    ("Fidji", "+679"), ("Finlande", "+358"), ("France", "+33"),
+    ("Gabon", "+241"), ("Gambie", "+220"), ("Géorgie", "+995"),
+    ("Ghana", "+233"), ("Grèce", "+30"), ("Grenade", "+1473"),
+    ("Guatemala", "+502"), ("Guinée", "+224"), ("Guinée-Bissau", "+245"),
+    ("Guinée équatoriale", "+240"), ("Guyana", "+592"), ("Haïti", "+509"),
+    ("Honduras", "+504"), ("Hongrie", "+36"), ("Îles Marshall", "+692"),
+    ("Îles Salomon", "+677"), ("Inde", "+91"), ("Indonésie", "+62"),
+    ("Irak", "+964"), ("Iran", "+98"), ("Irlande", "+353"),
+    ("Islande", "+354"), ("Israël", "+972"), ("Italie", "+39"),
+    ("Jamaïque", "+1876"), ("Japon", "+81"), ("Jordanie", "+962"),
+    ("Kazakhstan", "+7"), ("Kenya", "+254"), ("Kirghizistan", "+996"),
+    ("Kiribati", "+686"), ("Koweït", "+965"), ("Laos", "+856"),
+    ("Lesotho", "+266"), ("Lettonie", "+371"), ("Liban", "+961"),
+    ("Liberia", "+231"), ("Libye", "+218"), ("Liechtenstein", "+423"),
+    ("Lituanie", "+370"), ("Luxembourg", "+352"),
+    ("Macédoine du Nord", "+389"), ("Madagascar", "+261"),
+    ("Malaisie", "+60"), ("Malawi", "+265"), ("Maldives", "+960"),
+    ("Mali", "+223"), ("Malte", "+356"), ("Maroc", "+212"),
+    ("Maurice", "+230"), ("Mauritanie", "+222"), ("Mexique", "+52"),
+    ("Micronésie", "+691"), ("Moldavie", "+373"), ("Monaco", "+377"),
+    ("Mongolie", "+976"), ("Monténégro", "+382"), ("Mozambique", "+258"),
+    ("Namibie", "+264"), ("Nauru", "+674"), ("Népal", "+977"),
+    ("Nicaragua", "+505"), ("Niger", "+227"), ("Nigeria", "+234"),
+    ("Norvège", "+47"), ("Nouvelle-Zélande", "+64"), ("Oman", "+968"),
+    ("Ouganda", "+256"), ("Ouzbékistan", "+998"), ("Pakistan", "+92"),
+    ("Palaos", "+680"), ("Panama", "+507"),
+    ("Papouasie-Nouvelle-Guinée", "+675"), ("Paraguay", "+595"),
+    ("Pays-Bas", "+31"), ("Pérou", "+51"), ("Philippines", "+63"),
+    ("Pologne", "+48"), ("Portugal", "+351"), ("Qatar", "+974"),
+    ("République centrafricaine", "+236"),
+    ("République dominicaine", "+1809"),
+    ("République tchèque (Tchéquie)", "+420"), ("Roumanie", "+40"),
+    ("Royaume-Uni", "+44"), ("Russie", "+7"), ("Rwanda", "+250"),
+    ("Saint-Christophe-et-Niévès", "+1869"), ("Saint-Marin", "+378"),
+    ("Saint-Vincent-et-les-Grenadines", "+1784"), ("Sainte-Lucie", "+1758"),
+    ("Salvador", "+503"), ("Samoa", "+685"),
+    ("São Tomé-et-Príncipe", "+239"), ("Sénégal", "+221"),
+    ("Serbie", "+381"), ("Seychelles", "+248"), ("Sierra Leone", "+232"),
+    ("Singapour", "+65"), ("Slovaquie", "+421"), ("Slovénie", "+386"),
+    ("Somalie", "+252"), ("Soudan", "+249"), ("Soudan du Sud", "+211"),
+    ("Sri Lanka", "+94"), ("Suède", "+46"), ("Suisse", "+41"),
+    ("Suriname", "+597"), ("Syrie", "+963"), ("Tadjikistan", "+992"),
+    ("Tanzanie", "+255"), ("Tchad", "+235"), ("Thaïlande", "+66"),
+    ("Timor oriental", "+670"), ("Togo", "+228"), ("Tonga", "+676"),
+    ("Trinité-et-Tobago", "+1868"), ("Tunisie", "+216"),
+    ("Turkménistan", "+993"), ("Turquie", "+90"), ("Tuvalu", "+688"),
+    ("Ukraine", "+380"), ("Uruguay", "+598"), ("Vanuatu", "+678"),
+    ("Vatican", "+379"), ("Venezuela", "+58"), ("Vietnam", "+84"),
+    ("Yémen", "+967"), ("Zambie", "+260"), ("Zimbabwe", "+263"),
+]
+INDICATIF_PAR_DEFAUT = "+237"
+
+
+def decouper_telephone(valeur):
+    """Sépare un numéro stocké (ex. "+237677000000") en (indicatif, partie
+    locale), par correspondance du préfixe le plus long possible dans
+    INDICATIFS_TELEPHONE — pour présélectionner le bon pays à la
+    modification d'une fiche. Si `valeur` ne commence pas par "+" (ancienne
+    donnée, ou numéro sans indicatif), ou qu'aucun indicatif ne correspond,
+    renvoie (None, valeur) sans rien modifier."""
+    valeur = valeur or ""
+    if not valeur.startswith("+"):
+        return None, valeur
+    meilleur = None
+    for _nom, indicatif in INDICATIFS_TELEPHONE:
+        if valeur.startswith(indicatif) and (meilleur is None or len(indicatif) > len(meilleur)):
+            meilleur = indicatif
+    if meilleur is None:
+        return None, valeur
+    return meilleur, valeur[len(meilleur):]
+
+
+def fusionner_telephone(indicatif, local):
+    """Fusionne l'indicatif choisi et le numéro local saisis séparément dans
+    le formulaire en une seule valeur nettoyée (ex. "+237677000000"), ou
+    None si le numéro local est vide (même si un indicatif est choisi)."""
+    local = (local or "").strip()
+    if not local:
+        return None
+    return nettoyer_telephone(f"{(indicatif or '').strip()}{local}")
+
 
 # Colonnes de l'export CSV — et, à l'identique (moins la photo), du modèle
 # d'import et de la reconnaissance des en-têtes d'un fichier envoyé. Garder
@@ -1032,6 +1161,7 @@ def collecter_formulaire(form):
         c: normaliser_casse(c, (form.get(c, "") or "").strip() or None)
         for c in CHAMPS_TEXTE
     }
+    donnees["telephone"] = fusionner_telephone(form.get("indicatif"), form.get("telephone"))
     for c in CHAMPS_DATE:
         donnees[c] = lire_date(form.get(c))
     return donnees, valider_donnees(donnees)
@@ -1227,7 +1357,8 @@ def nouveau():
               f"(N° {record.numero_registre_1 or '—'}).", "success")
         return redirect(url_for("index"))
 
-    return render_template("form.html", record=None, valeurs={}, paroisse=PAROISSE)
+    return render_template("form.html", record=None,
+                           valeurs={"indicatif": INDICATIF_PAR_DEFAUT}, paroisse=PAROISSE)
 
 
 @app.route("/modifier/<int:record_id>", methods=["GET", "POST"])
@@ -1276,8 +1407,12 @@ def modifier(record_id):
         return redirect(url_for("index"))
 
     creation, derniere_modif = historique_fiche(record.id)
-    return render_template("form.html", record=record, valeurs={}, paroisse=PAROISSE,
-                           creation=creation, derniere_modif=derniere_modif)
+    indicatif_actuel, telephone_local = decouper_telephone(record.telephone)
+    return render_template(
+        "form.html", record=record,
+        valeurs={"indicatif": indicatif_actuel or "", "telephone": telephone_local or ""},
+        paroisse=PAROISSE, creation=creation, derniere_modif=derniere_modif,
+    )
 
 
 @app.post("/supprimer/<int:record_id>")
@@ -2552,19 +2687,6 @@ def normaliser_casse_fils(champ, valeur):
     return valeur
 
 
-def nettoyer_telephone(valeur):
-    """Nettoie/normalise un numéro : ne garde que les chiffres (et un + de
-    tête s'il y en avait un) — §5 du cahier des charges."""
-    if not valeur:
-        return None
-    valeur = str(valeur).strip()
-    garde_plus = valeur.startswith("+")
-    chiffres = re.sub(r"[^0-9]", "", valeur)
-    if not chiffres:
-        return None
-    return ("+" if garde_plus else "") + chiffres
-
-
 def normaliser_genre_fils(valeur):
     """Accepte M/F mais aussi Homme/Femme/H (casse et accents indifférents) —
     reconnaissance « intelligente » comme demandé pour les en-têtes (§8),
@@ -2601,7 +2723,7 @@ def collecter_formulaire_fils(form):
         "nom": normaliser_casse_fils("nom", (form.get("nom", "") or "").strip() or None),
         "prenom": normaliser_casse_fils("prenom", (form.get("prenom", "") or "").strip() or None),
         "ville": normaliser_casse_fils("ville", (form.get("ville", "") or "").strip() or None),
-        "telephone": nettoyer_telephone(form.get("telephone")),
+        "telephone": fusionner_telephone(form.get("indicatif"), form.get("telephone")),
         "genre": form.get("genre") if form.get("genre") in GENRES_FILS else None,
         "statut": form.get("statut") if form.get("statut") in LIBELLES_STATUTS_FILS else STATUT_FILS_ACTIF,
     }
@@ -2738,6 +2860,9 @@ def fils_modifier(fils_id):
         flash(f"Fils « {record.nom_complet} » mis à jour.", "success")
         return redirect(url_for("fils_detail", fils_id=record.id))
     valeurs = {c: getattr(record, c) for c in ("nom", "prenom", "ville", "telephone", "genre", "statut")}
+    indicatif_actuel, telephone_local = decouper_telephone(record.telephone)
+    valeurs["indicatif"] = indicatif_actuel or ""
+    valeurs["telephone"] = telephone_local or ""
     return render_template("fils_form.html", paroisse=PAROISSE, fils=record, valeurs=valeurs)
 
 

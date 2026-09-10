@@ -155,3 +155,54 @@ def test_normaliser_entete_ignore_accents_casse_ponctuation(icm_app):
         "  date   de naissance !!"
     )
     assert icm_app.normaliser_entete("Célébrant baptême") == "celebrant bapteme"
+
+
+# ------------------------------------------------------------------
+#  Sélecteur d'indicatif téléphonique international
+# ------------------------------------------------------------------
+def test_decouper_telephone_indicatif_connu(icm_app):
+    assert icm_app.decouper_telephone("+237677000000") == ("+237", "677000000")
+
+
+def test_decouper_telephone_prefixe_le_plus_long_gagne(icm_app):
+    # +1268 (Antigua-et-Barbuda) doit l'emporter sur +1 (Canada/États-Unis),
+    # tous deux présents dans INDICATIFS_TELEPHONE.
+    assert icm_app.decouper_telephone("+1268555000") == ("+1268", "555000")
+    assert icm_app.decouper_telephone("+15551234567") == ("+1", "5551234567")
+
+
+def test_decouper_telephone_sans_plus_reste_inchange(icm_app):
+    """Donnée ancienne (avant ce sélecteur) : aucun indicatif détecté, la
+    valeur ne doit surtout pas être altérée."""
+    assert icm_app.decouper_telephone("677000000") == (None, "677000000")
+
+
+def test_decouper_telephone_valeur_vide(icm_app):
+    assert icm_app.decouper_telephone(None) == (None, "")
+    assert icm_app.decouper_telephone("") == (None, "")
+
+
+def test_fusionner_telephone_local_vide_donne_none(icm_app):
+    """Même avec un pays choisi, un numéro local vide ne doit jamais
+    produire un « numéro » réduit au seul indicatif."""
+    assert icm_app.fusionner_telephone("+237", "") is None
+    assert icm_app.fusionner_telephone("+237", "   ") is None
+
+
+def test_fusionner_telephone_nettoie_la_ponctuation(icm_app):
+    assert icm_app.fusionner_telephone("+237", "677 00.00-00") == "+237677000000"
+
+
+def test_fusionner_telephone_sans_indicatif_egale_nettoyer_telephone_seul(icm_app):
+    """Non-régression : un formulaire soumis sans indicatif (ancien
+    comportement, ou champ non renseigné) doit produire exactement ce que
+    nettoyer_telephone() produisait avant l'ajout du sélecteur."""
+    assert icm_app.fusionner_telephone("", "691-23.45 67") == icm_app.nettoyer_telephone(
+        "691-23.45 67"
+    )
+    assert icm_app.fusionner_telephone(None, "691234567") == "691234567"
+
+
+def test_indicatifs_telephone_cameroun_present_et_defaut_correct(icm_app):
+    assert ("Cameroun", "+237") in icm_app.INDICATIFS_TELEPHONE
+    assert icm_app.INDICATIF_PAR_DEFAUT == "+237"

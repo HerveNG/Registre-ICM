@@ -91,7 +91,15 @@
         <input type="text" name="originaire_de" value="{{ txt('originaire_de') }}" maxlength="150">
       </label>
       <label>Téléphone
-        <input type="text" name="telephone" value="{{ txt('telephone') }}" maxlength="50">
+        <div class="champ-telephone">
+          <select name="indicatif">
+            <option value="">— Aucun indicatif —</option>
+            {% for nom_pays, code in indicatifs_telephone %}
+            <option value="{{ code }}" {% if txt('indicatif') == code %}selected{% endif %}>{{ nom_pays }} ({{ code }})</option>
+            {% endfor %}
+          </select>
+          <input type="text" name="telephone" value="{{ txt('telephone') }}" maxlength="50">
+        </div>
       </label>
     </div>
   </fieldset>

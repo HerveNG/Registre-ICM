@@ -218,6 +218,11 @@ label input,label select,label textarea{margin-top:.25rem; font-weight:400;
 .aide code{background:#eef1f6; padding:.1rem .35rem; border-radius:4px;}
 .actions-formulaire{display:flex; gap:.6rem; flex-wrap:wrap;}
 
+/* Sélecteur d'indicatif téléphonique + numéro local, sur une ligne */
+.champ-telephone{display:flex; gap:.5rem;}
+.champ-telephone select{flex:0 0 auto; max-width:45%;}
+.champ-telephone input{flex:1; min-width:0;}
+
 /* ---------------- Photo d'identité ---------------- */
 .bloc-photo{display:flex; gap:1.4rem; align-items:flex-start; flex-wrap:wrap;}
 .photo-cadre{

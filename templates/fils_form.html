@@ -28,7 +28,15 @@
       <input type="text" name="ville" maxlength="150" value="{{ val('ville') }}">
     </label>
     <label>Téléphone
-      <input type="text" name="telephone" maxlength="50" value="{{ val('telephone') }}">
+      <div class="champ-telephone">
+        <select name="indicatif">
+          <option value="">— Aucun indicatif —</option>
+          {% for nom_pays, code in indicatifs_telephone %}
+          <option value="{{ code }}" {% if val('indicatif', '+237') == code %}selected{% endif %}>{{ nom_pays }} ({{ code }})</option>
+          {% endfor %}
+        </select>
+        <input type="text" name="telephone" maxlength="50" value="{{ val('telephone') }}">
+      </div>
     </label>
     <label class="obligatoire">Genre
       <select name="genre" required>

@@ -271,6 +271,78 @@ def test_lire_formulaire_applique_la_normalisation_de_casse(page):
 
 
 # ------------------------------------------------------------------
+#  Sélecteur d'indicatif téléphonique international (decouperTelephone /
+#  fusionnerTelephone), en miroir de decouper_telephone /
+#  fusionner_telephone côté Flask (app.py) — voir tests/test_validation.py.
+# ------------------------------------------------------------------
+def test_decouper_telephone_indicatif_connu(page):
+    assert page.evaluate("decouperTelephone('+237677000000')") == {
+        "indicatif": "+237", "local": "677000000",
+    }
+
+
+def test_decouper_telephone_prefixe_le_plus_long_gagne(page):
+    assert page.evaluate("decouperTelephone('+1268555000')") == {
+        "indicatif": "+1268", "local": "555000",
+    }
+    assert page.evaluate("decouperTelephone('+15551234567')") == {
+        "indicatif": "+1", "local": "5551234567",
+    }
+
+
+def test_decouper_telephone_sans_plus_reste_inchange(page):
+    assert page.evaluate("decouperTelephone('677000000')") == {
+        "indicatif": "", "local": "677000000",
+    }
+
+
+def test_fusionner_telephone_local_vide_donne_null(page):
+    assert page.evaluate("fusionnerTelephone('+237', '')") is None
+    assert page.evaluate("fusionnerTelephone('+237', '   ')") is None
+
+
+def test_fusionner_telephone_nettoie_la_ponctuation(page):
+    assert page.evaluate("fusionnerTelephone('+237', '677 00.00-00')") == "+237677000000"
+
+
+def test_indicatifs_telephone_cameroun_present_et_defaut_correct(page):
+    assert page.evaluate(
+        "INDICATIFS_TELEPHONE.some(([nom, code]) => nom === 'Cameroun' && code === '+237')"
+    )
+    assert page.evaluate("INDICATIF_PAR_DEFAUT") == "+237"
+
+
+def test_formulaire_registre_preselectionne_cameroun_par_defaut(page):
+    assert page.eval_on_selector("#f-indicatif", "el => el.value") == "+237"
+
+
+def test_formulaire_fils_preselectionne_cameroun_par_defaut(page):
+    assert page.eval_on_selector("#fils-indicatif", "el => el.value") == "+237"
+
+
+def test_ouvrir_formulaire_edition_redetecte_lindicatif(page):
+    page.evaluate("""() => {
+        etat.role = "secretaire";
+        ouvrirFormulaire({ id: "1", nom: "TEST", prenom: "X", telephone: "+237677000000" });
+    }""")
+    assert page.eval_on_selector("#f-indicatif", "el => el.value") == "+237"
+    assert page.eval_on_selector("#f-telephone", "el => el.value") == "677000000"
+
+
+def test_ouvrir_formulaire_edition_preserve_un_numero_sans_indicatif(page):
+    """Une fiche ancienne (numéro sans « + ») ne doit pas être altérée à la
+    ré-ouverture du formulaire, ni à la relecture avant enregistrement."""
+    page.evaluate("""() => {
+        etat.role = "secretaire";
+        ouvrirFormulaire({ id: "2", nom: "TEST2", prenom: "Y", telephone: "0022899123456" });
+    }""")
+    assert page.eval_on_selector("#f-indicatif", "el => el.value") == ""
+    assert page.eval_on_selector("#f-telephone", "el => el.value") == "0022899123456"
+    donnees = page.evaluate("lireFormulaire()")
+    assert donnees["telephone"] == "0022899123456"
+
+
+# ------------------------------------------------------------------
 #  Régression : validerFormulaire comparait la date saisie (locale, telle
 #  que rendue par <input type="date">) à `new Date().toISOString()` (UTC).
 #  Entre minuit et l'heure de décalage local, dans un fuseau en avance sur

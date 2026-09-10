@@ -69,6 +69,62 @@ def test_modifier_fiche_inexistante_renvoie_404(client_secretaire):
     assert reponse.status_code == 404
 
 
+# ------------------------------------------------------------------
+#  Sélecteur d'indicatif téléphonique international
+# ------------------------------------------------------------------
+def test_creer_une_fiche_avec_indicatif_fusionne_le_telephone(client_secretaire, icm_app):
+    reponse = client_secretaire.post(
+        "/nouveau",
+        data={"nom": "Ateba", "prenom": "Jean", "indicatif": "+237", "telephone": "677 00 00 00"},
+    )
+    assert reponse.status_code == 302
+    with icm_app.app.app_context():
+        fiche = icm_app.Registre.query.filter_by(nom="ATEBA").one()
+        assert fiche.telephone == "+237677000000"
+
+
+def test_creer_une_fiche_sans_indicatif_ne_prefixe_rien(client_secretaire, icm_app):
+    """Non-régression : un formulaire sans indicatif (ou soumis directement
+    sans passer par le sélecteur) doit se comporter comme avant."""
+    reponse = client_secretaire.post(
+        "/nouveau", data={"nom": "Mballa", "prenom": "Paul", "telephone": "677000000"},
+    )
+    assert reponse.status_code == 302
+    with icm_app.app.app_context():
+        fiche = icm_app.Registre.query.filter_by(nom="MBALLA").one()
+        assert fiche.telephone == "677000000"
+
+
+def test_modifier_une_fiche_ancienne_sans_toucher_au_telephone_le_preserve(client_secretaire, icm_app):
+    """Une fiche déjà en base avec un numéro sans indicatif (donnée
+    antérieure à ce sélecteur) ne doit pas être corrompue par une
+    modification qui ne touche pas au téléphone."""
+    with icm_app.app.app_context():
+        fiche = icm_app.Registre(nom="Ancien", prenom="Test", telephone="0022899123456")
+        icm_app.db.session.add(fiche)
+        icm_app.db.session.commit()
+        id_fiche = fiche.id
+
+    # Le formulaire de modification (GET) doit présélectionner « aucun
+    # indicatif » et afficher le numéro brut tel quel dans le champ local.
+    page = client_secretaire.get(f"/modifier/{id_fiche}")
+    assert b"0022899123456" in page.data
+
+    reponse = client_secretaire.post(
+        f"/modifier/{id_fiche}",
+        data={"nom": "Ancien", "prenom": "Test", "indicatif": "", "telephone": "0022899123456"},
+    )
+    assert reponse.status_code == 302
+    with icm_app.app.app_context():
+        fiche = icm_app.db.session.get(icm_app.Registre, id_fiche)
+        assert fiche.telephone == "0022899123456"
+
+
+def test_formulaire_nouveau_preselectionne_cameroun(client_secretaire):
+    page = client_secretaire.get("/nouveau")
+    assert b'value="+237" selected' in page.data
+
+
 def test_supprimer_une_fiche_la_retire_de_la_base(client_secretaire, icm_app):
     with icm_app.app.app_context():
         fiche = icm_app.Registre(nom="ASupprimer", prenom="Test")

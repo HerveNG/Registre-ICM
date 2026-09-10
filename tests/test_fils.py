@@ -61,6 +61,45 @@ def test_creer_un_fils(client_secretaire, icm_app):
         assert f.genre == "F"
 
 
+def test_creer_un_fils_avec_indicatif_fusionne_le_telephone(client_secretaire, icm_app):
+    reponse = client_secretaire.post("/fils/nouveau", data={
+        "nom": "mballa", "prenom": "jean", "genre": "M",
+        "indicatif": "+237", "telephone": "677 00 00 00",
+    })
+    assert reponse.status_code == 302
+    with icm_app.app.app_context():
+        f = icm_app.Fils.query.filter_by(nom="MBALLA").one()
+        assert f.telephone == "+237677000000"
+
+
+def test_modifier_un_fils_ancien_sans_toucher_au_telephone_le_preserve(client_secretaire, icm_app):
+    """Un fils déjà en base avec un numéro sans indicatif (donnée antérieure
+    à ce sélecteur) ne doit pas être corrompu par une modification qui ne
+    touche pas au téléphone."""
+    with icm_app.app.app_context():
+        f = icm_app.Fils(nom="ANCIEN", prenom="Test", genre="M", telephone="0022899123456")
+        icm_app.db.session.add(f)
+        icm_app.db.session.commit()
+        id_fils = f.id
+
+    page = client_secretaire.get(f"/fils/{id_fils}/modifier")
+    assert b"0022899123456" in page.data
+
+    reponse = client_secretaire.post(f"/fils/{id_fils}/modifier", data={
+        "nom": "Ancien", "prenom": "Test", "genre": "M",
+        "indicatif": "", "telephone": "0022899123456",
+    })
+    assert reponse.status_code == 302
+    with icm_app.app.app_context():
+        f = icm_app.db.session.get(icm_app.Fils, id_fils)
+        assert f.telephone == "0022899123456"
+
+
+def test_formulaire_fils_nouveau_preselectionne_cameroun(client_secretaire):
+    page = client_secretaire.get("/fils/nouveau")
+    assert b'value="+237" selected' in page.data
+
+
 def test_nom_et_prenom_obligatoires(client_secretaire, icm_app):
     reponse = client_secretaire.post("/fils/nouveau", data={"nom": "", "prenom": "", "genre": "M"})
     assert reponse.status_code == 200
