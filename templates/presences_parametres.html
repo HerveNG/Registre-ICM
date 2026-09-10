@@ -2,6 +2,7 @@
 {% block titre %}Paramètres des présences — ICM{% endblock %}
 
 {% block contenu %}
+{% set peut_supprimer = session.get('role') in ('secretaire', 'pasteur') %}
 
 <div class="titre-page">
   <h1>Paramètres — Présences</h1>
@@ -22,8 +23,8 @@
             <td><input type="text" name="type_nom_{{ t.id }}" value="{{ t.nom }}" maxlength="100" required></td>
             <td><input type="number" name="type_ordre_{{ t.id }}" value="{{ t.ordre_affichage }}"></td>
             <td><input type="checkbox" name="type_actif_{{ t.id }}" {% if t.is_active %}checked{% endif %}></td>
-            <td><button type="button" class="bouton bouton-petit bouton-danger btn-supprimer-type"
-                         data-id="{{ t.id }}" data-nom="{{ t.nom }}">🗑 Supprimer</button></td>
+            <td>{% if peut_supprimer %}<button type="button" class="bouton bouton-petit bouton-danger btn-supprimer-type"
+                         data-id="{{ t.id }}" data-nom="{{ t.nom }}">🗑 Supprimer</button>{% endif %}</td>
           </tr>
           {% else %}
           <tr><td colspan="4" class="discret">Aucun type de culte.</td></tr>
@@ -67,8 +68,8 @@
             <td><input type="number" min="0" name="cat_age_max_{{ cat.id }}" value="{{ cat.age_max if cat.age_max is not none else '' }}"></td>
             <td><input type="number" name="cat_ordre_{{ cat.id }}" value="{{ cat.ordre_affichage }}"></td>
             <td><input type="checkbox" name="cat_actif_{{ cat.id }}" {% if cat.is_active %}checked{% endif %}></td>
-            <td><button type="button" class="bouton bouton-petit bouton-danger btn-supprimer-categorie"
-                         data-id="{{ cat.id }}" data-nom="{{ cat.nom }}">🗑 Supprimer</button></td>
+            <td>{% if peut_supprimer %}<button type="button" class="bouton bouton-petit bouton-danger btn-supprimer-categorie"
+                         data-id="{{ cat.id }}" data-nom="{{ cat.nom }}">🗑 Supprimer</button>{% endif %}</td>
           </tr>
           {% else %}
           <tr><td colspan="6" class="discret">Aucune catégorie pour ce groupe.</td></tr>

@@ -178,6 +178,28 @@ def test_supprimer_une_presence(client_secretaire, icm_app):
         assert icm_app.AttendanceValue.query.count() == 0
 
 
+def test_visiteur_ne_peut_pas_supprimer_une_presence(client_visiteur, icm_app):
+    # Créée directement en base (pas via client_secretaire) : mélanger deux
+    # fixtures client_X dans un même test partagerait la même session de
+    # test Flask (fixture `client`), et la dernière connexion établie
+    # écraserait la précédente.
+    from datetime import date as _date
+    with icm_app.app.app_context():
+        record = icm_app.AttendanceRecord(
+            date_culte=_date(2026, 8, 30),
+            service_type_id=_id_type_dimanche(icm_app),
+            created_by="test_secretaire",
+        )
+        icm_app.db.session.add(record)
+        icm_app.db.session.commit()
+        id_record = record.id
+
+    reponse = client_visiteur.post(f"/presences/{id_record}/supprimer")
+    assert reponse.status_code == 302
+    with icm_app.app.app_context():
+        assert icm_app.AttendanceRecord.query.count() == 1
+
+
 def test_presence_inexistante_renvoie_404(client_secretaire):
     assert client_secretaire.get("/presences/999999").status_code == 404
     assert client_secretaire.get("/presences/999999/modifier").status_code == 404
@@ -222,17 +244,21 @@ def test_visiteur_peut_consulter_le_module_presences(client_visiteur, icm_app):
         assert client_visiteur.get(chemin).status_code == 200
 
 
-def test_visiteur_ne_peut_pas_enregistrer_une_presence(client_visiteur, icm_app):
+def test_visiteur_peut_enregistrer_une_presence(client_visiteur, icm_app):
+    """Depuis la reclassification des droits du 10/09/2026, le visiteur a
+    les mêmes droits d'écriture que secrétaire/pasteur sur les présences —
+    seule la suppression définitive lui reste fermée (voir
+    test_visiteur_ne_peut_pas_supprimer_un_type_ou_une_categorie)."""
     reponse = client_visiteur.get("/presences/nouvelle")
+    assert reponse.status_code == 200
+    reponse = client_visiteur.post("/presences/nouvelle", data=_donnees_exemple(icm_app))
     assert reponse.status_code == 302
-    reponse = client_visiteur.post(
-        "/presences/nouvelle", data=_donnees_exemple(icm_app), follow_redirects=True)
     with icm_app.app.app_context():
-        assert icm_app.AttendanceRecord.query.count() == 0
+        assert icm_app.AttendanceRecord.query.count() == 1
 
 
-def test_visiteur_ne_peut_pas_acceder_aux_parametres(client_visiteur):
-    assert client_visiteur.get("/presences/parametres").status_code == 302
+def test_visiteur_peut_acceder_aux_parametres(client_visiteur):
+    assert client_visiteur.get("/presences/parametres").status_code == 200
 
 
 def test_pasteur_a_les_memes_droits_que_secretaire(client_pasteur, icm_app):

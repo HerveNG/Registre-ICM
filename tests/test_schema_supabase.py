@@ -119,17 +119,32 @@ def test_bucket_photos_prive_et_limite_en_taille(sql):
     )
 
 
-def test_registre_reserve_lecriture_a_secretaire_et_pasteur(sql):
+def test_registre_ouvert_en_ecriture_aux_trois_roles(sql):
+    """Depuis la reclassification des droits du 10/09/2026 : les trois
+    rôles peuvent créer/modifier une fiche — seule la suppression
+    définitive reste réservée secrétaire/pasteur."""
     bloc = _normalise(sql)
-    for action in ("for insert", "for update", "for delete"):
+    for action in ("for insert", "for update"):
         motif = (
             rf'create policy "[^"]*"\s+on public\.registre {action}[^;]*'
-            rf"role_utilisateur\(\) in \('secretaire', 'pasteur'\)"
+            rf"role_utilisateur\(\) in \('secretaire', 'pasteur', 'visiteur'\)"
         )
         assert re.search(motif, bloc), (
-            f"la policy {action} sur public.registre doit rester réservée "
-            f"aux rôles secretaire/pasteur"
+            f"la policy {action} sur public.registre doit être ouverte "
+            f"aux trois rôles (secretaire/pasteur/visiteur)"
         )
+
+
+def test_registre_reserve_suppression_a_secretaire_et_pasteur(sql):
+    bloc = _normalise(sql)
+    motif = (
+        r'create policy "[^"]*"\s+on public\.registre for delete[^;]*'
+        r"role_utilisateur\(\) in \('secretaire', 'pasteur'\)"
+    )
+    assert re.search(motif, bloc), (
+        "la policy for delete sur public.registre doit rester réservée "
+        "aux rôles secretaire/pasteur"
+    )
 
 
 def test_longueurs_maximales_coherentes_avec_flask(sql):

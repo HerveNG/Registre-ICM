@@ -2,7 +2,7 @@
 {% block titre %}Historique des présences — ICM{% endblock %}
 
 {% block contenu %}
-{% set peut_ecrire = session.get('role') in ('secretaire', 'pasteur') %}
+{% set peut_supprimer = session.get('role') in ('secretaire', 'pasteur') %}
 
 <div class="titre-page">
   <h1>Historique des présences</h1>
@@ -34,9 +34,7 @@
     <a class="bouton bouton-discret" href="{{ url_for('presences_historique') }}">Réinitialiser</a>
   {% endif %}
   <a class="bouton bouton-discret" href="{{ url_for('presences_export_csv', q=q, type=type_id, debut=date_debut, fin=date_fin) }}">Export Excel</a>
-  {% if peut_ecrire %}
-    <a class="bouton bouton-principal" href="{{ url_for('presences_nouvelle') }}">+ Nouvelle présence</a>
-  {% endif %}
+  <a class="bouton bouton-principal" href="{{ url_for('presences_nouvelle') }}">+ Nouvelle présence</a>
 </form>
 
 {% if entrees %}
@@ -62,8 +60,8 @@
       <td><strong>{{ r.total_general }}</strong></td>
       <td class="col-actions">
         <a class="bouton bouton-petit" href="{{ url_for('presences_detail', record_id=r.id) }}">👁 Voir</a>
-        {% if peut_ecrire %}
-          <a class="bouton bouton-petit" href="{{ url_for('presences_modifier', record_id=r.id) }}">✏ Modifier</a>
+        <a class="bouton bouton-petit" href="{{ url_for('presences_modifier', record_id=r.id) }}">✏ Modifier</a>
+        {% if peut_supprimer %}
           <form method="post" action="{{ url_for('presences_supprimer', record_id=r.id) }}"
                 onsubmit="return confirm('Supprimer définitivement les présences du {{ r.date_culte | jj_mm_aaaa }} ({{ r.service_type.nom if r.service_type else '' }}) ?');">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -94,11 +92,9 @@
   {% if q or type_id or date_debut or date_fin %}
     <p>Aucune présence ne correspond à cette recherche.</p>
     <a class="bouton" href="{{ url_for('presences_historique') }}">Voir tout l'historique</a>
-  {% elif peut_ecrire %}
-    <p>Aucune présence enregistrée pour le moment.</p>
-    <a class="bouton bouton-principal" href="{{ url_for('presences_nouvelle') }}">Enregistrer la première présence</a>
   {% else %}
     <p>Aucune présence enregistrée pour le moment.</p>
+    <a class="bouton bouton-principal" href="{{ url_for('presences_nouvelle') }}">Enregistrer la première présence</a>
   {% endif %}
 </div>
 {% endif %}

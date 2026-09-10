@@ -94,6 +94,9 @@ mvp_registre_bapteme_mariage/
 │   ├── migration_06_categorisation_fils_icm_nouveaux.sql
 │   │                               ← si la base existait AVANT le classement Fils-ICM /
 │   │                                 Nouveaux du 10/09/2026 (§ 11)
+│   ├── migration_07_visiteur_ecriture.sql
+│   │                               ← si la base existait AVANT la reclassification des
+│   │                                 droits du 10/09/2026 (§ 5) — le Visiteur peut écrire
 │   └── schema_sqlite.sql          ← documentation du schéma local
 │
 ├── app.py                         ← APPLICATION FLASK
@@ -129,14 +132,15 @@ mvp_registre_bapteme_mariage/
 
 > **Vous aviez déjà créé la base avant les photos, avant les rôles, avant
 > le journal d'audit, avant l'audit de sécurité du 25/08/2026 (§ 14), avant
-> le module Présences (§ 11), ou avant le classement Fils-ICM / Nouveaux
-> du 10/09/2026 (§ 11) ?**
+> le module Présences (§ 11), avant le classement Fils-ICM / Nouveaux, ou
+> avant la reclassification des droits (§ 5) du 10/09/2026 ?**
 > Ne rejouez pas le script complet : exécutez, dans cet ordre,
 > `database/migration_01_photo.sql` puis `database/migration_02_roles.sql`
 > puis `database/migration_03_journal.sql` puis
 > `database/migration_04_durcissement_securite.sql` puis
 > `database/migration_05_presences.sql` puis
-> `database/migration_06_categorisation_fils_icm_nouveaux.sql` — chacun
+> `database/migration_06_categorisation_fils_icm_nouveaux.sql` puis
+> `database/migration_07_visiteur_ecriture.sql` — chacun
 > ajoute seulement ce qui manque, sans toucher à vos données. Une base créée
 > à partir du `schema_supabase.sql` actuel n'a besoin d'aucune de ces
 > migrations : tout est déjà dedans.
@@ -206,17 +210,20 @@ toute utilisation réelle.* La base `registre.db` est créée automatiquement.
 
 ## 5. Comptes et rôles
 
-Trois rôles, sur les deux versions de l'application :
+Trois rôles, sur les deux versions de l'application. Depuis la
+reclassification des droits du 10/09/2026, les trois ont exactement les
+mêmes droits d'écriture — **seule la suppression définitive** distingue
+encore les rôles :
 
 | Rôle | Droits |
 |---|---|
 | **Secrétaire** | Accès complet : saisie, modification, suppression, import, export. |
 | **Pasteur** | Accès complet également, exactement comme le secrétariat — un compte séparé pour savoir qui a fait quoi. |
-| **Visiteur** | Consultation seule : recherche, fiche, carte imprimable. Aucune modification, import ni export. |
+| **Visiteur** | Accès complet lui aussi : saisie, modification, import, export, paramètres des présences. Seule la **suppression définitive** (fiche, présence, catégorie, type de culte, photo) lui reste fermée. |
 
 Dans les deux versions, la restriction est appliquée côté serveur (pas
 seulement en cachant les boutons à l'écran) : un visiteur qui contournerait
-l'affichage ou ouvrirait directement une action réservée est bloqué avec un
+l'affichage ou tenterait directement une suppression est bloqué avec un
 message, sans que rien ne soit modifié.
 
 **Version Flask** — les comptes sont définis dans `.env` :
@@ -430,8 +437,8 @@ l'en-tête (**📊 Présences**), pour suivre la fréquentation des cultes :
   §14) respectant les filtres actifs de l'historique — type de culte,
   période, recherche.
 
-Mêmes rôles que le reste de l'application (§5) : secrétaire et pasteur ont
-accès complet, le visiteur consulte sans modifier.
+Mêmes rôles que le reste de l'application (§5) : les trois ont accès
+complet, seule la suppression définitive reste réservée secrétaire/pasteur.
 
 **Différences entre les deux versions.** Le calcul des statistiques (§8),
 l'analyse intelligente et la comparaison de périodes tournent côté serveur

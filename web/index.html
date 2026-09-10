@@ -1157,10 +1157,14 @@ const LIBELLES_ACTIONS_JOURNAL = {
 };
 
 // role vaut 'secretaire', 'pasteur' ou 'visiteur' (table "profils" côté
-// Supabase). secretaire et pasteur ont exactement les mêmes droits —
-// seul visiteur est restreint à la consultation.
+// Supabase). Depuis la reclassification des droits du 10/09/2026, les
+// trois rôles ont accès à toutes les actions d'écriture (création,
+// modification, import, export, paramètres) — seule la suppression
+// définitive (fiche/présence, ou catégorie/type de culte) reste réservée
+// secrétariat/pasteur, voir peutSupprimer().
 const LIBELLES_ROLES = { secretaire:"Secrétaire", pasteur:"Pasteur", visiteur:"Visiteur" };
-function peutEcrire(){ return etat.role === "secretaire" || etat.role === "pasteur"; }
+function peutEcrire(){ return etat.role === "secretaire" || etat.role === "pasteur" || etat.role === "visiteur"; }
+function peutSupprimer(){ return etat.role === "secretaire" || etat.role === "pasteur"; }
 
 /* Stockage local : entouré de try/catch (navigation privée, fichier local…) */
 const stockage = {
@@ -1232,16 +1236,17 @@ function afficherVue(nom){
   $("entete").hidden = !connecte;
   $("pied").hidden   = !connecte;
 
-  // Un visiteur connecté ne voit pas les actions d'écriture dans
-  // l'en-tête — le contrôle réel se fait côté base (RLS Supabase),
-  // ceci n'est qu'un confort d'affichage.
-  const ecriture = connecte && peutEcrire();
-  $("btn-nouveau").hidden     = !ecriture;
-  $("btn-import-nav").hidden  = !ecriture;
-  $("btn-export").hidden      = !ecriture;
+  // Depuis la reclassification des droits du 10/09/2026, les trois rôles
+  // ont accès à toutes les actions d'écriture (création, modification,
+  // import, export, paramètres) — seule la suppression définitive reste
+  // réservée secrétariat/pasteur (voir peutSupprimer()) : rien à masquer
+  // ici pour un visiteur connecté.
+  $("btn-nouveau").hidden     = !connecte;
+  $("btn-import-nav").hidden  = !connecte;
+  $("btn-export").hidden      = !connecte;
   ["btn-presences-nouvelle", "btn-presences-nouvelle-2", "btn-presences-parametres"].forEach(id=>{
     const el = $(id);
-    if (el) el.hidden = !ecriture;
+    if (el) el.hidden = !connecte;
   });
 
   effacerMessage();
@@ -1570,6 +1575,8 @@ function dessinerTableau(){
         <button class="bouton bouton-petit" data-action="carte" data-id="${echapper(r.id)}">Carte</button>
         ${ peutEcrire() ? `
         <button class="bouton bouton-petit" data-action="modifier"  data-id="${echapper(r.id)}">Modifier</button>
+        ` : "" }
+        ${ peutSupprimer() ? `
         <button class="bouton bouton-petit bouton-danger" data-action="supprimer" data-id="${echapper(r.id)}">Supprimer</button>
         ` : "" }
       </td>
@@ -1861,8 +1868,8 @@ async function soumettreFormulaire(evt){
 }
 
 async function supprimer(id){
-  if (!peutEcrire()){
-    message("Accès réservé au secrétariat et au pasteur.", "erreur");
+  if (!peutSupprimer()){
+    message("Seuls le secrétariat et le pasteur peuvent supprimer définitivement.", "erreur");
     return;
   }
   const r = etat.lignes.find(x=>x.id===id);
@@ -2587,7 +2594,7 @@ async function soumettrePresenceFormulaire(evt){
 }
 
 async function supprimerPresence(id, texte){
-  if (!peutEcrire()){ message("Accès réservé au secrétariat et au pasteur.", "erreur"); return; }
+  if (!peutSupprimer()){ message("Seuls le secrétariat et le pasteur peuvent supprimer définitivement.", "erreur"); return; }
   if (!confirm(`Supprimer définitivement les présences du ${texte} ?`)) return;
   try{
     await api(`attendance_record?id=eq.${id}`, { method:"DELETE" });
@@ -2629,7 +2636,8 @@ async function ouvrirPresencesDetail(id){
       <div class="actions-formulaire" style="margin-bottom:1.2rem;">
         <button type="button" class="bouton bouton-discret" onclick="ouvrirPresencesHistorique()">← Retour à l'historique</button>
         ${peutEcrire() ? `
-          <button type="button" class="bouton" onclick="ouvrirPresencesForm('${id}')">✏ Modifier</button>
+          <button type="button" class="bouton" onclick="ouvrirPresencesForm('${id}')">✏ Modifier</button>` : ""}
+        ${peutSupprimer() ? `
           <button type="button" class="bouton bouton-danger" onclick="supprimerPresence('${id}', '${texteConfirm}')">🗑 Supprimer</button>` : ""}
       </div>
       ${Object.keys(parGroupe).map(groupe=>`
@@ -2708,6 +2716,7 @@ function dessinerHistoriquePresences(lignes, total){
   const corps = $("corps-tableau-presences");
   const pages = Math.max(Math.ceil(total / PAR_PAGE_PRESENCES), 1);
   const ecriture = peutEcrire();
+  const suppression = peutSupprimer();
 
   if (!lignes.length){
     corps.innerHTML = "";
@@ -2733,7 +2742,8 @@ function dessinerHistoriquePresences(lignes, total){
       <td class="col-actions">
         <button type="button" class="bouton bouton-petit" onclick="ouvrirPresencesDetail('${r.id}')">👁 Voir</button>
         ${ecriture ? `
-          <button type="button" class="bouton bouton-petit" onclick="ouvrirPresencesForm('${r.id}')">✏ Modifier</button>
+          <button type="button" class="bouton bouton-petit" onclick="ouvrirPresencesForm('${r.id}')">✏ Modifier</button>` : ""}
+        ${suppression ? `
           <button type="button" class="bouton bouton-petit bouton-danger" onclick="supprimerPresence('${r.id}', '${texteConfirm}')">🗑 Supprimer</button>` : ""}
       </td>
     </tr>`;
@@ -3188,6 +3198,7 @@ function dessinerParametresPresences(){
     (parGroupe[c.groupe] = parGroupe[c.groupe] || []).push(c);
   });
   Object.keys(parGroupe).forEach(g=>parGroupe[g].sort((a,b)=>a.ordre_affichage-b.ordre_affichage));
+  const suppression = peutSupprimer();
 
   $("presences-parametres-contenu").innerHTML = `
     <div class="bloc-stat">
@@ -3198,8 +3209,8 @@ function dessinerParametresPresences(){
           <td><input type="text" data-champ="nom" value="${echapper(t.nom)}" id="type-nom-${t.id}"></td>
           <td><input type="number" data-champ="ordre" value="${t.ordre_affichage}" id="type-ordre-${t.id}"></td>
           <td><input type="checkbox" id="type-actif-${t.id}" ${t.is_active?"checked":""}></td>
-          <td><button type="button" class="bouton bouton-petit bouton-danger btn-supprimer-type"
-                data-id="${t.id}" data-nom="${echapper(t.nom)}">🗑 Supprimer</button></td>
+          <td>${suppression ? `<button type="button" class="bouton bouton-petit bouton-danger btn-supprimer-type"
+                data-id="${t.id}" data-nom="${echapper(t.nom)}">🗑 Supprimer</button>` : ""}</td>
         </tr>`).join("")}</tbody>
       </table></div>
       <p class="actions-formulaire" style="margin-top:.9rem;">
@@ -3224,8 +3235,8 @@ function dessinerParametresPresences(){
           <td><input type="number" min="0" value="${c.age_max ?? ""}" id="cat-age-max-${c.id}"></td>
           <td><input type="number" value="${c.ordre_affichage}" id="cat-ordre-${c.id}"></td>
           <td><input type="checkbox" id="cat-actif-${c.id}" ${c.is_active?"checked":""}></td>
-          <td><button type="button" class="bouton bouton-petit bouton-danger btn-supprimer-categorie"
-                data-id="${c.id}" data-nom="${echapper(c.nom)}">🗑 Supprimer</button></td>
+          <td>${suppression ? `<button type="button" class="bouton bouton-petit bouton-danger btn-supprimer-categorie"
+                data-id="${c.id}" data-nom="${echapper(c.nom)}">🗑 Supprimer</button>` : ""}</td>
         </tr>`).join("")}</tbody>
       </table></div>
       <p class="actions-formulaire" style="margin-top:.9rem;">
@@ -3253,6 +3264,10 @@ function dessinerParametresPresences(){
 }
 
 async function supprimerTypeCultePresences(id, nom){
+  if (!peutSupprimer()){
+    message("Seuls le secrétariat et le pasteur peuvent supprimer définitivement.", "erreur");
+    return;
+  }
   if (!confirm(`Supprimer définitivement le type de culte « ${nom} » ? Impossible si une `
     + `présence l'utilise encore — cette action est irréversible.`)) return;
   try{
@@ -3270,6 +3285,10 @@ async function supprimerTypeCultePresences(id, nom){
 }
 
 async function supprimerCategoriePresences(id, nom){
+  if (!peutSupprimer()){
+    message("Seuls le secrétariat et le pasteur peuvent supprimer définitivement.", "erreur");
+    return;
+  }
   if (!confirm(`Supprimer définitivement la catégorie « ${nom} » ? Impossible si une `
     + `présence l'utilise encore — cette action est irréversible.`)) return;
   try{

@@ -223,24 +223,30 @@ drop policy if exists "lecture pour utilisateurs connectes"      on public.regis
 drop policy if exists "insertion pour utilisateurs connectes"    on public.registre;
 drop policy if exists "modification pour utilisateurs connectes" on public.registre;
 drop policy if exists "suppression pour utilisateurs connectes"  on public.registre;
+drop policy if exists "ecriture secretaire ou pasteur - insertion"    on public.registre;
+drop policy if exists "ecriture secretaire ou pasteur - modification" on public.registre;
+drop policy if exists "ecriture secretaire ou pasteur - suppression" on public.registre;
 
 create policy "lecture pour comptes avec un role"
     on public.registre for select
     to authenticated
     using (public.role_utilisateur() is not null);
 
-create policy "ecriture secretaire ou pasteur - insertion"
+-- Reclassification des droits du 10/09/2026 : les trois rôles peuvent
+-- désormais créer/modifier une fiche — seule la suppression définitive
+-- reste réservée secrétariat/pasteur (cohérent avec app.py, côté Flask).
+create policy "ecriture tous roles - insertion"
     on public.registre for insert
     to authenticated
-    with check (public.role_utilisateur() in ('secretaire', 'pasteur'));
+    with check (public.role_utilisateur() in ('secretaire', 'pasteur', 'visiteur'));
 
-create policy "ecriture secretaire ou pasteur - modification"
+create policy "ecriture tous roles - modification"
     on public.registre for update
     to authenticated
-    using      (public.role_utilisateur() in ('secretaire', 'pasteur'))
-    with check (public.role_utilisateur() in ('secretaire', 'pasteur'));
+    using      (public.role_utilisateur() in ('secretaire', 'pasteur', 'visiteur'))
+    with check (public.role_utilisateur() in ('secretaire', 'pasteur', 'visiteur'));
 
-create policy "ecriture secretaire ou pasteur - suppression"
+create policy "suppression secretaire ou pasteur"
     on public.registre for delete
     to authenticated
     using (public.role_utilisateur() in ('secretaire', 'pasteur'));
@@ -272,24 +278,29 @@ drop policy if exists "photos lecture connectes"      on storage.objects;
 drop policy if exists "photos insertion connectes"    on storage.objects;
 drop policy if exists "photos modification connectes" on storage.objects;
 drop policy if exists "photos suppression connectes"  on storage.objects;
+drop policy if exists "photos ecriture secretaire ou pasteur - insertion"    on storage.objects;
+drop policy if exists "photos ecriture secretaire ou pasteur - modification" on storage.objects;
+drop policy if exists "photos ecriture secretaire ou pasteur - suppression" on storage.objects;
 
 create policy "photos lecture pour comptes avec un role"
     on storage.objects for select
     to authenticated
     using (bucket_id = 'photos' and public.role_utilisateur() is not null);
 
-create policy "photos ecriture secretaire ou pasteur - insertion"
+-- Reclassification des droits du 10/09/2026 : voir le commentaire au-dessus
+-- des policies "ecriture tous roles" de la table registre (§7).
+create policy "photos ecriture tous roles - insertion"
     on storage.objects for insert
     to authenticated
-    with check (bucket_id = 'photos' and public.role_utilisateur() in ('secretaire', 'pasteur'));
+    with check (bucket_id = 'photos' and public.role_utilisateur() in ('secretaire', 'pasteur', 'visiteur'));
 
-create policy "photos ecriture secretaire ou pasteur - modification"
+create policy "photos ecriture tous roles - modification"
     on storage.objects for update
     to authenticated
-    using      (bucket_id = 'photos' and public.role_utilisateur() in ('secretaire', 'pasteur'))
-    with check (bucket_id = 'photos' and public.role_utilisateur() in ('secretaire', 'pasteur'));
+    using      (bucket_id = 'photos' and public.role_utilisateur() in ('secretaire', 'pasteur', 'visiteur'))
+    with check (bucket_id = 'photos' and public.role_utilisateur() in ('secretaire', 'pasteur', 'visiteur'));
 
-create policy "photos ecriture secretaire ou pasteur - suppression"
+create policy "photos suppression secretaire ou pasteur"
     on storage.objects for delete
     to authenticated
     using (bucket_id = 'photos' and public.role_utilisateur() in ('secretaire', 'pasteur'));
@@ -786,7 +797,9 @@ create index if not exists attendance_value_record_idx
 
 
 -- RLS : mêmes règles que le registre (section 7) — lecture pour tout
--- compte muni d'un rôle, écriture réservée à secretaire/pasteur.
+-- compte muni d'un rôle ; depuis la reclassification des droits du
+-- 10/09/2026, insertion/modification ouvertes aux trois rôles, seule la
+-- suppression définitive reste réservée à secretaire/pasteur.
 alter table public.service_type       enable row level security;
 alter table public.attendance_category enable row level security;
 alter table public.attendance_record   enable row level security;
@@ -808,17 +821,21 @@ begin
         execute format(
             'drop policy if exists "presences insertion secretaire ou pasteur" on public.%I', t);
         execute format(
-            'create policy "presences insertion secretaire ou pasteur" on public.%I '
+            'drop policy if exists "presences insertion tous roles" on public.%I', t);
+        execute format(
+            'create policy "presences insertion tous roles" on public.%I '
             'for insert to authenticated '
-            'with check (public.role_utilisateur() in (''secretaire'', ''pasteur''))', t);
+            'with check (public.role_utilisateur() in (''secretaire'', ''pasteur'', ''visiteur''))', t);
 
         execute format(
             'drop policy if exists "presences modification secretaire ou pasteur" on public.%I', t);
         execute format(
-            'create policy "presences modification secretaire ou pasteur" on public.%I '
+            'drop policy if exists "presences modification tous roles" on public.%I', t);
+        execute format(
+            'create policy "presences modification tous roles" on public.%I '
             'for update to authenticated '
-            'using      (public.role_utilisateur() in (''secretaire'', ''pasteur'')) '
-            'with check (public.role_utilisateur() in (''secretaire'', ''pasteur''))', t);
+            'using      (public.role_utilisateur() in (''secretaire'', ''pasteur'', ''visiteur'')) '
+            'with check (public.role_utilisateur() in (''secretaire'', ''pasteur'', ''visiteur''))', t);
 
         execute format(
             'drop policy if exists "presences suppression secretaire ou pasteur" on public.%I', t);

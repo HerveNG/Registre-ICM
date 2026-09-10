@@ -159,17 +159,20 @@ def ajouter_entetes_securite(reponse):
 # ------------------------------------------------------------------
 #  Comptes et rôles (à changer dans le fichier .env)
 # ------------------------------------------------------------------
-# Trois rôles possibles :
+# Trois rôles possibles, depuis la reclassification des droits du
+# 10/09/2026 :
 #   - secretaire : accès complet — saisie, modification, suppression,
 #                  import, export (comme le compte unique d'avant).
 #   - pasteur    : accès complet également, exactement comme secrétaire —
 #                  un compte séparé sert surtout à savoir qui a fait quoi.
-#   - visiteur   : consultation seule — recherche, fiche, carte imprimable,
-#                  sans pouvoir rien modifier, importer ni exporter.
+#   - visiteur   : accès complet lui aussi (saisie, modification, import,
+#                  export, paramètres) — seule la suppression définitive
+#                  (fiche/présence, ou catégorie/type de culte) lui reste
+#                  fermée. Voir ROLES_SUPPRESSION et @suppression_requise.
 ROLE_SECRETAIRE = "secretaire"
 ROLE_PASTEUR = "pasteur"
 ROLE_VISITEUR = "visiteur"
-ROLES_ECRITURE = {ROLE_SECRETAIRE, ROLE_PASTEUR}
+ROLES_SUPPRESSION = {ROLE_SECRETAIRE, ROLE_PASTEUR}
 LIBELLES_ROLES = {
     ROLE_SECRETAIRE: "Secrétaire",
     ROLE_PASTEUR: "Pasteur",
@@ -644,18 +647,20 @@ def login_requis(vue):
     return wrapper
 
 
-def ecriture_requise(vue):
+def suppression_requise(vue):
     """Comme @login_requis, mais réserve la vue aux rôles secrétaire et
-    pasteur. Un visiteur connecté qui tente d'y accéder — même par une
-    URL tapée directement — est renvoyé vers le registre avec un message,
-    sans que rien ne soit modifié : le contrôle est fait ici, côté
-    serveur, pas seulement en cachant les boutons dans les pages."""
+    pasteur — les seuls habilités à supprimer définitivement une fiche,
+    une présence, une catégorie ou un type de culte (voir ROLES_SUPPRESSION).
+    Un visiteur connecté qui tente d'y accéder — même par une URL tapée
+    directement — est renvoyé vers le registre avec un message, sans que
+    rien ne soit modifié : le contrôle est fait ici, côté serveur, pas
+    seulement en cachant les boutons dans les pages."""
     @wraps(vue)
     def wrapper(*args, **kwargs):
         if not session.get("utilisateur"):
             return redirect(url_for("connexion", suivant=request.path))
-        if session.get("role") not in ROLES_ECRITURE:
-            flash("Accès réservé au secrétariat et au pasteur.", "error")
+        if session.get("role") not in ROLES_SUPPRESSION:
+            flash("Seuls le secrétariat et le pasteur peuvent supprimer définitivement.", "error")
             return redirect(url_for("index"))
         return vue(*args, **kwargs)
     return wrapper
@@ -1096,7 +1101,7 @@ def index():
 #  Création / modification / suppression
 # ------------------------------------------------------------------
 @app.route("/nouveau", methods=["GET", "POST"])
-@ecriture_requise
+@login_requis
 def nouveau():
     if request.method == "POST":
         donnees, erreurs = collecter_formulaire(request.form)
@@ -1138,7 +1143,7 @@ def nouveau():
 
 
 @app.route("/modifier/<int:record_id>", methods=["GET", "POST"])
-@ecriture_requise
+@login_requis
 def modifier(record_id):
     record = db.session.get(Registre, record_id) or abort(404)
 
@@ -1188,7 +1193,7 @@ def modifier(record_id):
 
 
 @app.post("/supprimer/<int:record_id>")
-@ecriture_requise
+@suppression_requise
 def supprimer(record_id):
     record = db.session.get(Registre, record_id) or abort(404)
     nom = record.nom_complet
@@ -1409,7 +1414,7 @@ def presences_dashboard():
 
 
 @app.route("/presences/nouvelle", methods=["GET", "POST"])
-@ecriture_requise
+@login_requis
 def presences_nouvelle():
     par_groupe, categories = categories_pour_edition()
     types_culte = ServiceType.query.filter_by(is_active=True) \
@@ -1446,7 +1451,7 @@ def presences_nouvelle():
 
 
 @app.route("/presences/<int:record_id>/modifier", methods=["GET", "POST"])
-@ecriture_requise
+@login_requis
 def presences_modifier(record_id):
     record = db.session.get(AttendanceRecord, record_id) or abort(404)
     par_groupe, categories = categories_pour_edition(record)
@@ -1491,7 +1496,7 @@ def presences_modifier(record_id):
 
 
 @app.route("/presences/<int:record_id>/supprimer", methods=["POST"])
-@ecriture_requise
+@suppression_requise
 def presences_supprimer(record_id):
     record = db.session.get(AttendanceRecord, record_id) or abort(404)
     resume = (f"{record.date_culte.strftime('%d/%m/%Y')} — "
@@ -1782,10 +1787,19 @@ def presences_statistiques():
 
 
 @app.route("/presences/parametres", methods=["GET", "POST"])
-@ecriture_requise
+@login_requis
 def presences_parametres():
     if request.method == "POST":
         action = request.form.get("action")
+
+        # Seules les deux actions de suppression définitive restent
+        # réservées secrétariat/pasteur — le reste des paramètres (ajout,
+        # modification) est ouvert au visiteur depuis la reclassification
+        # des droits du 10/09/2026 (voir ROLES_SUPPRESSION).
+        if action in ("supprimer_type", "supprimer_categorie") \
+                and session.get("role") not in ROLES_SUPPRESSION:
+            flash("Seuls le secrétariat et le pasteur peuvent supprimer définitivement.", "error")
+            return redirect(url_for("presences_parametres"))
 
         if action == "ajouter_type":
             nom = (request.form.get("nom") or "").strip()[:100]
@@ -2074,7 +2088,7 @@ def neutraliser_formule(valeur):
 
 
 @app.route("/export.csv")
-@ecriture_requise
+@login_requis
 def export_csv():
     colonnes = COLONNES_EXPORT
 
@@ -2291,7 +2305,7 @@ def analyser_lignes(paires):
 
 
 @app.route("/importer", methods=["GET", "POST"])
-@ecriture_requise
+@login_requis
 def importer():
     if request.method == "GET":
         return render_template("importer.html", resultats=None, paroisse=PAROISSE)
@@ -2384,7 +2398,7 @@ def importer():
 
 
 @app.route("/importer/modele.csv")
-@ecriture_requise
+@login_requis
 def importer_modele():
     exemple = {
         "nom": "NGOOH", "prenom": "Hervé", "nom_pere": "NGOOH Paul",

@@ -82,6 +82,22 @@ def test_supprimer_une_fiche_la_retire_de_la_base(client_secretaire, icm_app):
         assert icm_app.db.session.get(icm_app.Registre, id_fiche) is None
 
 
+def test_visiteur_ne_peut_pas_supprimer_une_fiche(client_visiteur, icm_app):
+    """Seule action encore réservée secrétaire/pasteur depuis la
+    reclassification des droits du 10/09/2026 (voir @suppression_requise) :
+    le visiteur peut créer/modifier une fiche mais jamais la supprimer."""
+    with icm_app.app.app_context():
+        fiche = icm_app.Registre(nom="ASupprimer", prenom="Test")
+        icm_app.db.session.add(fiche)
+        icm_app.db.session.commit()
+        id_fiche = fiche.id
+
+    reponse = client_visiteur.post(f"/supprimer/{id_fiche}")
+    assert reponse.status_code == 302
+    with icm_app.app.app_context():
+        assert icm_app.db.session.get(icm_app.Registre, id_fiche) is not None
+
+
 def test_liste_accepte_recherche_et_filtre(client_secretaire, icm_app):
     with icm_app.app.app_context():
         icm_app.db.session.add_all([

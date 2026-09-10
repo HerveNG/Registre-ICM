@@ -2,7 +2,7 @@
 {% block titre %}Présences du {{ record.date_culte | jj_mm_aaaa }} — ICM{% endblock %}
 
 {% block contenu %}
-{% set peut_ecrire = session.get('role') in ('secretaire', 'pasteur') %}
+{% set peut_supprimer = session.get('role') in ('secretaire', 'pasteur') %}
 
 <div class="titre-page">
   <h1>{{ record.date_culte | jj_mm_aaaa }} — {{ record.jour_semaine }}</h1>
@@ -18,8 +18,8 @@
 
 <div class="actions-formulaire" style="margin-bottom:1.2rem;">
   <a class="bouton bouton-discret" href="{{ url_for('presences_historique') }}">← Retour à l'historique</a>
-  {% if peut_ecrire %}
-    <a class="bouton" href="{{ url_for('presences_modifier', record_id=record.id) }}">✏ Modifier</a>
+  <a class="bouton" href="{{ url_for('presences_modifier', record_id=record.id) }}">✏ Modifier</a>
+  {% if peut_supprimer %}
     <form method="post" action="{{ url_for('presences_supprimer', record_id=record.id) }}"
           onsubmit="return confirm('Supprimer définitivement cette présence ?');">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

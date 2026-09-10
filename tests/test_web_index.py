@@ -112,14 +112,25 @@ def test_date_heure_fr_valeur_invalide(page):
 
 
 # ------------------------------------------------------------------
-#  Permissions (peutEcrire) — miroir client du contrôle serveur/RLS
+#  Permissions (peutEcrire / peutSupprimer) — miroir client du contrôle
+#  serveur/RLS. Depuis la reclassification des droits du 10/09/2026, les
+#  trois rôles ont les mêmes droits d'écriture — seule la suppression
+#  définitive reste réservée secrétaire/pasteur.
 # ------------------------------------------------------------------
 @pytest.mark.parametrize("role,attendu", [
-    ("secretaire", True), ("pasteur", True), ("visiteur", False), (None, False),
+    ("secretaire", True), ("pasteur", True), ("visiteur", True), (None, False),
 ])
 def test_peut_ecrire_selon_le_role(page, role, attendu):
     page.evaluate("(r) => { etat.role = r; }", role)
     assert page.evaluate("peutEcrire()") is attendu
+
+
+@pytest.mark.parametrize("role,attendu", [
+    ("secretaire", True), ("pasteur", True), ("visiteur", False), (None, False),
+])
+def test_peut_supprimer_selon_le_role(page, role, attendu):
+    page.evaluate("(r) => { etat.role = r; }", role)
+    assert page.evaluate("peutSupprimer()") is attendu
 
 
 # ------------------------------------------------------------------

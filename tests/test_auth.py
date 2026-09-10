@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 """Connexion, anti brute-force, redirection après connexion, contrôle d'accès
-par rôle (login_requis / ecriture_requise) — cœur du § 13 Sécurité du README."""
+par rôle (login_requis / suppression_requise) — cœur du § 13 Sécurité du
+README. Depuis la reclassification des droits du 10/09/2026 : les trois
+rôles ont les mêmes droits d'écriture, seule la suppression définitive
+reste réservée secrétaire/pasteur."""
 import time
 
 from conftest import (
@@ -134,28 +137,26 @@ def test_visiteur_peut_consulter_le_registre(client_visiteur):
     assert reponse.status_code == 200
 
 
-def test_visiteur_ne_peut_pas_creer_une_fiche(client_visiteur):
-    reponse = client_visiteur.get("/nouveau")
-    assert reponse.status_code == 302
-    assert reponse.headers["Location"].endswith("/") or reponse.headers["Location"] == "/"
-
-
-def test_visiteur_ne_peut_pas_creer_une_fiche_meme_par_url_directe_post(client_visiteur, icm_app):
-    """Le contrôle doit être fait côté serveur, pas seulement en cachant les
-    boutons : un POST direct doit aussi être refusé pour un visiteur, et ne
-    doit rien écrire en base."""
+def test_visiteur_peut_creer_une_fiche(client_visiteur, icm_app):
+    """Depuis la reclassification des droits du 10/09/2026, le visiteur a
+    les mêmes droits d'écriture que secrétaire/pasteur — seule la
+    suppression définitive lui reste fermée (voir
+    test_visiteur_ne_peut_pas_supprimer_une_fiche, tests/test_registre_routes.py)."""
     reponse = client_visiteur.post(
         "/nouveau",
         data={"nom": "Dupont", "prenom": "Jean"},
-        follow_redirects=True,
+        follow_redirects=False,
     )
-    assert reponse.status_code == 200
+    assert reponse.status_code == 302
     with icm_app.app.app_context():
-        assert icm_app.Registre.query.count() == 0
+        # nom est normalisé en MAJUSCULES à la saisie (test_normalisation_casse.py).
+        assert icm_app.Registre.query.filter_by(nom="DUPONT").count() == 1
 
 
-def test_secretaire_et_pasteur_peuvent_creer_une_fiche(client_secretaire, client_pasteur):
-    for client_role, prenom in ((client_secretaire, "Alice"), (client_pasteur, "Bob")):
+def test_secretaire_pasteur_et_visiteur_peuvent_creer_une_fiche(
+        client_secretaire, client_pasteur, client_visiteur):
+    for client_role, prenom in (
+            (client_secretaire, "Alice"), (client_pasteur, "Bob"), (client_visiteur, "Chloé")):
         reponse = client_role.post(
             "/nouveau",
             data={"nom": "Test", "prenom": prenom},

@@ -22,11 +22,9 @@
     {% if session.get('utilisateur') %}
     <nav class="nav">
       <a href="{{ url_for('index') }}">Registre</a>
-      {% if session.get('role') in ('secretaire', 'pasteur') %}
-        <a href="{{ url_for('nouveau') }}">Nouvelle carte</a>
-        <a href="{{ url_for('importer') }}">Importer</a>
-        <a href="{{ url_for('export_csv') }}">Export Excel</a>
-      {% endif %}
+      <a href="{{ url_for('nouveau') }}">Nouvelle carte</a>
+      <a href="{{ url_for('importer') }}">Importer</a>
+      <a href="{{ url_for('export_csv') }}">Export Excel</a>
       <a href="{{ url_for('presences_dashboard') }}">📊 Présences</a>
       <a href="{{ url_for('journal') }}">Journal</a>
       <a href="{{ url_for('a_propos') }}">À propos</a>

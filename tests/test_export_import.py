@@ -32,9 +32,12 @@ def test_export_csv_neutralise_une_observation_piegee(client_secretaire, icm_app
     assert "﻿" in corps  # BOM pour l'affichage correct des accents dans Excel
 
 
-def test_export_csv_refuse_a_un_visiteur(client_visiteur):
+def test_export_csv_accessible_a_un_visiteur(client_visiteur):
+    """Depuis la reclassification des droits du 10/09/2026, le visiteur a
+    accès à l'export comme les autres rôles — seule la suppression
+    définitive lui reste fermée."""
     reponse = client_visiteur.get("/export.csv")
-    assert reponse.status_code == 302
+    assert reponse.status_code == 200
 
 
 def test_lire_fichier_import_rejette_format_inconnu(icm_app):
@@ -90,14 +93,17 @@ def test_analyser_lignes_detecte_doublon_dans_le_meme_fichier(icm_app):
         assert any("aussi à la ligne 2" in e for e in resultats[1]["erreurs"])
 
 
-def test_route_importer_refusee_a_un_visiteur(client_visiteur):
+def test_route_importer_accessible_a_un_visiteur(client_visiteur):
+    """Depuis la reclassification des droits du 10/09/2026, le visiteur peut
+    importer comme les autres rôles — seule la suppression définitive lui
+    reste fermée."""
     donnees = {
         "fichier": (io.BytesIO(b"Nom;Prenom\nA;B\n"), "fichier.csv"),
     }
     reponse = client_visiteur.post(
         "/importer", data=donnees, content_type="multipart/form-data"
     )
-    assert reponse.status_code == 302
+    assert reponse.status_code == 200
 
 
 def test_route_importer_analyse_puis_necessite_confirmation(client_secretaire, icm_app):
