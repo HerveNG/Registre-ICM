@@ -327,7 +327,7 @@ def test_ajouter_une_categorie(client_secretaire, icm_app):
         assert cat.age_min == 18 and cat.age_max == 24
 
 
-def test_ajouter_une_categorie_refuse_un_groupe_retire(client_secretaire):
+def test_ajouter_une_categorie_refuse_un_groupe_retire(client_secretaire, icm_app):
     """« enfants » n'est plus un groupe actif depuis la reclassification du
     10/09/2026 — il ne doit plus être possible d'y ajouter une catégorie."""
     reponse = client_secretaire.post(
