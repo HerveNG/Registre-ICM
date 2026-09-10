@@ -10,8 +10,11 @@ ne pas perturber les autres tests qui en dépendent (ex. "Culte du dimanche").
 Classement par défaut depuis la reclassification du 10/09/2026 (voir
 initialiser_donnees_presences() dans app.py) : Hommes et Femmes ont chacun
 trois catégories (Enfants, Adolescent(e)s, Adultes) ; Fils-ICM et Nouveaux
-ont chacun deux catégories (Hommes, Femmes) sans tranche d'âge. « Enfants »
-et « Adultes » existent à la fois côté Hommes et côté Femmes — d'où le
+ont chacun les mêmes trois tranches déclinées Hommes/Femmes (six catégories
+chacun : « Hommes — Enfants », « Hommes — Adolescents », « Hommes —
+Adultes », « Femmes — Enfants », « Femmes — Adolescentes », « Femmes —
+Adultes »), depuis la segmentation du 10/09/2026 également. « Enfants » et
+« Adultes » existent à la fois côté Hommes et côté Femmes — d'où le
 paramètre `groupe` de _id_categorie(), qui désambiguïse par (nom, groupe)
 plutôt que par le seul nom.
 """
@@ -37,8 +40,9 @@ def _id_categorie(icm_app, nom, groupe=None):
 
 def _donnees_exemple(icm_app, date_culte="2026-08-30"):
     """85 hommes (10 enfants + 15 adolescents + 60 adultes), 120 femmes
-    (12 enfants + 18 adolescentes + 90 adultes), 35 Fils-ICM (15 hommes +
-    20 femmes), 5 Nouveaux (3 hommes + 2 femmes) — 245 au total."""
+    (12 enfants + 18 adolescentes + 90 adultes), 35 Fils-ICM (2+3+10 hommes
+    + 1+4+15 femmes), 5 Nouveaux (1+0+2 hommes + 0+0+2 femmes) — 245 au
+    total."""
     return {
         "date_culte": date_culte,
         "service_type_id": str(_id_type_dimanche(icm_app)),
@@ -48,10 +52,15 @@ def _donnees_exemple(icm_app, date_culte="2026-08-30"):
         f"cat_{_id_categorie(icm_app, 'Enfants', 'femmes')}": "12",
         f"cat_{_id_categorie(icm_app, 'Adolescentes', 'femmes')}": "18",
         f"cat_{_id_categorie(icm_app, 'Adultes', 'femmes')}": "90",
-        f"cat_{_id_categorie(icm_app, 'Hommes', 'fils_icm')}": "15",
-        f"cat_{_id_categorie(icm_app, 'Femmes', 'fils_icm')}": "20",
-        f"cat_{_id_categorie(icm_app, 'Hommes', 'nouveaux')}": "3",
-        f"cat_{_id_categorie(icm_app, 'Femmes', 'nouveaux')}": "2",
+        f"cat_{_id_categorie(icm_app, 'Hommes — Enfants', 'fils_icm')}": "2",
+        f"cat_{_id_categorie(icm_app, 'Hommes — Adolescents', 'fils_icm')}": "3",
+        f"cat_{_id_categorie(icm_app, 'Hommes — Adultes', 'fils_icm')}": "10",
+        f"cat_{_id_categorie(icm_app, 'Femmes — Enfants', 'fils_icm')}": "1",
+        f"cat_{_id_categorie(icm_app, 'Femmes — Adolescentes', 'fils_icm')}": "4",
+        f"cat_{_id_categorie(icm_app, 'Femmes — Adultes', 'fils_icm')}": "15",
+        f"cat_{_id_categorie(icm_app, 'Hommes — Enfants', 'nouveaux')}": "1",
+        f"cat_{_id_categorie(icm_app, 'Hommes — Adultes', 'nouveaux')}": "2",
+        f"cat_{_id_categorie(icm_app, 'Femmes — Adultes', 'nouveaux')}": "2",
     }
 
 
@@ -65,7 +74,7 @@ def test_types_de_culte_et_categories_semes_par_defaut(icm_app):
         assert "Culte du mercredi" in noms_types
 
         categories = icm_app.AttendanceCategory.query.all()
-        assert len(categories) == 10
+        assert len(categories) == 18
         assert {c.groupe for c in categories} == {"hommes", "femmes", "fils_icm", "nouveaux"}
 
 
@@ -89,7 +98,7 @@ def test_enregistrer_une_presence_calcule_les_totaux(client_secretaire, icm_app)
         assert record.updated_by is None
         assert record.jour_semaine == "Dimanche"
         # Une ligne AttendanceValue par catégorie active, même à 0.
-        assert len(record.valeurs) == 10
+        assert len(record.valeurs) == 18
 
 
 def test_effectif_negatif_refuse(client_secretaire, icm_app):
@@ -441,7 +450,7 @@ def test_comparaison_agrege_chaque_periode_separement(client_secretaire, icm_app
     for cle in list(autre):
         if cle.startswith("cat_"):
             autre[cle] = "0"
-    autre[f"cat_{_id_categorie(icm_app, 'Hommes', 'nouveaux')}"] = "10"
+    autre[f"cat_{_id_categorie(icm_app, 'Hommes — Adultes', 'nouveaux')}"] = "10"
     client_secretaire.post("/presences/nouvelle", data=autre)
 
     reponse = client_secretaire.get(

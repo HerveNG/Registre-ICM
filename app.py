@@ -2474,10 +2474,18 @@ def initialiser_donnees_presences():
         (GROUPE_FEMMES, "Enfants", 0, 12),
         (GROUPE_FEMMES, "Adolescentes", 13, 17),
         (GROUPE_FEMMES, "Adultes", 18, None),
-        (GROUPE_FILS_ICM, "Hommes", None, None),
-        (GROUPE_FILS_ICM, "Femmes", None, None),
-        (GROUPE_NOUVEAUX, "Hommes", None, None),
-        (GROUPE_NOUVEAUX, "Femmes", None, None),
+        (GROUPE_FILS_ICM, "Hommes — Enfants", 0, 12),
+        (GROUPE_FILS_ICM, "Hommes — Adolescents", 13, 17),
+        (GROUPE_FILS_ICM, "Hommes — Adultes", 18, None),
+        (GROUPE_FILS_ICM, "Femmes — Enfants", 0, 12),
+        (GROUPE_FILS_ICM, "Femmes — Adolescentes", 13, 17),
+        (GROUPE_FILS_ICM, "Femmes — Adultes", 18, None),
+        (GROUPE_NOUVEAUX, "Hommes — Enfants", 0, 12),
+        (GROUPE_NOUVEAUX, "Hommes — Adolescents", 13, 17),
+        (GROUPE_NOUVEAUX, "Hommes — Adultes", 18, None),
+        (GROUPE_NOUVEAUX, "Femmes — Enfants", 0, 12),
+        (GROUPE_NOUVEAUX, "Femmes — Adolescentes", 13, 17),
+        (GROUPE_NOUVEAUX, "Femmes — Adultes", 18, None),
     ]
     ordres = defaultdict(int)
     for groupe, nom, age_min, age_max in categories_par_defaut:

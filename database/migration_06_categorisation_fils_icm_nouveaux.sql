@@ -28,8 +28,9 @@
 --      si elles existent encore sous leur nom d'origine et sont actives ;
 --      si vous les aviez renommées, ce script ne les touche pas.
 --   4. Sème les nouvelles catégories par défaut : Enfants/Adolescent(e)s/
---      Adultes pour Hommes et Femmes, Hommes/Femmes pour Fils-ICM et pour
---      Nouveaux — seulement celles qui n'existent pas déjà.
+--      Adultes pour Hommes et Femmes, et les mêmes tranches d'âge déclinées
+--      Hommes/Femmes pour Fils-ICM et pour Nouveaux — seulement celles qui
+--      n'existent pas déjà.
 -- ============================================================
 
 
@@ -83,10 +84,18 @@ from (values
     ('Enfants',      'femmes',   0, 12,   0),
     ('Adolescentes', 'femmes',  13, 17,   1),
     ('Adultes',      'femmes',  18, null, 2),
-    ('Hommes',       'fils_icm', null, null, 0),
-    ('Femmes',       'fils_icm', null, null, 1),
-    ('Hommes',       'nouveaux', null, null, 0),
-    ('Femmes',       'nouveaux', null, null, 1)
+    ('Hommes — Enfants',      'fils_icm', 0, 12,   0),
+    ('Hommes — Adolescents',  'fils_icm', 13, 17,  1),
+    ('Hommes — Adultes',      'fils_icm', 18, null, 2),
+    ('Femmes — Enfants',      'fils_icm', 0, 12,   3),
+    ('Femmes — Adolescentes', 'fils_icm', 13, 17,  4),
+    ('Femmes — Adultes',      'fils_icm', 18, null, 5),
+    ('Hommes — Enfants',      'nouveaux', 0, 12,   0),
+    ('Hommes — Adolescents',  'nouveaux', 13, 17,  1),
+    ('Hommes — Adultes',      'nouveaux', 18, null, 2),
+    ('Femmes — Enfants',      'nouveaux', 0, 12,   3),
+    ('Femmes — Adolescentes', 'nouveaux', 13, 17,  4),
+    ('Femmes — Adultes',      'nouveaux', 18, null, 5)
 ) as v(nom, groupe, age_min, age_max, ordre)
 where not exists (
     select 1 from public.attendance_category c
@@ -102,7 +111,7 @@ select
      where table_schema = 'public' and table_name = 'attendance_record'
      and column_name in ('total_fils_icm', 'total_nouveaux')
      having count(*) = 2)                                                  as colonnes_totaux_ajoutees,
-    (select count(*) >= 4 from public.attendance_category
+    (select count(*) >= 12 from public.attendance_category
      where groupe in ('fils_icm', 'nouveaux') and is_active)               as categories_fils_icm_nouveaux_semees,
     (select count(*) from pg_constraint
      where conname = 'attendance_category_groupe_check') = 1               as contrainte_groupe_elargie;

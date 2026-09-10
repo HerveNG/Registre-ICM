@@ -390,12 +390,11 @@ l'en-tête (**📊 Présences**), pour suivre la fréquentation des cultes :
   automatiquement), type de culte, effectifs par catégorie (compteurs +/-),
   avec calcul des totaux Hommes / Femmes / Fils-ICM / Nouveaux et du total
   général en temps réel avant même l'enregistrement. Classement depuis le
-  10/09/2026 : **Hommes** et **Femmes** ont chacun trois catégories
-  (Enfants, Adolescent·e·s, Adultes) ; **Fils-ICM** (le groupe de disciples)
-  et **Nouveaux** (une personne venue pour la première fois) ont chacun
-  deux catégories, Hommes et Femmes, sans tranche d'âge — chaque personne
-  présente n'est comptée qu'une seule fois, dans le groupe qui la décrit le
-  mieux ce jour-là.
+  10/09/2026 : **Hommes**, **Femmes**, **Fils-ICM** (le groupe de disciples)
+  et **Nouveaux** (une personne venue pour la première fois) ont chacun la
+  même segmentation Hommes/Femmes × Enfants/Adolescent·e·s/Adultes — chaque
+  personne présente n'est comptée qu'une seule fois, dans le groupe et la
+  tranche qui la décrivent le mieux ce jour-là.
 - **Tableau de bord** : dernier culte enregistré, évolution par rapport au
   culte précédent de même type, derniers cultes.
 - **Historique** : recherche, filtre par type de culte et par période, tri,

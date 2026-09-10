@@ -849,10 +849,18 @@ from (values
     ('Enfants',      'femmes',   0, 12,   0),
     ('Adolescentes', 'femmes',  13, 17,   1),
     ('Adultes',      'femmes',  18, null, 2),
-    ('Hommes',       'fils_icm', null, null, 0),
-    ('Femmes',       'fils_icm', null, null, 1),
-    ('Hommes',       'nouveaux', null, null, 0),
-    ('Femmes',       'nouveaux', null, null, 1)
+    ('Hommes — Enfants',      'fils_icm', 0, 12,   0),
+    ('Hommes — Adolescents',  'fils_icm', 13, 17,  1),
+    ('Hommes — Adultes',      'fils_icm', 18, null, 2),
+    ('Femmes — Enfants',      'fils_icm', 0, 12,   3),
+    ('Femmes — Adolescentes', 'fils_icm', 13, 17,  4),
+    ('Femmes — Adultes',      'fils_icm', 18, null, 5),
+    ('Hommes — Enfants',      'nouveaux', 0, 12,   0),
+    ('Hommes — Adolescents',  'nouveaux', 13, 17,  1),
+    ('Hommes — Adultes',      'nouveaux', 18, null, 2),
+    ('Femmes — Enfants',      'nouveaux', 0, 12,   3),
+    ('Femmes — Adolescentes', 'nouveaux', 13, 17,  4),
+    ('Femmes — Adultes',      'nouveaux', 18, null, 5)
 ) as v(nom, groupe, age_min, age_max, ordre)
 where not exists (select 1 from public.attendance_category);
 
