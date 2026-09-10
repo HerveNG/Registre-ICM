@@ -10,13 +10,13 @@ ne pas perturber les autres tests qui en dépendent (ex. "Culte du dimanche").
 Classement par défaut depuis la reclassification du 10/09/2026 (voir
 initialiser_donnees_presences() dans app.py) : Hommes et Femmes ont chacun
 trois catégories (Enfants, Adolescent(e)s, Adultes) ; Fils-ICM et Nouveaux
-ont chacun les mêmes trois tranches déclinées Hommes/Femmes (six catégories
-chacun : « Hommes — Enfants », « Hommes — Adolescents », « Hommes —
-Adultes », « Femmes — Enfants », « Femmes — Adolescentes », « Femmes —
-Adultes »), depuis la segmentation du 10/09/2026 également. « Enfants » et
-« Adultes » existent à la fois côté Hommes et côté Femmes — d'où le
-paramètre `groupe` de _id_categorie(), qui désambiguïse par (nom, groupe)
-plutôt que par le seul nom.
+ont chacun quatre catégories déclinées Hommes/Femmes × Enfants/Adultes
+(« Hommes — Enfants », « Hommes — Adultes », « Femmes — Enfants », « Femmes
+— Adultes »), sans tranche adolescent·e — moins pertinente pour ces deux
+groupes que pour Hommes/Femmes (décision du 10/09/2026 également).
+« Enfants » et « Adultes » existent à la fois côté Hommes et côté Femmes —
+d'où le paramètre `groupe` de _id_categorie(), qui désambiguïse par (nom,
+groupe) plutôt que par le seul nom.
 """
 
 
@@ -40,8 +40,8 @@ def _id_categorie(icm_app, nom, groupe=None):
 
 def _donnees_exemple(icm_app, date_culte="2026-08-30"):
     """85 hommes (10 enfants + 15 adolescents + 60 adultes), 120 femmes
-    (12 enfants + 18 adolescentes + 90 adultes), 35 Fils-ICM (2+3+10 hommes
-    + 1+4+15 femmes), 5 Nouveaux (1+0+2 hommes + 0+0+2 femmes) — 245 au
+    (12 enfants + 18 adolescentes + 90 adultes), 28 Fils-ICM (2+10 hommes +
+    1+15 femmes), 5 Nouveaux (1+0+2 hommes + 0+0+2 femmes) — 238 au
     total."""
     return {
         "date_culte": date_culte,
@@ -53,10 +53,8 @@ def _donnees_exemple(icm_app, date_culte="2026-08-30"):
         f"cat_{_id_categorie(icm_app, 'Adolescentes', 'femmes')}": "18",
         f"cat_{_id_categorie(icm_app, 'Adultes', 'femmes')}": "90",
         f"cat_{_id_categorie(icm_app, 'Hommes — Enfants', 'fils_icm')}": "2",
-        f"cat_{_id_categorie(icm_app, 'Hommes — Adolescents', 'fils_icm')}": "3",
         f"cat_{_id_categorie(icm_app, 'Hommes — Adultes', 'fils_icm')}": "10",
         f"cat_{_id_categorie(icm_app, 'Femmes — Enfants', 'fils_icm')}": "1",
-        f"cat_{_id_categorie(icm_app, 'Femmes — Adolescentes', 'fils_icm')}": "4",
         f"cat_{_id_categorie(icm_app, 'Femmes — Adultes', 'fils_icm')}": "15",
         f"cat_{_id_categorie(icm_app, 'Hommes — Enfants', 'nouveaux')}": "1",
         f"cat_{_id_categorie(icm_app, 'Hommes — Adultes', 'nouveaux')}": "2",
@@ -74,7 +72,7 @@ def test_types_de_culte_et_categories_semes_par_defaut(icm_app):
         assert "Culte du mercredi" in noms_types
 
         categories = icm_app.AttendanceCategory.query.all()
-        assert len(categories) == 18
+        assert len(categories) == 14
         assert {c.groupe for c in categories} == {"hommes", "femmes", "fils_icm", "nouveaux"}
 
 
@@ -90,15 +88,15 @@ def test_enregistrer_une_presence_calcule_les_totaux(client_secretaire, icm_app)
         record = icm_app.AttendanceRecord.query.one()
         assert record.total_hommes == 85
         assert record.total_femmes == 120
-        assert record.total_fils_icm == 35
+        assert record.total_fils_icm == 28
         assert record.total_nouveaux == 5
         assert record.total_enfants == 0   # legacy, jamais renseigné pour une fiche neuve
-        assert record.total_general == 245
+        assert record.total_general == 238
         assert record.created_by == "test_secretaire"
         assert record.updated_by is None
         assert record.jour_semaine == "Dimanche"
         # Une ligne AttendanceValue par catégorie active, même à 0.
-        assert len(record.valeurs) == 18
+        assert len(record.valeurs) == 14
 
 
 def test_effectif_negatif_refuse(client_secretaire, icm_app):
@@ -163,7 +161,7 @@ def test_modifier_une_presence_recalcule_les_totaux_et_marque_updated_by(
     with icm_app.app.app_context():
         record = icm_app.db.session.get(icm_app.AttendanceRecord, id_record)
         assert record.total_hommes == 88
-        assert record.total_general == 248
+        assert record.total_general == 241
         assert record.updated_by == "test_secretaire"
 
 
@@ -251,7 +249,7 @@ def test_statistiques_periode_tout_agrege_correctement(client_secretaire, icm_ap
     client_secretaire.post("/presences/nouvelle", data=_donnees_exemple(icm_app))
     reponse = client_secretaire.get("/presences/statistiques?periode=tout")
     assert reponse.status_code == 200
-    assert b"245" in reponse.data
+    assert b"238" in reponse.data
 
 
 def test_statistiques_periode_personnalisee(client_secretaire, icm_app):
@@ -259,7 +257,7 @@ def test_statistiques_periode_personnalisee(client_secretaire, icm_app):
     reponse = client_secretaire.get(
         "/presences/statistiques?periode=personnalise&debut=2026-08-01&fin=2026-08-31")
     assert reponse.status_code == 200
-    assert b"245" in reponse.data
+    assert b"238" in reponse.data
 
     hors_periode = client_secretaire.get(
         "/presences/statistiques?periode=personnalise&debut=2026-01-01&fin=2026-01-31")
@@ -457,7 +455,7 @@ def test_comparaison_agrege_chaque_periode_separement(client_secretaire, icm_app
         "/presences/comparaison?a_debut=2026-08-01&a_fin=2026-08-31"
         "&b_debut=2026-07-01&b_fin=2026-07-31")
     assert reponse.status_code == 200
-    assert b"245" in reponse.data   # periode A : la carte d'exemple
+    assert b"238" in reponse.data   # periode A : la carte d'exemple
     assert b"10" in reponse.data    # periode B : le seul enregistrement
 
 
@@ -485,7 +483,7 @@ def test_rapport_tout_lhistorique_contient_le_detail(client_secretaire, icm_app)
     client_secretaire.post("/presences/nouvelle", data=_donnees_exemple(icm_app))
     reponse = client_secretaire.get("/presences/rapport?periode=tout")
     assert reponse.status_code == 200
-    assert b"245" in reponse.data
+    assert b"238" in reponse.data
     assert b"30/08/2026" in reponse.data
 
 
@@ -494,7 +492,7 @@ def test_rapport_periode_personnalisee(client_secretaire, icm_app):
     reponse = client_secretaire.get(
         "/presences/rapport?periode=personnalise&debut=2026-08-01&fin=2026-08-31")
     assert reponse.status_code == 200
-    assert b"245" in reponse.data
+    assert b"238" in reponse.data
 
 
 # ------------------------------------------------------------------
@@ -543,7 +541,7 @@ def test_export_csv_contient_les_colonnes_et_les_totaux(client_secretaire, icm_a
     assert "Total Général" in contenu
     assert "Total Fils-ICM" in contenu
     assert "Total Nouveaux" in contenu
-    assert "245" in contenu
+    assert "238" in contenu
 
 
 def test_export_csv_respecte_le_filtre_type(client_secretaire, icm_app):

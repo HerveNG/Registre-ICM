@@ -28,9 +28,13 @@
 --      si elles existent encore sous leur nom d'origine et sont actives ;
 --      si vous les aviez renommées, ce script ne les touche pas.
 --   4. Sème les nouvelles catégories par défaut : Enfants/Adolescent(e)s/
---      Adultes pour Hommes et Femmes, et les mêmes tranches d'âge déclinées
---      Hommes/Femmes pour Fils-ICM et pour Nouveaux — seulement celles qui
+--      Adultes pour Hommes et Femmes ; Enfants/Adultes déclinés Hommes/
+--      Femmes (sans tranche adolescent·e — moins pertinente pour ces deux
+--      groupes) pour Fils-ICM et pour Nouveaux — seulement celles qui
 --      n'existent pas déjà.
+--   4b. Retire la tranche Adolescent(e)s de Fils-ICM/Nouveaux si une
+--       exécution antérieure de ce script l'avait semée, et seulement si
+--       aucune présence ne l'utilise déjà.
 -- ============================================================
 
 
@@ -75,6 +79,10 @@ where is_active = true
 
 
 -- 4. Sème les nouvelles catégories par défaut — une seule fois chacune.
+--    Fils-ICM et Nouveaux n'ont que deux tranches (Enfants/Adultes) par
+--    sexe, pas trois : contrairement à Hommes/Femmes, ce ne sont pas des
+--    groupes d'âge général, la distinction adolescent/adulte y est moins
+--    utile (décision du 10/09/2026).
 insert into public.attendance_category (nom, groupe, age_min, age_max, ordre_affichage)
 select v.nom, v.groupe, v.age_min, v.age_max, v.ordre
 from (values
@@ -84,23 +92,30 @@ from (values
     ('Enfants',      'femmes',   0, 12,   0),
     ('Adolescentes', 'femmes',  13, 17,   1),
     ('Adultes',      'femmes',  18, null, 2),
-    ('Hommes — Enfants',      'fils_icm', 0, 12,   0),
-    ('Hommes — Adolescents',  'fils_icm', 13, 17,  1),
-    ('Hommes — Adultes',      'fils_icm', 18, null, 2),
-    ('Femmes — Enfants',      'fils_icm', 0, 12,   3),
-    ('Femmes — Adolescentes', 'fils_icm', 13, 17,  4),
-    ('Femmes — Adultes',      'fils_icm', 18, null, 5),
-    ('Hommes — Enfants',      'nouveaux', 0, 12,   0),
-    ('Hommes — Adolescents',  'nouveaux', 13, 17,  1),
-    ('Hommes — Adultes',      'nouveaux', 18, null, 2),
-    ('Femmes — Enfants',      'nouveaux', 0, 12,   3),
-    ('Femmes — Adolescentes', 'nouveaux', 13, 17,  4),
-    ('Femmes — Adultes',      'nouveaux', 18, null, 5)
+    ('Hommes — Enfants', 'fils_icm', 0, 12,   0),
+    ('Hommes — Adultes', 'fils_icm', 18, null, 1),
+    ('Femmes — Enfants', 'fils_icm', 0, 12,   2),
+    ('Femmes — Adultes', 'fils_icm', 18, null, 3),
+    ('Hommes — Enfants', 'nouveaux', 0, 12,   0),
+    ('Hommes — Adultes', 'nouveaux', 18, null, 1),
+    ('Femmes — Enfants', 'nouveaux', 0, 12,   2),
+    ('Femmes — Adultes', 'nouveaux', 18, null, 3)
 ) as v(nom, groupe, age_min, age_max, ordre)
 where not exists (
     select 1 from public.attendance_category c
     where c.nom = v.nom and c.groupe = v.groupe
 );
+
+-- 4b. Si une exécution précédente de ce script avait semé la tranche
+--     Adolescent(e)s pour Fils-ICM/Nouveaux (version antérieure au
+--     10/09/2026, revue le jour même), on la retire — uniquement si aucune
+--     présence enregistrée ne s'en sert déjà, jamais autrement.
+delete from public.attendance_category c
+where c.groupe in ('fils_icm', 'nouveaux')
+  and c.nom in ('Hommes — Adolescents', 'Femmes — Adolescentes')
+  and not exists (
+      select 1 from public.attendance_value v where v.category_id = c.id
+  );
 
 
 -- ------------------------------------------------------------
@@ -111,7 +126,7 @@ select
      where table_schema = 'public' and table_name = 'attendance_record'
      and column_name in ('total_fils_icm', 'total_nouveaux')
      having count(*) = 2)                                                  as colonnes_totaux_ajoutees,
-    (select count(*) >= 12 from public.attendance_category
+    (select count(*) >= 8 from public.attendance_category
      where groupe in ('fils_icm', 'nouveaux') and is_active)               as categories_fils_icm_nouveaux_semees,
     (select count(*) from pg_constraint
      where conname = 'attendance_category_groupe_check') = 1               as contrainte_groupe_elargie;
