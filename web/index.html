@@ -319,6 +319,7 @@ h1.titre{margin:0 0 1rem;font-size:1.5rem;}
       <button id="btn-export">Export Excel</button>
       <button data-vue="journal">Journal</button>
       <button data-vue="presences">📊 Présences</button>
+      <button data-vue="fils">👥 Fils</button>
       <button data-vue="apropos">À propos</button>
       <button data-vue="reglages">Réglages</button>
       <span class="utilisateur" id="etiquette-utilisateur"></span>
@@ -621,6 +622,167 @@ h1.titre{margin:0 0 1rem;font-size:1.5rem;}
     <h1 class="titre">Paramètres — Présences</h1>
     <p class="discret" style="margin-top:-.8rem;margin-bottom:1.2rem">Types de culte et catégories d'âge, communs à toute l'application.</p>
     <div id="presences-parametres-contenu"></div>
+  </section>
+
+  <!-- ================= FILS : LISTE ================= -->
+  <section id="vue-fils" hidden>
+    <h1 class="titre">👥 Fils</h1>
+    <p class="discret" id="fils-total" style="margin-top:-.8rem;margin-bottom:1.2rem"></p>
+
+    <form class="barre-recherche" id="form-recherche-fils">
+      <input type="search" id="fils-recherche" placeholder="Rechercher un nom ou un prénom…">
+      <select id="fils-filtre-ville"><option value="">Toutes les villes</option></select>
+      <select id="fils-filtre-genre">
+        <option value="">Tous genres</option><option value="M">Homme</option><option value="F">Femme</option>
+      </select>
+      <select id="fils-filtre-statut">
+        <option value="">Tous statuts</option><option value="active">Actif</option><option value="inactive">Inactif</option>
+      </select>
+      <button type="submit" class="bouton">Rechercher</button>
+      <button type="button" class="bouton bouton-discret" id="btn-fils-importer" onclick="ouvrirFilsImporter()" hidden>Importer depuis Excel</button>
+      <button type="button" class="bouton bouton-discret" id="btn-fils-export" onclick="exporterFilsCsv()" hidden>Export Excel</button>
+      <button type="button" class="bouton bouton-discret" onclick="ouvrirFilsActivites()">Activités &amp; pointage</button>
+      <button type="button" class="bouton bouton-discret" onclick="ouvrirFilsStatistiques()">Statistiques</button>
+      <button type="button" class="bouton bouton-principal" id="btn-fils-nouveau" onclick="ouvrirFilsForm(null)" hidden>+ Nouveau fils</button>
+    </form>
+
+    <div id="fils-liste-contenu"></div>
+  </section>
+
+  <!-- ================= FILS : FORMULAIRE ================= -->
+  <section id="vue-fils-form" hidden>
+    <h1 class="titre" id="titre-fils-form">Nouveau fils</h1>
+    <form id="form-fils">
+      <input type="hidden" id="fils-id">
+      <div class="grille">
+        <label class="obligatoire">Nom <input type="text" id="fils-nom" maxlength="120" required></label>
+        <label class="obligatoire">Prénom <input type="text" id="fils-prenom" maxlength="120" required></label>
+        <label>Ville de résidence <input type="text" id="fils-ville" maxlength="150"></label>
+        <label>Téléphone <input type="text" id="fils-telephone" maxlength="50"></label>
+        <label class="obligatoire">Genre
+          <select id="fils-genre" required>
+            <option value="">— Choisir —</option><option value="M">Homme</option><option value="F">Femme</option>
+          </select>
+        </label>
+        <label>Statut
+          <select id="fils-statut"><option value="active">Actif</option><option value="inactive">Inactif</option></select>
+        </label>
+      </div>
+      <div class="actions-formulaire">
+        <button type="submit" class="bouton bouton-principal bouton-large">Enregistrer</button>
+        <button type="button" class="bouton bouton-discret" onclick="ouvrirFilsListe()">Annuler</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- ================= FILS : FICHE ================= -->
+  <section id="vue-fils-detail" hidden>
+    <div id="fils-detail-contenu"></div>
+  </section>
+
+  <!-- ================= FILS : IMPORT EXCEL/CSV ================= -->
+  <section id="vue-fils-importer" hidden>
+    <h1 class="titre">Importer des fils depuis Excel</h1>
+    <p class="discret">Depuis un fichier CSV — une ligne par fils.</p>
+
+    <div id="fils-import-upload" class="bloc-import">
+      <p class="aide" style="margin-top:0">
+        Téléchargez d'abord le modèle, remplissez-le (une ligne par fils),
+        enregistrez-le au format .csv, puis envoyez-le ici.
+      </p>
+      <p><button type="button" class="bouton" id="btn-fils-import-modele">Télécharger le modèle (.csv)</button></p>
+      <form id="form-fils-import" style="margin-top:1.2rem">
+        <label>Fichier à importer (.csv)
+          <input type="file" id="fils-import-fichier" accept=".csv" required>
+        </label>
+        <div class="actions-formulaire" style="margin-top:1rem">
+          <button type="submit" class="bouton bouton-principal">Analyser le fichier</button>
+        </div>
+      </form>
+      <p class="aide">Rien n'est enregistré à cette étape : le fichier est
+        d'abord analysé, vous voyez un aperçu ligne par ligne, et l'import
+        ne se fait qu'après votre confirmation.</p>
+    </div>
+
+    <div id="fils-import-resultats" class="bloc-import" hidden>
+      <div class="import-resume" id="fils-import-resume"></div>
+      <div id="fils-import-colonnes-ignorees"></div>
+      <p class="aide" id="fils-import-aide-erreurs" style="margin-top:0" hidden>
+        Les lignes en erreur ci-dessous ne seront <strong>pas</strong> importées.
+      </p>
+      <div class="tableau-enveloppe">
+        <table>
+          <thead><tr><th>Ligne</th><th>Nom &amp; prénom</th><th>Ville</th><th>Téléphone</th><th>Genre</th><th>Statut</th></tr></thead>
+          <tbody id="fils-import-corps-tableau"></tbody>
+        </table>
+      </div>
+      <div class="import-actions">
+        <button type="button" class="bouton bouton-principal" id="btn-fils-import-confirmer" hidden>Confirmer l'import</button>
+        <button type="button" class="bouton bouton-discret" id="btn-fils-import-recommencer">Recommencer avec un autre fichier</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= FILS : ACTIVITÉS ================= -->
+  <section id="vue-fils-activites" hidden>
+    <h1 class="titre">Activités &amp; pointage</h1>
+    <p class="discret" style="margin-top:-.8rem;margin-bottom:1.2rem">Créez une activité (date + type), puis faites l'appel.</p>
+    <div class="bloc-stat">
+      <h2>Nouvelle activité</h2>
+      <form id="form-fils-activite" class="grille" style="align-items:end;">
+        <label class="obligatoire">Date <input type="date" id="fils-activite-date" required></label>
+        <label class="obligatoire">Type d'activité <select id="fils-activite-type" required></select></label>
+        <label>Libellé (facultatif) <input type="text" id="fils-activite-nom" maxlength="150"></label>
+        <button type="submit" class="bouton bouton-principal">Créer et pointer</button>
+      </form>
+    </div>
+    <div class="bloc-stat">
+      <h2>Activités récentes</h2>
+      <div id="fils-activites-contenu"></div>
+    </div>
+  </section>
+
+  <!-- ================= FILS : POINTAGE ================= -->
+  <section id="vue-fils-pointage" hidden>
+    <h1 class="titre">📋 Pointage</h1>
+    <p class="discret" id="fils-pointage-titre" style="margin-top:-.8rem;margin-bottom:1.2rem"></p>
+    <form id="form-fils-pointage">
+      <input type="hidden" id="fils-pointage-activite-id">
+      <div id="fils-pointage-contenu"></div>
+      <p class="aide">Tout le monde est proposé « Présent » par défaut —
+        décochez seulement les absents. Un seul enregistrement pour toute la liste.</p>
+      <div class="actions-formulaire">
+        <button type="submit" class="bouton bouton-principal bouton-large">Enregistrer les présences</button>
+        <button type="button" class="bouton bouton-discret" onclick="ouvrirFilsActivites()">Annuler</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- ================= FILS : STATISTIQUES ================= -->
+  <section id="vue-fils-statistiques" hidden>
+    <h1 class="titre">Statistiques des fils</h1>
+    <p class="discret" id="fils-stats-periode-texte" style="margin-top:-.8rem;margin-bottom:1.2rem"></p>
+    <form class="filtres-periode" id="form-fils-statistiques">
+      <select id="fils-stats-periode">
+        <option value="aujourdhui">Aujourd'hui</option>
+        <option value="semaine">Cette semaine</option>
+        <option value="mois" selected>Ce mois</option>
+        <option value="trimestre">Ce trimestre</option>
+        <option value="annee">Cette année</option>
+        <option value="tout">Tout l'historique</option>
+        <option value="personnalise">Période personnalisée…</option>
+      </select>
+      <span id="fils-stats-bloc-personnalise" hidden>
+        Du <input type="date" id="fils-stats-debut" style="width:auto;display:inline-block;">
+        au <input type="date" id="fils-stats-fin" style="width:auto;display:inline-block;">
+      </span>
+      <select id="fils-stats-genre">
+        <option value="">Tous genres</option><option value="M">Hommes</option><option value="F">Femmes</option>
+      </select>
+      <select id="fils-stats-ville"><option value="">Toutes les villes</option></select>
+      <button type="submit" class="bouton bouton-petit">Appliquer</button>
+    </form>
+    <div id="fils-statistiques-contenu"></div>
   </section>
 
   <!-- ================= FORMULAIRE ================= -->
@@ -1229,7 +1391,9 @@ function dateHeureFr(iso){
 function afficherVue(nom){
   ["reglages","connexion","liste","formulaire","import","journal","apropos",
    "presences","presences-form","presences-historique","presences-detail",
-   "presences-statistiques","presences-comparaison","presences-parametres"].forEach(v=>{
+   "presences-statistiques","presences-comparaison","presences-parametres",
+   "fils","fils-form","fils-detail","fils-importer","fils-activites",
+   "fils-pointage","fils-statistiques"].forEach(v=>{
     $("vue-"+v).hidden = (v !== nom);
   });
   const connecte = !!etat.session;
@@ -1244,7 +1408,8 @@ function afficherVue(nom){
   $("btn-nouveau").hidden     = !connecte;
   $("btn-import-nav").hidden  = !connecte;
   $("btn-export").hidden      = !connecte;
-  ["btn-presences-nouvelle", "btn-presences-nouvelle-2", "btn-presences-parametres"].forEach(id=>{
+  ["btn-presences-nouvelle", "btn-presences-nouvelle-2", "btn-presences-parametres",
+   "btn-fils-nouveau", "btn-fils-nouveau-2", "btn-fils-importer", "btn-fils-export"].forEach(id=>{
     const el = $(id);
     if (el) el.hidden = !connecte;
   });
@@ -2284,6 +2449,8 @@ etat.presences = {
   historique: { page:1, total:0, q:"", type:"", debut:"", fin:"", tri:"date_desc" }
 };
 const PAR_PAGE_PRESENCES = 25;
+
+etat.fils = { liste: [], q:"", ville:"", genre:"", statut:"", page:1, total:0, pointageActifsIds: [] };
 
 /* --- Référentiel (types de culte + catégories), chargé une fois --- */
 async function chargerReferentielPresences(force){
@@ -3385,6 +3552,839 @@ async function enregistrerCategoriesPresences(groupe){
 }
 
 /* ==========================================================
+   8 ter. MODULE FILS — registre nominatif des disciples et suivi
+   individuel de présence aux activités (distinct de la catégorie
+   agrégée « Fils-ICM » de Présences ci-dessus : ici chaque fils est
+   une personne identifiée, avec son propre historique). Miroir de
+   app.py (mêmes règles de casse/téléphone/genre, mêmes colonnes
+   d'export/import/modèle, mêmes statistiques) — fils_activite
+   réutilise service_type (etat.presences.types), déjà chargé pour
+   Présences, comme type d'activité.
+   ========================================================== */
+const LIBELLES_GENRES_FILS = { M:"Homme", F:"Femme" };
+const LIBELLES_STATUTS_FILS = { active:"Actif", inactive:"Inactif" };
+const FILS_CHAMPS_MAJUSCULES = new Set(["nom"]);
+const FILS_CHAMPS_CAPITALISES = new Set(["prenom", "ville"]);
+const FILS_LONGUEURS_MAX = { nom:120, prenom:120, ville:150, telephone:50 };
+const FILS_PAR_PAGE = 20;
+
+// Colonnes de l'export/modèle/import — une seule liste, comme
+// COLONNES_EXPORT pour le registre.
+const FILS_COLONNES_EXPORT = [
+  ["nom","Nom"], ["prenom","Prénom"], ["ville","Ville"],
+  ["telephone","Téléphone"], ["genre","Genre"],
+];
+const FILS_CHAMPS_PAR_ENTETE_IMPORT = Object.fromEntries(
+  FILS_COLONNES_EXPORT.map(([champ, libelle]) => [normaliserEnteteImport(libelle), champ])
+);
+// Synonymes usuels non couverts par la simple normalisation accents/casse.
+FILS_CHAMPS_PAR_ENTETE_IMPORT[normaliserEnteteImport("TEL")] = "telephone";
+FILS_CHAMPS_PAR_ENTETE_IMPORT[normaliserEnteteImport("SEXE")] = "genre";
+
+function normaliserCasseFils(champ, valeur){
+  if (!valeur) return valeur;
+  if (FILS_CHAMPS_MAJUSCULES.has(champ)) return valeur.toUpperCase();
+  if (FILS_CHAMPS_CAPITALISES.has(champ))
+    return valeur.charAt(0).toUpperCase() + valeur.slice(1).toLowerCase();
+  return valeur;
+}
+
+// Ne garde que les chiffres (et un + de tête s'il y en avait un).
+function nettoyerTelephoneFils(valeur){
+  if (!valeur) return null;
+  valeur = String(valeur).trim();
+  const gardePlus = valeur.startsWith("+");
+  const chiffres = valeur.replace(/[^0-9]/g, "");
+  if (!chiffres) return null;
+  return (gardePlus ? "+" : "") + chiffres;
+}
+
+// Accepte M/F mais aussi Homme/Femme/H (casse et accents indifférents).
+function normaliserGenreFils(valeur){
+  if (!valeur) return null;
+  const v = normaliserEnteteImport(String(valeur));
+  if (["m","homme","h","masculin"].includes(v)) return "M";
+  if (["f","femme","feminin"].includes(v)) return "F";
+  return null;
+}
+
+function validerDonneesFils(d){
+  const erreurs = [];
+  if (!d.nom) erreurs.push("Le nom est obligatoire.");
+  if (!d.prenom) erreurs.push("Le prénom est obligatoire.");
+  for (const [champ, max] of Object.entries(FILS_LONGUEURS_MAX)){
+    if (d[champ] && d[champ].length > max)
+      erreurs.push(`« ${champ} » dépasse la longueur maximale autorisée (${max} caractères).`);
+  }
+  if (!d.genre) erreurs.push("Le genre doit être Homme (M) ou Femme (F).");
+  return erreurs;
+}
+
+function lireFormulaireFils(){
+  return {
+    nom: normaliserCasseFils("nom", $("fils-nom").value.trim() || null),
+    prenom: normaliserCasseFils("prenom", $("fils-prenom").value.trim() || null),
+    ville: normaliserCasseFils("ville", $("fils-ville").value.trim() || null),
+    telephone: nettoyerTelephoneFils($("fils-telephone").value),
+    genre: $("fils-genre").value || null,
+    statut: $("fils-statut").value || "active",
+  };
+}
+
+function remplirFormulaireFils(f){
+  $("fils-nom").value = f.nom || "";
+  $("fils-prenom").value = f.prenom || "";
+  $("fils-ville").value = f.ville || "";
+  $("fils-telephone").value = f.telephone || "";
+  $("fils-genre").value = f.genre || "";
+  $("fils-statut").value = f.statut || "active";
+}
+
+/* ---------------------------------------------------------------
+   LISTE
+   --------------------------------------------------------------- */
+async function villesDistinctesFils(){
+  const { donnees } = await api("fils?select=ville&ville=not.is.null&order=ville.asc", {
+    headers: { "Range-Unit":"items", "Range":"0-9999" }
+  });
+  return [...new Set((donnees || []).map(r => r.ville).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"fr"));
+}
+
+function remplirSelectVillesFils(select, villes, valeurActuelle){
+  select.innerHTML = `<option value="">Toutes les villes</option>` +
+    villes.map(v => `<option value="${echapper(v)}">${echapper(v)}</option>`).join("");
+  select.value = valeurActuelle || "";
+}
+
+async function ouvrirFilsListe(){
+  afficherVue("fils");
+  $("fils-recherche").value = etat.fils.q;
+  $("fils-filtre-genre").value = etat.fils.genre;
+  $("fils-filtre-statut").value = etat.fils.statut;
+  try{
+    const villes = await villesDistinctesFils();
+    remplirSelectVillesFils($("fils-filtre-ville"), villes, etat.fils.ville);
+  }catch(e){ /* filtre non bloquant */ }
+  await chargerFilsListe();
+}
+
+function construireRequeteFils(){
+  const params = new URLSearchParams();
+  params.set("select", "*");
+  params.set("order", "nom.asc,prenom.asc");
+  if (etat.fils.q){
+    const motif = "*" + etat.fils.q.replace(/[,()*"\\]/g, " ").trim() + "*";
+    params.set("or", `(nom.ilike.${motif},prenom.ilike.${motif})`);
+  }
+  if (etat.fils.ville)  params.set("ville",  `eq.${etat.fils.ville}`);
+  if (etat.fils.genre)  params.set("genre",  `eq.${etat.fils.genre}`);
+  if (etat.fils.statut) params.set("statut", `eq.${etat.fils.statut}`);
+  return params;
+}
+
+async function chargerFilsListe(){
+  const params = construireRequeteFils();
+  const debut = (etat.fils.page - 1) * FILS_PAR_PAGE;
+  const fin   = debut + FILS_PAR_PAGE - 1;
+  try{
+    const { donnees, total } = await api(`fils?${params}`, {
+      headers:{ "Range-Unit":"items", "Range":`${debut}-${fin}`, "Prefer":"count=exact" }
+    });
+    etat.fils.liste = donnees || [];
+    etat.fils.total = total ?? etat.fils.liste.length;
+    await dessinerFilsListe();
+  }catch(e){ message(e.message, "erreur"); }
+}
+
+// Dernier pointage de chaque fils affiché — un seul aller-retour groupé
+// plutôt qu'une requête par ligne (dataset toujours petit, voir
+// numerosExistantsImport ci-dessus pour le même principe).
+async function dernieresPresencesFils(ids){
+  if (!ids.length) return {};
+  const { donnees } = await api(
+    `fils_presence?select=fils_id,statut,fils_activite(date_activite)&fils_id=in.(${ids.join(",")})`,
+    { headers:{ "Range-Unit":"items", "Range":"0-9999" } });
+  const parFils = {};
+  (donnees || []).forEach(p=>{
+    const date = p.fils_activite && p.fils_activite.date_activite;
+    if (!date) return;
+    const actuel = parFils[p.fils_id];
+    if (!actuel || date > actuel.date) parFils[p.fils_id] = { date, statut: p.statut };
+  });
+  return parFils;
+}
+
+function changerPageFils(delta){
+  etat.fils.page += delta;
+  chargerFilsListe();
+}
+
+async function dessinerFilsListe(){
+  const zone = $("fils-liste-contenu");
+  const lignes = etat.fils.liste;
+  const total = etat.fils.total;
+  const pages = Math.max(Math.ceil(total / FILS_PAR_PAGE), 1);
+  const ecriture = peutEcrire();
+  const suppression = peutSupprimer();
+
+  $("fils-total").textContent = `${total} fils enregistré(s).`;
+
+  if (!lignes.length){
+    const filtre = etat.fils.q || etat.fils.ville || etat.fils.genre || etat.fils.statut;
+    zone.innerHTML = filtre
+      ? `<div class="vide"><p>Aucun fils ne correspond à cette recherche.</p></div>`
+      : `<div class="vide"><p>Aucun fils enregistré pour le moment.</p>${
+          ecriture ? `<button class="bouton bouton-principal" onclick="ouvrirFilsForm(null)">Enregistrer le premier fils</button>
+            <button class="bouton bouton-discret" onclick="ouvrirFilsImporter()">ou importer depuis Excel</button>` : "" }</div>`;
+    return;
+  }
+
+  let dernieres = {};
+  try{ dernieres = await dernieresPresencesFils(lignes.map(f=>f.id)); }catch(e){ /* non bloquant */ }
+
+  zone.innerHTML = `
+    <div class="tableau-enveloppe">
+    <table class="tableau">
+      <thead><tr>
+        <th>Nom &amp; prénom</th><th>Ville</th><th>Téléphone</th><th>Genre</th>
+        <th>Statut</th><th>Présence récente</th><th class="col-actions">Actions</th>
+      </tr></thead>
+      <tbody>${lignes.map(f=>{
+        const derniere = dernieres[f.id];
+        return `<tr>
+          <td><strong>${echapper(f.nom)}</strong> ${echapper(f.prenom)}</td>
+          <td>${echapper(f.ville || "—")}</td>
+          <td>${echapper(f.telephone || "—")}</td>
+          <td>${LIBELLES_GENRES_FILS[f.genre] || "—"}</td>
+          <td>${ f.statut === "active"
+              ? `<span class="etiquette etiquette-ok">Actif</span>`
+              : `<span class="etiquette etiquette-erreur">Inactif</span>` }</td>
+          <td>${ derniere
+              ? `${derniere.statut === "P" ? "Présent" : "Absent"} (${dateFr(derniere.date)})`
+              : "—" }</td>
+          <td class="col-actions">
+            <button type="button" class="bouton bouton-petit" onclick="ouvrirFilsDetail('${f.id}')">Voir</button>
+            ${ecriture ? `<button type="button" class="bouton bouton-petit" onclick="ouvrirFilsForm('${f.id}')">Modifier</button>` : ""}
+            ${suppression ? `<button type="button" class="bouton bouton-petit bouton-danger" onclick="supprimerFils('${f.id}')">Supprimer</button>` : ""}
+          </td>
+        </tr>`;
+      }).join("")}</tbody>
+    </table>
+    </div>
+    ${ pages > 1 ? `
+    <nav class="pagination">
+      <button type="button" class="bouton bouton-petit" ${etat.fils.page<=1?"disabled":""} onclick="changerPageFils(-1)">‹ Précédent</button>
+      <span class="pagination-info">Page ${etat.fils.page} sur ${pages}</span>
+      <button type="button" class="bouton bouton-petit" ${etat.fils.page>=pages?"disabled":""} onclick="changerPageFils(1)">Suivant ›</button>
+    </nav>` : "" }`;
+}
+
+/* ---------------------------------------------------------------
+   FORMULAIRE (création / modification)
+   --------------------------------------------------------------- */
+async function ouvrirFilsForm(id){
+  if (!peutEcrire()){ message("Accès réservé au secrétariat et au pasteur.", "erreur"); return; }
+  afficherVue("fils-form");
+  $("form-fils").reset();
+  $("fils-id").value = id || "";
+  $("titre-fils-form").textContent = id ? "Modifier le fils" : "Nouveau fils";
+  if (!id) return;
+  try{
+    let f = etat.fils.liste.find(x=>x.id===id);
+    if (!f){
+      const { donnees } = await api(`fils?id=eq.${encodeURIComponent(id)}`);
+      f = donnees && donnees[0];
+    }
+    if (!f){ message("Fils introuvable.", "erreur"); ouvrirFilsListe(); return; }
+    remplirFormulaireFils(f);
+  }catch(e){ message(e.message, "erreur"); }
+}
+
+async function soumettreFilsFormulaire(evt){
+  evt.preventDefault();
+  if (!peutEcrire()){ message("Accès réservé au secrétariat et au pasteur.", "erreur"); return; }
+  const donnees = lireFormulaireFils();
+  const erreurs = validerDonneesFils(donnees);
+  if (erreurs.length){ message(erreurs.join(" "), "erreur"); return; }
+
+  const id = $("fils-id").value;
+  const bouton = evt.target.querySelector("button[type=submit]");
+  bouton.disabled = true;
+  try{
+    if (id){
+      await api(`fils?id=eq.${encodeURIComponent(id)}`,
+        { method:"PATCH", body:donnees, headers:{ "Prefer":"return=minimal" } });
+      message(`Fils « ${donnees.nom} ${donnees.prenom} » mis à jour.`, "succes");
+      ouvrirFilsDetail(id);
+    }else{
+      await api("fils", { method:"POST", body:donnees, headers:{ "Prefer":"return=minimal" } });
+      message(`Fils « ${donnees.nom} ${donnees.prenom} » enregistré.`, "succes");
+      ouvrirFilsListe();
+    }
+  }catch(e){ message(e.message, "erreur"); }
+  finally{ bouton.disabled = false; }
+}
+
+async function supprimerFils(id){
+  if (!peutSupprimer()){
+    message("Seuls le secrétariat et le pasteur peuvent supprimer définitivement.", "erreur");
+    return;
+  }
+  const f = etat.fils.liste.find(x=>x.id===id);
+  const nom = f ? `${f.nom} ${f.prenom}` : "ce fils";
+  if (!confirm(`Supprimer définitivement ${nom} ?`)) return;
+  try{
+    const { donnees: presences } = await api(
+      `fils_presence?fils_id=eq.${encodeURIComponent(id)}&select=id&limit=1`);
+    if (presences && presences.length){
+      message(`Impossible de supprimer ${nom} : il a un historique de présence — `
+        + `désactivez-le plutôt (modifier la fiche, statut Inactif).`, "erreur");
+      return;
+    }
+    await api(`fils?id=eq.${encodeURIComponent(id)}`, { method:"DELETE" });
+    message(`Fils « ${nom} » supprimé définitivement.`, "succes");
+    if (etat.fils.liste.length === 1 && etat.fils.page > 1) etat.fils.page--;
+    await chargerFilsListe();
+  }catch(e){ message(e.message, "erreur"); }
+}
+
+/* ---------------------------------------------------------------
+   FICHE — détail, historique, taux de présence/absence
+   --------------------------------------------------------------- */
+async function ouvrirFilsDetail(id){
+  afficherVue("fils-detail");
+  const zone = $("fils-detail-contenu");
+  zone.innerHTML = `<p class="discret">Chargement…</p>`;
+  try{
+    const { donnees } = await api(`fils?id=eq.${encodeURIComponent(id)}`);
+    const f = donnees && donnees[0];
+    if (!f){ message("Fils introuvable.", "erreur"); ouvrirFilsListe(); return; }
+
+    const { donnees: historique } = await api(
+      `fils_presence?fils_id=eq.${encodeURIComponent(id)}`
+      + `&select=*,fils_activite(date_activite,nom,service_type(nom))`
+      + `&order=fils_activite(date_activite).desc`,
+      { headers:{ "Range-Unit":"items", "Range":"0-9999" } });
+    const lignes = historique || [];
+    const nbPresent = lignes.filter(p=>p.statut==="P").length;
+    const nbAbsent = lignes.filter(p=>p.statut==="A").length;
+    const total = nbPresent + nbAbsent;
+    const tauxPresence = total ? Math.round(nbPresent/total*1000)/10 : 0;
+    const tauxAbsence = total ? Math.round(nbAbsent/total*1000)/10 : 0;
+
+    zone.innerHTML = `
+      <div class="titre-page">
+        <h1>${echapper(f.nom)} ${echapper(f.prenom)}</h1>
+        <p class="discret">${echapper(f.ville || "—")} · ${echapper(f.telephone || "—")} ·
+          ${LIBELLES_GENRES_FILS[f.genre] || "—"} ·
+          ${ f.statut === "active"
+              ? `<span class="etiquette etiquette-ok">Actif</span>`
+              : `<span class="etiquette etiquette-erreur">Inactif</span>` }</p>
+      </div>
+      <div class="actions-formulaire" style="margin-bottom:1.2rem;">
+        <button type="button" class="bouton bouton-discret" onclick="ouvrirFilsListe()">← Retour à la liste</button>
+        ${peutEcrire() ? `<button type="button" class="bouton" onclick="ouvrirFilsForm('${id}')">✏ Modifier</button>` : ""}
+        ${peutSupprimer() ? `<button type="button" class="bouton bouton-danger" onclick="supprimerFils('${id}')">🗑 Supprimer</button>` : ""}
+      </div>
+      <div class="cartes-tableau-bord">
+        <div class="carte-kpi"><span class="carte-kpi-libelle">Présences</span><span class="carte-kpi-valeur">${nbPresent}</span></div>
+        <div class="carte-kpi"><span class="carte-kpi-libelle">Absences</span><span class="carte-kpi-valeur">${nbAbsent}</span></div>
+        <div class="carte-kpi"><span class="carte-kpi-libelle">Taux de présence</span><span class="carte-kpi-valeur">${tauxPresence} %</span></div>
+        <div class="carte-kpi"><span class="carte-kpi-libelle">Taux d'absence</span><span class="carte-kpi-valeur">${tauxAbsence} %</span></div>
+      </div>
+      <div class="bloc-stat">
+        <h2>Historique des présences</h2>
+        ${ lignes.length ? `
+        <div class="tableau-enveloppe"><table class="tableau">
+          <thead><tr><th>Date</th><th>Activité</th><th>Statut</th></tr></thead>
+          <tbody>${lignes.map(p=>{
+            const a = p.fils_activite || {};
+            const libelle = a.nom ? `${a.nom} (${(a.service_type && a.service_type.nom) || "?"})`
+                                   : ((a.service_type && a.service_type.nom) || "?");
+            return `<tr><td>${dateFr(a.date_activite)}</td><td>${echapper(libelle)}</td>
+              <td>${ p.statut==="P"
+                  ? `<span class="etiquette etiquette-ok">Présent</span>`
+                  : `<span class="etiquette etiquette-erreur">Absent</span>` }</td></tr>`;
+          }).join("")}</tbody>
+        </table></div>` : `<p class="discret">Aucune présence enregistrée pour ce fils.</p>` }
+      </div>`;
+  }catch(e){ zone.innerHTML=""; message(e.message, "erreur"); }
+}
+
+/* ---------------------------------------------------------------
+   IMPORT EXCEL/CSV — même principe en 2 étapes que l'import du
+   registre (voir plus haut) : analyse (rien n'est écrit), puis
+   confirmation. Doublons intra-fichier + contre la base détectés par
+   téléphone en priorité, sinon par (nom, prénom).
+   --------------------------------------------------------------- */
+const etatImportFils = { lignesValides: [] };
+
+function donneesDepuisLigneFilsImport(ligneBrute){
+  return {
+    nom: normaliserCasseFils("nom", valeurTexteImport(ligneBrute.nom)),
+    prenom: normaliserCasseFils("prenom", valeurTexteImport(ligneBrute.prenom)),
+    ville: normaliserCasseFils("ville", valeurTexteImport(ligneBrute.ville)),
+    telephone: nettoyerTelephoneFils(valeurTexteImport(ligneBrute.telephone)),
+    genre: normaliserGenreFils(ligneBrute.genre),
+  };
+}
+
+async function donneesExistantesFils(){
+  const { donnees } = await api("fils?select=nom,prenom,telephone", {
+    headers:{ "Range-Unit":"items", "Range":"0-9999" }
+  });
+  const telephones = new Set(), nomsPrenoms = new Set();
+  (donnees || []).forEach(f=>{
+    if (f.telephone) telephones.add(f.telephone);
+    if (f.nom && f.prenom) nomsPrenoms.add(f.nom + "|" + f.prenom);
+  });
+  return { telephones, nomsPrenoms };
+}
+
+function marquerDoublonsFils(lignes, telephones, nomsPrenoms){
+  const vusTelephone = {}, vusNom = {};
+  return lignes.map(({ numeroLigne, donnees, erreurs }) => {
+    const e = erreurs.slice();
+    const telephone = donnees.telephone;
+    const cleNom = donnees.nom + "|" + donnees.prenom;
+    if (telephone){
+      if (telephones.has(telephone)) e.push(`Un fils avec le téléphone « ${telephone} » existe déjà.`);
+      else if (vusTelephone[telephone]) e.push(`Téléphone « ${telephone} » utilisé aussi à la ligne ${vusTelephone[telephone]} de ce fichier.`);
+      else vusTelephone[telephone] = numeroLigne;
+    }else if (donnees.nom && donnees.prenom){
+      if (nomsPrenoms.has(cleNom)) e.push(`« ${donnees.nom} ${donnees.prenom} » existe déjà (aucun téléphone à comparer pour le distinguer).`);
+      else if (vusNom[cleNom]) e.push(`« ${donnees.nom} ${donnees.prenom} » apparaît aussi à la ligne ${vusNom[cleNom]} de ce fichier.`);
+      else vusNom[cleNom] = numeroLigne;
+    }
+    return { numeroLigne, donnees, erreurs: e };
+  });
+}
+
+async function analyserFichierFilsImport(fichier){
+  const texte = await fichier.text();
+  const lignesCsv = analyserCsvTexte(texte);
+  if (!lignesCsv.length)
+    throw new Error("Ce fichier ne contient aucune ligne de données.");
+
+  const entetes = lignesCsv[0];
+  const correspondance = {};
+  entetes.forEach((e, i) => {
+    const champ = FILS_CHAMPS_PAR_ENTETE_IMPORT[normaliserEnteteImport(e)];
+    if (champ) correspondance[i] = champ;
+  });
+  const champsTrouves = Object.values(correspondance);
+  if (!champsTrouves.includes("nom") || !champsTrouves.includes("prenom"))
+    throw new Error("Les colonnes « Nom » et « Prénom » sont introuvables dans ce "
+      + "fichier. Téléchargez le modèle et gardez ses en-têtes tels quels.");
+
+  const colonnesIgnorees = entetes.filter((e, i) =>
+    !(i in correspondance) && String(e || "").trim());
+
+  const lignesBrutes = [];
+  for (let i = 1; i < lignesCsv.length; i++){
+    const valeurs = lignesCsv[i];
+    const ligneBrute = {};
+    Object.entries(correspondance).forEach(([idx, champ]) => {
+      ligneBrute[champ] = valeurs[Number(idx)];
+    });
+    const donnees = donneesDepuisLigneFilsImport(ligneBrute);
+    if (Object.values(donnees).some(v => v !== null))
+      lignesBrutes.push({ numeroLigne: i + 1, donnees, erreurs: validerDonneesFils(donnees) });
+  }
+  if (!lignesBrutes.length)
+    throw new Error("Ce fichier ne contient aucune ligne de données à importer.");
+
+  const { telephones, nomsPrenoms } = await donneesExistantesFils();
+  const resultats = marquerDoublonsFils(lignesBrutes, telephones, nomsPrenoms);
+  return { resultats, colonnesIgnorees };
+}
+
+function afficherResultatsFilsImport(resultats, colonnesIgnorees, nomFichier){
+  etatImportFils.lignesValides = resultats.filter(r => !r.erreurs.length);
+  const nbValides = etatImportFils.lignesValides.length;
+  const nbErreurs = resultats.length - nbValides;
+
+  $("fils-import-resume").innerHTML = `
+    <span>Fichier : <strong>${echapper(nomFichier)}</strong></span>
+    <span class="etiquette etiquette-ok">${nbValides} ligne(s) prête(s) à importer</span>
+    ${nbErreurs ? `<span class="etiquette etiquette-erreur">${nbErreurs} ligne(s) en erreur</span>` : ""}`;
+
+  $("fils-import-colonnes-ignorees").innerHTML = colonnesIgnorees.length
+    ? `<p class="import-colonnes-ignorees">Colonne(s) non reconnue(s) et ignorée(s) : `
+      + `${echapper(colonnesIgnorees.join(", "))}.</p>`
+    : "";
+
+  $("fils-import-aide-erreurs").hidden = !nbErreurs;
+
+  $("fils-import-corps-tableau").innerHTML = resultats.map(r => `
+    <tr>
+      <td>${r.numeroLigne}</td>
+      <td>${echapper(r.donnees.nom || "—")} ${echapper(r.donnees.prenom || "")}</td>
+      <td>${echapper(r.donnees.ville || "—")}</td>
+      <td>${echapper(r.donnees.telephone || "—")}</td>
+      <td>${LIBELLES_GENRES_FILS[r.donnees.genre] || "—"}</td>
+      <td>
+        ${ r.erreurs.length
+            ? `<span class="etiquette etiquette-erreur">erreur</span>
+               <ul class="import-erreurs">${r.erreurs.map(e => `<li>${echapper(e)}</li>`).join("")}</ul>`
+            : `<span class="etiquette etiquette-ok">ok</span>` }
+      </td>
+    </tr>`).join("");
+
+  $("btn-fils-import-confirmer").hidden = !nbValides;
+  $("btn-fils-import-confirmer").textContent = `Confirmer l'import de ${nbValides} fils`;
+  $("fils-import-upload").hidden = true;
+  $("fils-import-resultats").hidden = false;
+}
+
+function reinitialiserFilsImport(){
+  etatImportFils.lignesValides = [];
+  const entree = $("fils-import-fichier");
+  if (entree) entree.value = "";
+  $("fils-import-upload").hidden = false;
+  $("fils-import-resultats").hidden = true;
+}
+
+function ouvrirFilsImporter(){
+  reinitialiserFilsImport();
+  afficherVue("fils-importer");
+}
+
+async function confirmerImportFils(){
+  if (!etatImportFils.lignesValides.length) return;
+  if (!confirm(`Importer ${etatImportFils.lignesValides.length} fils ?`)) return;
+
+  const bouton = $("btn-fils-import-confirmer");
+  bouton.disabled = true;
+  try{
+    // On revalide juste avant l'écriture : la base a pu changer entre-temps.
+    const { telephones, nomsPrenoms } = await donneesExistantesFils();
+    const revalides = marquerDoublonsFils(etatImportFils.lignesValides, telephones, nomsPrenoms);
+    const aEnvoyer = revalides.filter(r => !r.erreurs.length).map(r => ({ ...r.donnees, statut:"active" }));
+    const ignorees = revalides.length - aEnvoyer.length;
+
+    if (!aEnvoyer.length){
+      message("Aucune ligne à importer : toutes sont devenues invalides entre-temps.", "erreur");
+      return;
+    }
+
+    await api("fils", { method:"POST", body:aEnvoyer, headers:{ "Prefer":"return=minimal" } });
+
+    let msg = `${aEnvoyer.length} fils importé(s) depuis le fichier.`;
+    if (ignorees) msg += ` ${ignorees} ligne(s) ignorée(s) (doublon apparu entre-temps).`;
+    message(msg, "succes");
+    reinitialiserFilsImport();
+    ouvrirFilsListe();
+  }catch(e){ message(e.message, "erreur"); }
+  finally{ bouton.disabled = false; }
+}
+
+function telechargerModeleFilsImport(){
+  const exemple = { nom:"MBALLA", prenom:"Jean", ville:"Yaoundé", telephone:"677000000", genre:"M" };
+  const lignes = [
+    FILS_COLONNES_EXPORT.map(c => celluleCsv(c[1])).join(";"),
+    FILS_COLONNES_EXPORT.map(([champ]) => celluleCsv(exemple[champ] || "")).join(";"),
+  ];
+  const blob = new Blob(["\uFEFF" + lignes.join("\r\n")], { type:"text/csv;charset=utf-8;" });
+  const lien = document.createElement("a");
+  lien.href = URL.createObjectURL(blob);
+  lien.download = "modele_import_fils.csv";
+  document.body.appendChild(lien); lien.click(); lien.remove();
+  setTimeout(() => URL.revokeObjectURL(lien.href), 2000);
+}
+
+/* ---------------------------------------------------------------
+   ACTIVITÉS & POINTAGE
+   --------------------------------------------------------------- */
+function libelleFilsActivite(a){
+  const base = (a.service_type && a.service_type.nom) || "?";
+  return a.nom ? `${a.nom} (${base})` : base;
+}
+
+async function ouvrirFilsActivites(){
+  afficherVue("fils-activites");
+  $("form-fils-activite").reset();
+  $("fils-activite-date").value = aujourdhuiLocalISO();
+  await chargerReferentielPresences();
+  const typesActifs = etat.presences.types.filter(t=>t.is_active);
+  $("fils-activite-type").innerHTML = `<option value="">— Choisir —</option>`
+    + typesActifs.map(t=>`<option value="${t.id}">${echapper(t.nom)}</option>`).join("");
+  await chargerFilsActivites();
+}
+
+async function chargerFilsActivites(){
+  const zone = $("fils-activites-contenu");
+  zone.innerHTML = `<p class="discret">Chargement…</p>`;
+  try{
+    const { donnees } = await api(
+      "fils_activite?select=*,service_type(nom)&order=date_activite.desc&limit=50");
+    dessinerFilsActivites(donnees || []);
+  }catch(e){ zone.innerHTML=""; message(e.message, "erreur"); }
+}
+
+function dessinerFilsActivites(activites){
+  const zone = $("fils-activites-contenu");
+  const suppression = peutSupprimer();
+  if (!activites.length){
+    zone.innerHTML = `<p class="discret">Aucune activité enregistrée pour le moment.</p>`;
+    return;
+  }
+  zone.innerHTML = `
+    <div class="tableau-enveloppe"><table class="tableau">
+      <thead><tr><th>Date</th><th>Activité</th><th class="col-actions">Actions</th></tr></thead>
+      <tbody>${activites.map(a=>`
+        <tr>
+          <td>${dateFr(a.date_activite)}</td>
+          <td>${echapper(libelleFilsActivite(a))}</td>
+          <td class="col-actions">
+            <button type="button" class="bouton bouton-petit bouton-principal" onclick="ouvrirFilsPointage('${a.id}')">📋 Pointage</button>
+            ${suppression ? `<button type="button" class="bouton bouton-petit bouton-danger" onclick="supprimerFilsActivite('${a.id}')">🗑 Supprimer</button>` : ""}
+          </td>
+        </tr>`).join("")}</tbody>
+    </table></div>`;
+}
+
+async function creerFilsActivite(evt){
+  evt.preventDefault();
+  if (!peutEcrire()){ message("Accès réservé au secrétariat et au pasteur.", "erreur"); return; }
+  const dateActivite = $("fils-activite-date").value;
+  const serviceTypeId = $("fils-activite-type").value;
+  const nom = $("fils-activite-nom").value.trim().slice(0, 150) || null;
+  if (!dateActivite){ message("La date de l'activité est obligatoire.", "erreur"); return; }
+  if (!serviceTypeId){ message("Le type d'activité est obligatoire.", "erreur"); return; }
+
+  const bouton = evt.target.querySelector("button[type=submit]");
+  bouton.disabled = true;
+  try{
+    const { donnees } = await api("fils_activite", {
+      method:"POST", body:{ date_activite: dateActivite, service_type_id: serviceTypeId, nom },
+      headers:{ "Prefer":"return=representation" }
+    });
+    message("Activité créée.", "succes");
+    ouvrirFilsPointage(donnees[0].id);
+  }catch(e){ message(e.message, "erreur"); }
+  finally{ bouton.disabled = false; }
+}
+
+async function supprimerFilsActivite(id){
+  if (!peutSupprimer()){
+    message("Seuls le secrétariat et le pasteur peuvent supprimer définitivement.", "erreur");
+    return;
+  }
+  if (!confirm("Supprimer définitivement cette activité ?")) return;
+  try{
+    const { donnees: presences } = await api(
+      `fils_presence?activite_id=eq.${encodeURIComponent(id)}&select=id&limit=1`);
+    if (presences && presences.length){
+      message("Impossible de supprimer cette activité : des présences y sont déjà enregistrées.", "erreur");
+      return;
+    }
+    await api(`fils_activite?id=eq.${encodeURIComponent(id)}`, { method:"DELETE" });
+    message("Activité supprimée.", "succes");
+    chargerFilsActivites();
+  }catch(e){ message(e.message, "erreur"); }
+}
+
+async function ouvrirFilsPointage(activiteId){
+  afficherVue("fils-pointage");
+  $("fils-pointage-activite-id").value = activiteId;
+  $("form-fils-pointage").hidden = false;
+  const zone = $("fils-pointage-contenu");
+  zone.innerHTML = `<p class="discret">Chargement…</p>`;
+  try{
+    const { donnees: activites } = await api(
+      `fils_activite?id=eq.${encodeURIComponent(activiteId)}&select=*,service_type(nom)`);
+    const activite = activites && activites[0];
+    if (!activite){ message("Activité introuvable.", "erreur"); ouvrirFilsActivites(); return; }
+    $("fils-pointage-titre").textContent = `${libelleFilsActivite(activite)} — ${dateFr(activite.date_activite)}`;
+
+    const { donnees: actifs } = await api(
+      "fils?statut=eq.active&select=id,nom,prenom,genre&order=nom.asc,prenom.asc",
+      { headers:{ "Range-Unit":"items", "Range":"0-9999" } });
+    const { donnees: presences } = await api(
+      `fils_presence?activite_id=eq.${encodeURIComponent(activiteId)}&select=fils_id,statut`,
+      { headers:{ "Range-Unit":"items", "Range":"0-9999" } });
+    const statutsActuels = {};
+    (presences || []).forEach(p=>{ statutsActuels[p.fils_id] = p.statut; });
+
+    etat.fils.pointageActifsIds = (actifs || []).map(f=>f.id);
+
+    if (!actifs || !actifs.length){
+      $("form-fils-pointage").hidden = true;
+      zone.innerHTML = `<div class="vide"><p>Aucun fils actif à pointer — activez au moins un fils.</p>
+        <button class="bouton bouton-principal" onclick="ouvrirFilsForm(null)">Enregistrer un fils</button></div>`;
+      return;
+    }
+
+    zone.innerHTML = `
+      <div class="tableau-enveloppe"><table class="tableau tableau-pointage">
+        <thead><tr><th>Fils</th><th>Genre</th><th>Présent</th><th>Absent</th></tr></thead>
+        <tbody>${actifs.map(f=>{
+          const actuel = statutsActuels[f.id];
+          return `<tr>
+            <td>${echapper(f.nom)} ${echapper(f.prenom)}</td>
+            <td>${f.genre}</td>
+            <td style="text-align:center;">
+              <input type="radio" name="statut_${f.id}" value="P" ${actuel === "A" ? "" : "checked"}
+                aria-label="Présent : ${echapper(f.nom)} ${echapper(f.prenom)}"></td>
+            <td style="text-align:center;">
+              <input type="radio" name="statut_${f.id}" value="A" ${actuel === "A" ? "checked" : ""}
+                aria-label="Absent : ${echapper(f.nom)} ${echapper(f.prenom)}"></td>
+          </tr>`;
+        }).join("")}</tbody>
+      </table></div>`;
+  }catch(e){ zone.innerHTML=""; message(e.message, "erreur"); }
+}
+
+async function soumettreFilsPointage(evt){
+  evt.preventDefault();
+  if (!peutEcrire()){ message("Accès réservé au secrétariat et au pasteur.", "erreur"); return; }
+  const activiteId = $("fils-pointage-activite-id").value;
+  const ids = etat.fils.pointageActifsIds || [];
+  if (!ids.length) return;
+
+  const lignes = ids.map(id=>{
+    const coche = document.querySelector(`input[name="statut_${id}"]:checked`);
+    return { fils_id: id, activite_id: activiteId, statut: coche ? coche.value : "P" };
+  });
+
+  const bouton = evt.target.querySelector("button[type=submit]");
+  bouton.disabled = true;
+  try{
+    // Un seul aller-retour pour tout l'appel — upsert sur la contrainte
+    // unique (fils_id, activite_id), plutôt qu'une requête par personne.
+    await api("fils_presence?on_conflict=fils_id,activite_id", {
+      method:"POST", body:lignes,
+      headers:{ "Prefer":"resolution=merge-duplicates,return=minimal" }
+    });
+    message("Présences enregistrées.", "succes");
+    ouvrirFilsActivites();
+  }catch(e){ message(e.message, "erreur"); }
+  finally{ bouton.disabled = false; }
+}
+
+/* ---------------------------------------------------------------
+   STATISTIQUES
+   --------------------------------------------------------------- */
+async function calculerStatistiquesFils(debut, fin, genre, ville){
+  let filtreFils = "";
+  if (genre) filtreFils += `&genre=eq.${encodeURIComponent(genre)}`;
+  if (ville) filtreFils += `&ville=eq.${encodeURIComponent(ville)}`;
+  const { donnees: tousFils } = await api(`fils?select=id,genre${filtreFils}`, {
+    headers:{ "Range-Unit":"items", "Range":"0-9999" } });
+  const totalFils = (tousFils || []).length;
+  const nbHommes = (tousFils || []).filter(f=>f.genre==="M").length;
+  const nbFemmes = (tousFils || []).filter(f=>f.genre==="F").length;
+
+  const params = new URLSearchParams();
+  params.set("select", "statut,fils_activite!inner(date_activite),fils!inner(genre,ville)");
+  if (debut) params.append("fils_activite.date_activite", `gte.${debut}`);
+  if (fin)   params.append("fils_activite.date_activite", `lte.${fin}`);
+  if (genre) params.append("fils.genre", `eq.${genre}`);
+  if (ville) params.append("fils.ville", `eq.${ville}`);
+  const { donnees: presences } = await api(`fils_presence?${params}`, {
+    headers:{ "Range-Unit":"items", "Range":"0-9999" } });
+
+  const nbPresent = (presences || []).filter(p=>p.statut==="P").length;
+  const nbAbsent = (presences || []).filter(p=>p.statut==="A").length;
+  const total = nbPresent + nbAbsent;
+
+  return {
+    total_fils: totalFils, nb_hommes: nbHommes, nb_femmes: nbFemmes,
+    nb_present: nbPresent, nb_absent: nbAbsent,
+    taux_presence: total ? Math.round(nbPresent/total*1000)/10 : 0,
+    taux_absence: total ? Math.round(nbAbsent/total*1000)/10 : 0,
+  };
+}
+
+function dessinerStatistiquesFils(zone, stats){
+  const { total_fils, nb_hommes, nb_femmes, nb_present, nb_absent, taux_presence, taux_absence } = stats;
+  let repartitionHtml = "";
+  if (total_fils){
+    const pctH = Math.round(nb_hommes/total_fils*1000)/10;
+    const pctF = Math.round(nb_femmes/total_fils*1000)/10;
+    repartitionHtml = `
+      <div class="bloc-stat"><h2>Répartition Hommes / Femmes</h2>
+        <div class="camembert-enveloppe">
+          <div class="camembert" style="background:conic-gradient(var(--encre) 0deg ${pctH/100*360}deg, var(--or) ${pctH/100*360}deg 360deg);"></div>
+          <ul class="camembert-legende">
+            <li><span class="camembert-pastille" style="background:var(--encre);"></span> Hommes — <strong>${nb_hommes}</strong> (${pctH} %)</li>
+            <li><span class="camembert-pastille" style="background:var(--or);"></span> Femmes — <strong>${nb_femmes}</strong> (${pctF} %)</li>
+          </ul>
+        </div>
+      </div>`;
+  }
+  zone.innerHTML = `
+    <div class="stats">
+      <div class="stat"><b>${total_fils}</b><span>Total fils</span></div>
+      <div class="stat"><b>${nb_hommes}</b><span>👨 Hommes</span></div>
+      <div class="stat"><b>${nb_femmes}</b><span>👩 Femmes</span></div>
+      <div class="stat"><b>${nb_present}</b><span>Présents (période)</span></div>
+      <div class="stat"><b>${nb_absent}</b><span>Absents (période)</span></div>
+      <div class="stat"><b>${taux_presence} %</b><span>Taux de présence</span></div>
+      <div class="stat"><b>${taux_absence} %</b><span>Taux d'absence</span></div>
+    </div>
+    ${repartitionHtml}`;
+}
+
+async function ouvrirFilsStatistiques(periode, debutBrut, finBrut){
+  afficherVue("fils-statistiques");
+  periode = periode || $("fils-stats-periode").value || "mois";
+  debutBrut = debutBrut || $("fils-stats-debut").value || "";
+  finBrut = finBrut || $("fils-stats-fin").value || "";
+  $("fils-stats-periode").value = periode;
+  $("fils-stats-bloc-personnalise").hidden = periode !== "personnalise";
+  if (periode === "personnalise"){ $("fils-stats-debut").value = debutBrut; $("fils-stats-fin").value = finBrut; }
+
+  try{
+    const villes = await villesDistinctesFils();
+    remplirSelectVillesFils($("fils-stats-ville"), villes, $("fils-stats-ville").value);
+  }catch(e){ /* filtre non bloquant */ }
+
+  const genre = $("fils-stats-genre").value;
+  const ville = $("fils-stats-ville").value;
+
+  const zone = $("fils-statistiques-contenu");
+  zone.innerHTML = `<p class="discret">Chargement…</p>`;
+  try{
+    const [debut, fin] = bornesPeriodePresence(periode, debutBrut, finBrut);
+    $("fils-stats-periode-texte").textContent =
+      debut && fin ? `Du ${dateFr(debut)} au ${dateFr(fin)}` :
+      debut ? `Depuis le ${dateFr(debut)}` : fin ? `Jusqu'au ${dateFr(fin)}` : "Toutes périodes confondues";
+
+    const stats = await calculerStatistiquesFils(debut, fin, genre, ville);
+    dessinerStatistiquesFils(zone, stats);
+  }catch(e){ zone.innerHTML=""; message(e.message, "erreur"); }
+}
+
+/* ---------------------------------------------------------------
+   EXPORT CSV
+   --------------------------------------------------------------- */
+async function exporterFilsCsv(){
+  try{
+    message("Préparation de l'export…", "info");
+    const { donnees } = await api("fils?select=*&order=nom.asc,prenom.asc", {
+      headers:{ "Range-Unit":"items", "Range":"0-9999" }
+    });
+    const lignes = [["Nom","Prénom","Ville","Téléphone","Genre","Statut"].map(celluleCsv).join(";")];
+    (donnees || []).forEach(f=>{
+      lignes.push([
+        celluleCsv(f.nom), celluleCsv(f.prenom), celluleCsv(f.ville || ""), celluleCsv(f.telephone || ""),
+        celluleCsv(LIBELLES_GENRES_FILS[f.genre] || f.genre),
+        celluleCsv(LIBELLES_STATUTS_FILS[f.statut] || f.statut),
+      ].join(";"));
+    });
+    const blob = new Blob(["\uFEFF" + lignes.join("\r\n")], { type:"text/csv;charset=utf-8;" });
+    const lien = document.createElement("a");
+    lien.href = URL.createObjectURL(blob);
+    lien.download = `fils_icm_${aujourdhuiLocalISO()}.csv`;
+    document.body.appendChild(lien); lien.click(); lien.remove();
+    setTimeout(()=>URL.revokeObjectURL(lien.href), 2000);
+    message(`Export de ${(donnees || []).length} fils terminé.`, "succes");
+  }catch(e){ message(e.message, "erreur"); }
+}
+
+/* ==========================================================
    9. SESSION
    ========================================================== */
 function deconnexion(raison){
@@ -3478,6 +4478,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       else if (vue === "journal"){ ouvrirJournal(""); }
       else if (vue === "apropos"){ afficherVue("apropos"); }
       else if (vue === "presences"){ ouvrirPresencesDashboard(); }
+      else if (vue === "fils"){ ouvrirFilsListe(); }
       else { afficherVue(vue); chargerListe(); }
     });
   });
@@ -3591,6 +4592,52 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     ouvrirPresencesComparaison(
       $("comparaison-a-debut").value, $("comparaison-a-fin").value,
       $("comparaison-b-debut").value, $("comparaison-b-fin").value);
+  });
+
+  // --- Module Fils
+  $("form-recherche-fils").addEventListener("submit", (e)=>{
+    e.preventDefault();
+    etat.fils.q = $("fils-recherche").value.trim();
+    etat.fils.ville = $("fils-filtre-ville").value;
+    etat.fils.genre = $("fils-filtre-genre").value;
+    etat.fils.statut = $("fils-filtre-statut").value;
+    etat.fils.page = 1;
+    chargerFilsListe();
+  });
+  $("form-fils").addEventListener("submit", soumettreFilsFormulaire);
+
+  $("btn-fils-import-modele").addEventListener("click", telechargerModeleFilsImport);
+  $("form-fils-import").addEventListener("submit", async (e)=>{
+    e.preventDefault();
+    const entree = $("fils-import-fichier");
+    const f = entree.files && entree.files[0];
+    if (!f){ message("Choisissez un fichier .csv à importer.", "erreur"); return; }
+    const bouton = e.target.querySelector("button[type=submit]");
+    bouton.disabled = true;
+    try{
+      const { resultats, colonnesIgnorees } = await analyserFichierFilsImport(f);
+      afficherResultatsFilsImport(resultats, colonnesIgnorees, f.name);
+    }catch(err){ message(err.message, "erreur"); }
+    finally{ bouton.disabled = false; }
+  });
+  $("btn-fils-import-confirmer").addEventListener("click", confirmerImportFils);
+  $("btn-fils-import-recommencer").addEventListener("click", reinitialiserFilsImport);
+
+  $("form-fils-activite").addEventListener("submit", creerFilsActivite);
+  $("form-fils-pointage").addEventListener("submit", soumettreFilsPointage);
+
+  $("fils-stats-periode").addEventListener("change", ()=>{
+    const p = $("fils-stats-periode").value;
+    $("fils-stats-bloc-personnalise").hidden = p !== "personnalise";
+    if (p !== "personnalise") ouvrirFilsStatistiques(p);
+  });
+  $("fils-stats-genre").addEventListener("change", ()=>
+    ouvrirFilsStatistiques($("fils-stats-periode").value, $("fils-stats-debut").value, $("fils-stats-fin").value));
+  $("fils-stats-ville").addEventListener("change", ()=>
+    ouvrirFilsStatistiques($("fils-stats-periode").value, $("fils-stats-debut").value, $("fils-stats-fin").value));
+  $("form-fils-statistiques").addEventListener("submit", (e)=>{
+    e.preventDefault();
+    ouvrirFilsStatistiques($("fils-stats-periode").value, $("fils-stats-debut").value, $("fils-stats-fin").value);
   });
 
   // --- Volet photo

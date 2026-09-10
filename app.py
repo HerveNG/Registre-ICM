@@ -633,6 +633,94 @@ class AttendanceValue(db.Model):
 
 
 # ------------------------------------------------------------------
+#  Module Fils — registre nominatif et suivi de présence individuelle
+# ------------------------------------------------------------------
+# Distinct de la catégorie agrégée « Fils-ICM » du module Présences (un
+# simple compteur par tranche d'âge/sexe, sans identité) : ce module tient
+# un registre nominatif (un fils = une personne identifiée) et son
+# historique de présence individuelle, activité par activité. Les deux
+# coexistent sans lien entre eux.
+GENRE_HOMME = "M"
+GENRE_FEMME = "F"
+GENRES_FILS = [GENRE_HOMME, GENRE_FEMME]
+LIBELLES_GENRES_FILS = {GENRE_HOMME: "Homme", GENRE_FEMME: "Femme"}
+
+STATUT_FILS_ACTIF = "active"
+STATUT_FILS_INACTIF = "inactive"
+LIBELLES_STATUTS_FILS = {STATUT_FILS_ACTIF: "Actif", STATUT_FILS_INACTIF: "Inactif"}
+
+PRESENCE_FILS_PRESENT = "P"
+PRESENCE_FILS_ABSENT = "A"
+LIBELLES_PRESENCE_FILS = {PRESENCE_FILS_PRESENT: "Présent", PRESENCE_FILS_ABSENT: "Absent"}
+
+
+class Fils(db.Model):
+    """Registre nominatif des fils (disciples suivis individuellement).
+    Jamais supprimé tant qu'il a un historique de présence : on bascule
+    `statut` à inactive à la place (voir /fils/<id>/desactiver et
+    /fils/<id>/supprimer)."""
+    __tablename__ = "fils"
+
+    id = db.Column(db.Integer, primary_key=True)
+    nom = db.Column(db.String(120), nullable=False)
+    prenom = db.Column(db.String(120), nullable=False)
+    ville = db.Column(db.String(150))
+    telephone = db.Column(db.String(50))
+    genre = db.Column(db.String(1), nullable=False)              # M | F
+    statut = db.Column(db.String(10), nullable=False, default=STATUT_FILS_ACTIF)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    presences = db.relationship(
+        "FilsPresence", backref="fils_ref", cascade="all, delete-orphan")
+
+    @property
+    def nom_complet(self):
+        return f"{self.nom} {self.prenom}".strip()
+
+
+class FilsActivite(db.Model):
+    """Une activité datée (culte ou réunion des fils) pouvant recevoir un
+    pointage de présence. Réutilise ServiceType (déjà en place pour
+    Présences, déjà configurable dans Paramètres) comme type d'activité,
+    plutôt qu'une deuxième liste de types à gérer séparément — un même
+    « Culte du dimanche » désigne le même événement réel dans les deux
+    modules."""
+    __tablename__ = "fils_activite"
+
+    id = db.Column(db.Integer, primary_key=True)
+    date_activite = db.Column(db.Date, nullable=False, index=True)
+    service_type_id = db.Column(db.Integer, db.ForeignKey("service_type.id"), nullable=False)
+    nom = db.Column(db.String(150))   # libellé optionnel (ex. « Réunion spéciale »)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    service_type = db.relationship("ServiceType")
+    presences = db.relationship(
+        "FilsPresence", backref="activite_ref", cascade="all, delete-orphan")
+
+    @property
+    def libelle(self):
+        base = self.service_type.nom if self.service_type else "?"
+        return f"{self.nom} ({base})" if self.nom else base
+
+
+class FilsPresence(db.Model):
+    """Un pointage Présent/Absent pour un fils, à une activité donnée."""
+    __tablename__ = "fils_presence"
+
+    id = db.Column(db.Integer, primary_key=True)
+    fils_id = db.Column(db.Integer, db.ForeignKey("fils.id"), nullable=False)
+    activite_id = db.Column(db.Integer, db.ForeignKey("fils_activite.id"), nullable=False)
+    statut = db.Column(db.String(1), nullable=False)   # P | A
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint("fils_id", "activite_id", name="uq_fils_presence_fils_activite"),
+    )
+
+
+# ------------------------------------------------------------------
 #  Authentification
 # ------------------------------------------------------------------
 def login_requis(vue):
@@ -2163,8 +2251,14 @@ def _lire_xlsx(fichier):
     return [list(l) for l in lignes], entetes
 
 
-def lire_fichier_import(fichier):
+def lire_fichier_import(fichier, champs_par_entete=None, champs_essentiels=("nom", "prenom")):
     """Lit un fichier .xlsx ou .csv envoyé par le secrétariat.
+
+    `champs_par_entete` et `champs_essentiels` sont paramétrables (défaut :
+    ceux du registre des baptêmes/mariages) pour que ce lecteur serve aussi
+    à d'autres imports (voir le module Fils, qui appelle cette même
+    fonction avec sa propre correspondance de colonnes) sans dupliquer la
+    lecture .xlsx/.csv ni la reconnaissance d'en-têtes.
 
     Renvoie (lignes, colonnes_ignorees, erreur). `lignes` est une liste de
     dicts {champ_interne: valeur_brute} — une entrée par ligne non vide du
@@ -2172,6 +2266,7 @@ def lire_fichier_import(fichier):
     du tout (mauvais format, colonnes essentielles introuvables…), et dans
     ce cas les deux autres valeurs sont None.
     """
+    champs_par_entete = champs_par_entete if champs_par_entete is not None else CHAMPS_PAR_ENTETE
     nom_fichier = (fichier.filename or "").lower()
     try:
         if nom_fichier.endswith((".xlsx", ".xlsm")):
@@ -2195,15 +2290,14 @@ def lire_fichier_import(fichier):
 
     correspondance = {}
     for i, entete in enumerate(entetes):
-        champ = CHAMPS_PAR_ENTETE.get(normaliser_entete(entete))
+        champ = champs_par_entete.get(normaliser_entete(entete))
         if champ:
             correspondance[i] = champ
 
-    if "nom" not in correspondance.values() or "prenom" not in correspondance.values():
+    if any(c not in correspondance.values() for c in champs_essentiels):
         return None, None, (
-            "Les colonnes « Nom » et « Prénom » sont introuvables dans ce "
-            "fichier. Téléchargez le modèle ci-dessous et gardez ses "
-            "en-têtes tels quels."
+            "Les colonnes essentielles sont introuvables dans ce fichier. "
+            "Téléchargez le modèle ci-dessous et gardez ses en-têtes tels quels."
         )
 
     colonnes_ignorees = [
@@ -2425,6 +2519,506 @@ def importer_modele():
 
 
 # ------------------------------------------------------------------
+#  Module Fils — règles de saisie, import, CRUD, activités/pointage,
+#  historique et statistiques.
+# ------------------------------------------------------------------
+FILS_CHAMPS_MAJUSCULES = {"nom"}
+FILS_CHAMPS_CAPITALISES = {"prenom", "ville"}
+FILS_LONGUEURS_MAX = {"nom": 120, "prenom": 120, "ville": 150, "telephone": 50}
+FILS_PAR_PAGE = 20
+
+# Colonnes de l'export/modèle/import — une seule liste, comme COLONNES_EXPORT
+# pour le registre (§8/§11 du cahier des charges).
+FILS_COLONNES_EXPORT = [
+    ("nom", "Nom"), ("prenom", "Prénom"), ("ville", "Ville"),
+    ("telephone", "Téléphone"), ("genre", "Genre"),
+]
+FILS_CHAMPS_PAR_ENTETE = {
+    normaliser_entete(libelle): champ for champ, libelle in FILS_COLONNES_EXPORT
+}
+# Synonymes usuels non couverts par la simple normalisation accents/casse
+# (§8 : « Téléphone / TEL », « Genre / SEXE »).
+FILS_CHAMPS_PAR_ENTETE[normaliser_entete("TEL")] = "telephone"
+FILS_CHAMPS_PAR_ENTETE[normaliser_entete("SEXE")] = "genre"
+
+
+def normaliser_casse_fils(champ, valeur):
+    if not valeur:
+        return valeur
+    if champ in FILS_CHAMPS_MAJUSCULES:
+        return valeur.upper()
+    if champ in FILS_CHAMPS_CAPITALISES:
+        return valeur[:1].upper() + valeur[1:].lower()
+    return valeur
+
+
+def nettoyer_telephone(valeur):
+    """Nettoie/normalise un numéro : ne garde que les chiffres (et un + de
+    tête s'il y en avait un) — §5 du cahier des charges."""
+    if not valeur:
+        return None
+    valeur = str(valeur).strip()
+    garde_plus = valeur.startswith("+")
+    chiffres = re.sub(r"[^0-9]", "", valeur)
+    if not chiffres:
+        return None
+    return ("+" if garde_plus else "") + chiffres
+
+
+def normaliser_genre_fils(valeur):
+    """Accepte M/F mais aussi Homme/Femme/H (casse et accents indifférents) —
+    reconnaissance « intelligente » comme demandé pour les en-têtes (§8),
+    étendue ici aux valeurs du genre."""
+    if not valeur:
+        return None
+    v = normaliser_entete(str(valeur))
+    if v in ("m", "homme", "h", "masculin"):
+        return GENRE_HOMME
+    if v in ("f", "femme", "feminin"):
+        return GENRE_FEMME
+    return None
+
+
+def valider_donnees_fils(donnees):
+    erreurs = []
+    if not donnees.get("nom"):
+        erreurs.append("Le nom est obligatoire.")
+    if not donnees.get("prenom"):
+        erreurs.append("Le prénom est obligatoire.")
+    for champ, maximum in FILS_LONGUEURS_MAX.items():
+        valeur = donnees.get(champ)
+        if valeur and len(valeur) > maximum:
+            erreurs.append(
+                f"« {champ} » dépasse la longueur maximale autorisée ({maximum} caractères)."
+            )
+    if not donnees.get("genre"):
+        erreurs.append("Le genre doit être Homme (M) ou Femme (F).")
+    return erreurs
+
+
+def collecter_formulaire_fils(form):
+    donnees = {
+        "nom": normaliser_casse_fils("nom", (form.get("nom", "") or "").strip() or None),
+        "prenom": normaliser_casse_fils("prenom", (form.get("prenom", "") or "").strip() or None),
+        "ville": normaliser_casse_fils("ville", (form.get("ville", "") or "").strip() or None),
+        "telephone": nettoyer_telephone(form.get("telephone")),
+        "genre": form.get("genre") if form.get("genre") in GENRES_FILS else None,
+        "statut": form.get("statut") if form.get("statut") in LIBELLES_STATUTS_FILS else STATUT_FILS_ACTIF,
+    }
+    return donnees, valider_donnees_fils(donnees)
+
+
+def verifier_unicite_fils(donnees):
+    """Doublon contre la base déjà en place — utilisé par l'import (§10),
+    pas par la saisie manuelle (un secrétariat qui ajoute sciemment un
+    homonyme ne doit pas en être empêché)."""
+    erreurs = []
+    telephone = donnees.get("telephone")
+    if telephone:
+        if Fils.query.filter(Fils.telephone == telephone).first():
+            erreurs.append(f"Un fils avec le téléphone « {telephone} » existe déjà.")
+    elif donnees.get("nom") and donnees.get("prenom"):
+        if Fils.query.filter(Fils.nom == donnees["nom"], Fils.prenom == donnees["prenom"]).first():
+            erreurs.append(
+                f"« {donnees['nom']} {donnees['prenom']} » existe déjà "
+                f"(aucun téléphone à comparer pour le distinguer)."
+            )
+    return erreurs
+
+
+def donnees_depuis_ligne_fils(ligne_brute):
+    donnees = {}
+    for champ in ("nom", "prenom", "ville"):
+        donnees[champ] = normaliser_casse_fils(champ, _valeur_texte_import(ligne_brute.get(champ)))
+    donnees["telephone"] = nettoyer_telephone(_valeur_texte_import(ligne_brute.get("telephone")))
+    donnees["genre"] = normaliser_genre_fils(ligne_brute.get("genre"))
+    return donnees
+
+
+def analyser_lignes_fils(paires):
+    """Miroir de analyser_lignes() (import du registre) adapté aux règles
+    des fils : doublons intra-fichier détectés par téléphone en priorité,
+    sinon par (nom, prénom) — §10 du cahier des charges."""
+    resultats = []
+    vus_telephone, vus_nom = {}, {}
+    for numero_ligne, donnees in paires:
+        erreurs = valider_donnees_fils(donnees) + verifier_unicite_fils(donnees)
+        telephone = donnees.get("telephone")
+        cle_nom = (donnees.get("nom"), donnees.get("prenom"))
+        if telephone:
+            if telephone in vus_telephone:
+                erreurs.append(
+                    f"Téléphone « {telephone} » utilisé aussi à la ligne "
+                    f"{vus_telephone[telephone]} de ce fichier."
+                )
+            else:
+                vus_telephone[telephone] = numero_ligne
+        elif cle_nom in vus_nom:
+            erreurs.append(
+                f"« {donnees.get('nom')} {donnees.get('prenom')} » apparaît "
+                f"aussi à la ligne {vus_nom[cle_nom]} de ce fichier."
+            )
+        else:
+            vus_nom[cle_nom] = numero_ligne
+        resultats.append({"numero_ligne": numero_ligne, "donnees": donnees, "erreurs": erreurs})
+    return resultats
+
+
+# -------- Liste, fiche, création, modification, suppression --------
+@app.route("/fils")
+@login_requis
+def fils_liste():
+    q = request.args.get("q", "").strip()
+    ville = request.args.get("ville", "").strip()
+    genre = request.args.get("genre", "").strip()
+    statut = request.args.get("statut", "").strip()
+    page = max(request.args.get("page", 1, type=int), 1)
+
+    requete = Fils.query
+    if q:
+        motif = f"%{q}%"
+        requete = requete.filter(or_(Fils.nom.ilike(motif), Fils.prenom.ilike(motif)))
+    if ville:
+        requete = requete.filter(Fils.ville.ilike(f"%{ville}%"))
+    if genre in GENRES_FILS:
+        requete = requete.filter(Fils.genre == genre)
+    if statut in LIBELLES_STATUTS_FILS:
+        requete = requete.filter(Fils.statut == statut)
+
+    pagination = requete.order_by(Fils.nom.asc(), Fils.prenom.asc()) \
+                        .paginate(page=page, per_page=FILS_PAR_PAGE, error_out=False)
+
+    # Dernière présence de chaque fils affiché (colonne "Présence récente").
+    dernieres = {}
+    for f in pagination.items:
+        derniere = (FilsPresence.query.filter_by(fils_id=f.id)
+                    .join(FilsActivite).order_by(FilsActivite.date_activite.desc()).first())
+        dernieres[f.id] = derniere
+
+    villes = [v[0] for v in db.session.query(Fils.ville).filter(Fils.ville.isnot(None))
+              .distinct().order_by(Fils.ville).all() if v[0]]
+
+    return render_template(
+        "fils_liste.html", paroisse=PAROISSE, pagination=pagination, fils=pagination.items,
+        q=q, ville=ville, genre=genre, statut=statut, villes=villes,
+        total=Fils.query.count(), dernieres=dernieres,
+    )
+
+
+@app.route("/fils/nouveau", methods=["GET", "POST"])
+@login_requis
+def fils_nouveau():
+    if request.method == "POST":
+        donnees, erreurs = collecter_formulaire_fils(request.form)
+        if erreurs:
+            for e in erreurs:
+                flash(e, "error")
+            return render_template("fils_form.html", paroisse=PAROISSE, fils=None, valeurs=request.form)
+        record = Fils(**donnees)
+        db.session.add(record)
+        db.session.commit()
+        flash(f"Fils « {record.nom_complet} » enregistré.", "success")
+        return redirect(url_for("fils_liste"))
+    return render_template("fils_form.html", paroisse=PAROISSE, fils=None, valeurs={})
+
+
+@app.route("/fils/<int:fils_id>/modifier", methods=["GET", "POST"])
+@login_requis
+def fils_modifier(fils_id):
+    record = db.session.get(Fils, fils_id) or abort(404)
+    if request.method == "POST":
+        donnees, erreurs = collecter_formulaire_fils(request.form)
+        if erreurs:
+            for e in erreurs:
+                flash(e, "error")
+            return render_template("fils_form.html", paroisse=PAROISSE, fils=record, valeurs=request.form)
+        for champ, valeur in donnees.items():
+            setattr(record, champ, valeur)
+        db.session.commit()
+        flash(f"Fils « {record.nom_complet} » mis à jour.", "success")
+        return redirect(url_for("fils_detail", fils_id=record.id))
+    valeurs = {c: getattr(record, c) for c in ("nom", "prenom", "ville", "telephone", "genre", "statut")}
+    return render_template("fils_form.html", paroisse=PAROISSE, fils=record, valeurs=valeurs)
+
+
+@app.route("/fils/<int:fils_id>")
+@login_requis
+def fils_detail(fils_id):
+    record = db.session.get(Fils, fils_id) or abort(404)
+    historique = (FilsPresence.query.filter_by(fils_id=fils_id)
+                  .join(FilsActivite).order_by(FilsActivite.date_activite.desc()).all())
+    nb_present = sum(1 for p in historique if p.statut == PRESENCE_FILS_PRESENT)
+    nb_absent = sum(1 for p in historique if p.statut == PRESENCE_FILS_ABSENT)
+    total = nb_present + nb_absent
+    taux_presence = round(nb_present / total * 100, 1) if total else 0
+    taux_absence = round(nb_absent / total * 100, 1) if total else 0
+    return render_template(
+        "fils_detail.html", paroisse=PAROISSE, fils=record, historique=historique,
+        nb_present=nb_present, nb_absent=nb_absent,
+        taux_presence=taux_presence, taux_absence=taux_absence,
+    )
+
+
+@app.route("/fils/<int:fils_id>/supprimer", methods=["POST"])
+@suppression_requise
+def fils_supprimer(fils_id):
+    record = db.session.get(Fils, fils_id) or abort(404)
+    if FilsPresence.query.filter_by(fils_id=fils_id).first():
+        flash(
+            f"Impossible de supprimer « {record.nom_complet} » : il a un historique de "
+            f"présence — désactivez-le plutôt (modifier la fiche, statut Inactif).",
+            "error",
+        )
+        return redirect(url_for("fils_detail", fils_id=fils_id))
+    nom = record.nom_complet
+    db.session.delete(record)
+    db.session.commit()
+    flash(f"Fils « {nom} » supprimé définitivement.", "success")
+    return redirect(url_for("fils_liste"))
+
+
+# -------- Import Excel/CSV --------
+@app.route("/fils/importer", methods=["GET", "POST"])
+@login_requis
+def fils_importer():
+    if request.method == "GET":
+        return render_template("fils_importer.html", paroisse=PAROISSE, resultats=None)
+
+    etape = request.form.get("etape", "analyser")
+
+    if etape == "confirmer":
+        try:
+            lot = json.loads(request.form.get("donnees_json") or "[]")
+        except ValueError:
+            flash("La session d'import a expiré ou est invalide. Recommencez.", "error")
+            return redirect(url_for("fils_importer"))
+
+        paires = [(item.get("numero_ligne"), item.get("donnees") or {}) for item in lot]
+        resultats = analyser_lignes_fils(paires)
+        valides = [r for r in resultats if not r["erreurs"]]
+        for r in valides:
+            db.session.add(Fils(**r["donnees"], statut=STATUT_FILS_ACTIF))
+        db.session.commit()
+
+        ignorees = len(resultats) - len(valides)
+        message = f"{len(valides)} fils importé(s) depuis le fichier."
+        if ignorees:
+            message += f" {ignorees} ligne(s) ignorée(s) : devenue(s) invalide(s) ou en doublon depuis l'aperçu."
+        flash(message, "success" if valides else "error")
+        return redirect(url_for("fils_liste"))
+
+    fichier = request.files.get("fichier")
+    if not fichier or not fichier.filename:
+        flash("Choisissez un fichier .xlsx ou .csv à importer.", "error")
+        return redirect(url_for("fils_importer"))
+
+    lignes_brutes, colonnes_ignorees, erreur = lire_fichier_import(
+        fichier, champs_par_entete=FILS_CHAMPS_PAR_ENTETE, champs_essentiels=("nom", "prenom"))
+    if erreur:
+        flash(erreur, "error")
+        return redirect(url_for("fils_importer"))
+    if not lignes_brutes:
+        flash("Ce fichier ne contient aucune ligne de données à importer.", "error")
+        return redirect(url_for("fils_importer"))
+
+    paires = [
+        (i, donnees_depuis_ligne_fils(ligne))
+        for i, ligne in enumerate(lignes_brutes, start=2)
+    ]
+    resultats = analyser_lignes_fils(paires)
+    valides = [r for r in resultats if not r["erreurs"]]
+    donnees_json = [{"numero_ligne": r["numero_ligne"], "donnees": r["donnees"]} for r in valides]
+
+    return render_template(
+        "fils_importer.html", paroisse=PAROISSE, resultats=resultats,
+        nb_valides=len(valides), nb_erreurs=len(resultats) - len(valides),
+        colonnes_ignorees=colonnes_ignorees, donnees_json=donnees_json,
+        nom_fichier=fichier.filename,
+    )
+
+
+@app.route("/fils/importer/modele.csv")
+@login_requis
+def fils_importer_modele():
+    exemple = {"nom": "MBALLA", "prenom": "Jean", "ville": "Yaoundé",
+               "telephone": "677000000", "genre": "M"}
+    tampon = io.StringIO()
+    tampon.write("﻿")
+    writer = csv.writer(tampon, delimiter=";")
+    writer.writerow([libelle for _, libelle in FILS_COLONNES_EXPORT])
+    writer.writerow([exemple.get(champ, "") for champ, _ in FILS_COLONNES_EXPORT])
+    return Response(
+        tampon.getvalue(), mimetype="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="modele_import_fils.csv"'},
+    )
+
+
+# -------- Activités & pointage --------
+@app.route("/fils/activites", methods=["GET", "POST"])
+@login_requis
+def fils_activites():
+    if request.method == "POST":
+        date_brute = (request.form.get("date_activite") or "").strip()
+        service_type_id = request.form.get("service_type_id", type=int)
+        nom = (request.form.get("nom") or "").strip()[:150] or None
+        date_activite = lire_date(date_brute)
+        if not date_activite:
+            flash("La date de l'activité est obligatoire.", "error")
+        elif not service_type_id or not db.session.get(ServiceType, service_type_id):
+            flash("Le type d'activité est obligatoire.", "error")
+        else:
+            activite = FilsActivite(date_activite=date_activite,
+                                     service_type_id=service_type_id, nom=nom)
+            db.session.add(activite)
+            db.session.commit()
+            flash("Activité créée.", "success")
+            return redirect(url_for("fils_pointage", activite_id=activite.id))
+        return redirect(url_for("fils_activites"))
+
+    activites = (FilsActivite.query.order_by(FilsActivite.date_activite.desc()).limit(50).all())
+    types_activite = ServiceType.query.filter_by(is_active=True) \
+        .order_by(ServiceType.ordre_affichage).all()
+    return render_template(
+        "fils_activites.html", paroisse=PAROISSE, activites=activites,
+        types_activite=types_activite,
+    )
+
+
+@app.route("/fils/activites/<int:activite_id>/supprimer", methods=["POST"])
+@suppression_requise
+def fils_activite_supprimer(activite_id):
+    activite = db.session.get(FilsActivite, activite_id) or abort(404)
+    if FilsPresence.query.filter_by(activite_id=activite_id).first():
+        flash(
+            f"Impossible de supprimer « {activite.libelle} » du "
+            f"{activite.date_activite.strftime('%d/%m/%Y')} : des présences y sont déjà "
+            f"enregistrées.", "error",
+        )
+    else:
+        db.session.delete(activite)
+        db.session.commit()
+        flash("Activité supprimée.", "success")
+    return redirect(url_for("fils_activites"))
+
+
+@app.route("/fils/activites/<int:activite_id>/pointage", methods=["GET", "POST"])
+@login_requis
+def fils_pointage(activite_id):
+    activite = db.session.get(FilsActivite, activite_id) or abort(404)
+
+    if request.method == "POST":
+        # Un seul POST pour tout l'appel — pas une requête par personne (§25).
+        existants = {p.fils_id: p for p in FilsPresence.query.filter_by(activite_id=activite_id)}
+        for cle, valeur in request.form.items():
+            if not cle.startswith("statut_"):
+                continue
+            fils_id = int(cle.removeprefix("statut_"))
+            if valeur not in (PRESENCE_FILS_PRESENT, PRESENCE_FILS_ABSENT):
+                continue
+            if fils_id in existants:
+                existants[fils_id].statut = valeur
+            else:
+                db.session.add(FilsPresence(
+                    fils_id=fils_id, activite_id=activite_id, statut=valeur))
+        db.session.commit()
+        flash(f"Présences enregistrées pour « {activite.libelle} » du "
+              f"{activite.date_activite.strftime('%d/%m/%Y')}.", "success")
+        return redirect(url_for("fils_activites"))
+
+    fils_actifs = Fils.query.filter_by(statut=STATUT_FILS_ACTIF) \
+        .order_by(Fils.nom.asc(), Fils.prenom.asc()).all()
+    statuts_actuels = {
+        p.fils_id: p.statut
+        for p in FilsPresence.query.filter_by(activite_id=activite_id).all()
+    }
+    return render_template(
+        "fils_pointage.html", paroisse=PAROISSE, activite=activite,
+        fils_actifs=fils_actifs, statuts_actuels=statuts_actuels,
+    )
+
+
+# -------- Statistiques --------
+def calculer_statistiques_fils(debut, fin, genre=None, ville=None):
+    requete = FilsPresence.query.join(FilsActivite)
+    if debut:
+        requete = requete.filter(FilsActivite.date_activite >= debut)
+    if fin:
+        requete = requete.filter(FilsActivite.date_activite <= fin)
+    if genre or ville:
+        requete = requete.join(Fils, FilsPresence.fils_id == Fils.id)
+        if genre:
+            requete = requete.filter(Fils.genre == genre)
+        if ville:
+            requete = requete.filter(Fils.ville.ilike(f"%{ville}%"))
+    presences = requete.all()
+
+    nb_present = sum(1 for p in presences if p.statut == PRESENCE_FILS_PRESENT)
+    nb_absent = sum(1 for p in presences if p.statut == PRESENCE_FILS_ABSENT)
+    total = nb_present + nb_absent
+
+    requete_fils = Fils.query
+    if genre:
+        requete_fils = requete_fils.filter(Fils.genre == genre)
+    if ville:
+        requete_fils = requete_fils.filter(Fils.ville.ilike(f"%{ville}%"))
+    tous_fils = requete_fils.all()
+
+    return {
+        "total_fils": len(tous_fils),
+        "nb_hommes": sum(1 for f in tous_fils if f.genre == GENRE_HOMME),
+        "nb_femmes": sum(1 for f in tous_fils if f.genre == GENRE_FEMME),
+        "nb_present": nb_present,
+        "nb_absent": nb_absent,
+        "taux_presence": round(nb_present / total * 100, 1) if total else 0,
+        "taux_absence": round(nb_absent / total * 100, 1) if total else 0,
+    }
+
+
+@app.route("/fils/statistiques")
+@login_requis
+def fils_statistiques():
+    periode = request.args.get("periode", "mois")
+    debut_brut = request.args.get("debut", "")
+    fin_brut = request.args.get("fin", "")
+    genre = request.args.get("genre", "").strip()
+    ville = request.args.get("ville", "").strip()
+    debut, fin = bornes_periode(periode, debut_brut, fin_brut)
+
+    stats = calculer_statistiques_fils(debut, fin, genre=genre or None, ville=ville or None)
+    villes = [v[0] for v in db.session.query(Fils.ville).filter(Fils.ville.isnot(None))
+              .distinct().order_by(Fils.ville).all() if v[0]]
+
+    return render_template(
+        "fils_statistiques.html", paroisse=PAROISSE, periode=periode,
+        debut=debut, fin=fin, debut_brut=debut_brut, fin_brut=fin_brut,
+        genre=genre, ville=ville, villes=villes, **stats,
+    )
+
+
+# -------- Export CSV --------
+@app.route("/fils/export.csv")
+@login_requis
+def fils_export_csv():
+    lignes = Fils.query.order_by(Fils.nom.asc(), Fils.prenom.asc()).all()
+    tampon = io.StringIO()
+    tampon.write("﻿")
+    writer = csv.writer(tampon, delimiter=";")
+    writer.writerow(["Nom", "Prénom", "Ville", "Téléphone", "Genre", "Statut"])
+    for f in lignes:
+        writer.writerow([
+            neutraliser_formule(f.nom), neutraliser_formule(f.prenom),
+            neutraliser_formule(f.ville) or "", neutraliser_formule(f.telephone) or "",
+            LIBELLES_GENRES_FILS.get(f.genre, f.genre),
+            LIBELLES_STATUTS_FILS.get(f.statut, f.statut),
+        ])
+    nom_fichier = f"fils_icm_{date.today():%Y-%m-%d}.csv"
+    return Response(
+        tampon.getvalue(), mimetype="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{nom_fichier}"'},
+    )
+
+
+# ------------------------------------------------------------------
 #  Filtres d'affichage
 # ------------------------------------------------------------------
 @app.template_filter("jj_mm_aaaa")
@@ -2526,6 +3120,16 @@ def migrer_colonnes_presences_manquantes():
         db.session.commit()
 
 
+def initialiser_donnees_fils():
+    """Ajoute « Réunion des fils » aux types de culte/activité (ServiceType,
+    réutilisé comme type d'activité du module Fils) s'il n'existe pas déjà —
+    idempotent, ne touche à rien d'autre."""
+    if not ServiceType.query.filter(func.lower(ServiceType.nom) == "réunion des fils").first():
+        ordre_max = db.session.query(func.max(ServiceType.ordre_affichage)).scalar() or 0
+        db.session.add(ServiceType(nom="Réunion des fils", ordre_affichage=ordre_max + 1))
+        db.session.commit()
+
+
 # ------------------------------------------------------------------
 #  Démarrage
 # ------------------------------------------------------------------
@@ -2533,6 +3137,7 @@ with app.app_context():
     db.create_all()
     migrer_colonnes_presences_manquantes()
     initialiser_donnees_presences()
+    initialiser_donnees_fils()
     # Empêche deux fiches de partager le même numéro de registre au niveau
     # de la base elle-même — pas seulement par le contrôle applicatif
     # verifier_unicite(), qui ne couvre pas une numérotation automatique

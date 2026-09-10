@@ -97,13 +97,15 @@ mvp_registre_bapteme_mariage/
 │   ├── migration_07_visiteur_ecriture.sql
 │   │                               ← si la base existait AVANT la reclassification des
 │   │                                 droits du 10/09/2026 (§ 5) — le Visiteur peut écrire
+│   ├── migration_08_module_fils.sql
+│   │                               ← si la base existait AVANT le module Fils (§ 11 bis)
 │   └── schema_sqlite.sql          ← documentation du schéma local
 │
 ├── app.py                         ← APPLICATION FLASK
 ├── requirements.txt
 ├── .env.example                   ← à copier en « .env »
 ├── templates/                     ← pages (connexion, liste, formulaire, carte, import, journal,
-│                                     à propos, présences — voir § 11)
+│                                     à propos, présences — voir § 11, fils — voir § 11 bis)
 ├── static/
 │   ├── style.css
 │   ├── photo.js                   ← recadrage et compression des photos
@@ -132,15 +134,17 @@ mvp_registre_bapteme_mariage/
 
 > **Vous aviez déjà créé la base avant les photos, avant les rôles, avant
 > le journal d'audit, avant l'audit de sécurité du 25/08/2026 (§ 14), avant
-> le module Présences (§ 11), avant le classement Fils-ICM / Nouveaux, ou
-> avant la reclassification des droits (§ 5) du 10/09/2026 ?**
+> le module Présences (§ 11), avant le classement Fils-ICM / Nouveaux, avant
+> la reclassification des droits (§ 5) du 10/09/2026, ou avant le module
+> Fils (§ 11 bis) ?**
 > Ne rejouez pas le script complet : exécutez, dans cet ordre,
 > `database/migration_01_photo.sql` puis `database/migration_02_roles.sql`
 > puis `database/migration_03_journal.sql` puis
 > `database/migration_04_durcissement_securite.sql` puis
 > `database/migration_05_presences.sql` puis
 > `database/migration_06_categorisation_fils_icm_nouveaux.sql` puis
-> `database/migration_07_visiteur_ecriture.sql` — chacun
+> `database/migration_07_visiteur_ecriture.sql` puis
+> `database/migration_08_module_fils.sql` — chacun
 > ajoute seulement ce qui manque, sans toucher à vos données. Une base créée
 > à partir du `schema_supabase.sql` actuel n'a besoin d'aucune de ces
 > migrations : tout est déjà dedans.
@@ -219,7 +223,7 @@ encore les rôles :
 |---|---|
 | **Secrétaire** | Accès complet : saisie, modification, suppression, import, export. |
 | **Pasteur** | Accès complet également, exactement comme le secrétariat — un compte séparé pour savoir qui a fait quoi. |
-| **Visiteur** | Accès complet lui aussi : saisie, modification, import, export, paramètres des présences. Seule la **suppression définitive** (fiche, présence, catégorie, type de culte, photo) lui reste fermée. |
+| **Visiteur** | Accès complet lui aussi : saisie, modification, import, export, paramètres des présences. Seule la **suppression définitive** (fiche, présence, catégorie, type de culte, photo, fils, activité) lui reste fermée. |
 
 Dans les deux versions, la restriction est appliquée côté serveur (pas
 seulement en cachant les boutons à l'écran) : un visiteur qui contournerait
@@ -449,6 +453,54 @@ route serveur dédiée), pour rester cohérent avec le principe d'un fichier
 unique sans backend. `created_by`/`updated_by` y sont l'adresse e-mail du
 compte Supabase (texte simple, pas une clé étrangère vers `auth.users` —
 cette table n'est pas exposée par l'API REST).
+
+---
+
+## 11 bis. Gestion et suivi des Fils
+
+*Disponible sur la version Flask et sur la version en ligne (Supabase) —
+voir `database/schema_supabase.sql` § 14 / `database/migration_08_module_fils.sql`.
+La version bureau et la version Android en héritent automatiquement, comme
+pour Présences ci-dessus.*
+
+Un registre **nominatif** des fils (disciples suivis individuellement),
+accessible depuis l'en-tête (**👥 Fils**) — distinct de la catégorie agrégée
+« Fils-ICM » du module Présences (§ 11 : un simple compteur par tranche
+d'âge/sexe, sans identité). Ici, chaque fils est une personne identifiée
+avec son propre historique de présence, activité par activité :
+
+- **Fiche** : nom, prénom, ville, téléphone, genre (Homme/Femme), statut
+  (Actif/Inactif). Casse imposée automatiquement (nom en majuscules, prénom
+  et ville capitalisés) et téléphone nettoyé (chiffres uniquement, + de tête
+  conservé), comme pour le registre des baptêmes/mariages.
+- **Liste** : recherche par nom/prénom, filtres ville/genre/statut,
+  pagination, dernière présence pointée pour chaque fils affiché.
+- **Import Excel/CSV en masse** : même principe en deux étapes qu'ailleurs
+  dans l'application (§ 8) — aperçu ligne par ligne, rien n'est écrit avant
+  confirmation. Reconnaissance intelligente des en-têtes (accents/casse/
+  ponctuation indifférents, synonymes usuels comme « TEL » ou « SEXE »),
+  détection des doublons par téléphone en priorité, sinon par (nom, prénom),
+  aussi bien à l'intérieur du fichier que contre les fils déjà enregistrés.
+- **Suppression** : un fils avec un historique de présence ne peut pas être
+  supprimé (désactivez-le plutôt, statut Inactif) — même garde-fou que les
+  catégories/types de culte de Présences. Suppression définitive réservée
+  secrétariat/pasteur (§ 5).
+- **Activités & pointage** : une activité = une date + un type (le type de
+  culte de Présences, ordre affichage confondu, avec « Réunion des fils »
+  ajouté par défaut — pas de deuxième liste de types à gérer). Le pointage
+  Présent/Absent de tous les fils actifs à une activité se fait en un seul
+  enregistrement groupé, tout le monde étant proposé « Présent » par défaut.
+  Une activité déjà pointée ne peut pas être supprimée.
+- **Historique par fils** : liste des présences/absences avec taux calculés
+  (fiche individuelle de chaque fils).
+- **Statistiques** : filtres période (aujourd'hui → tout l'historique,
+  personnalisée), genre, ville — total de fils, répartition Hommes/Femmes,
+  présents/absents et taux sur la période, mêmes graphiques CSS purs
+  (camembert) que Présences.
+- **Export** : CSV (compatible Excel, anti-injection de formule du § 14).
+
+Mêmes rôles que le reste de l'application (§ 5) : les trois ont accès
+complet, seule la suppression définitive reste réservée secrétaire/pasteur.
 
 ---
 

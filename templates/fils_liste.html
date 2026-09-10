@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block titre %}Fils — ICM{% endblock %}
+{% set peut_supprimer = session.get('role') in ('secretaire', 'pasteur') %}
+
+{% block contenu %}
+
+<div class="titre-page">
+  <h1>👥 Fils</h1>
+  <p class="discret">{{ total }} fils enregistré(s).</p>
+</div>
+
+<form class="barre-recherche" method="get" action="{{ url_for('fils_liste') }}">
+  <input type="search" name="q" value="{{ q }}" placeholder="Rechercher un nom ou un prénom…">
+  <select name="ville">
+    <option value="">Toutes les villes</option>
+    {% for v in villes %}
+      <option value="{{ v }}" {% if ville == v %}selected{% endif %}>{{ v }}</option>
+    {% endfor %}
+  </select>
+  <select name="genre">
+    <option value="">Tous genres</option>
+    <option value="M" {% if genre == 'M' %}selected{% endif %}>Homme</option>
+    <option value="F" {% if genre == 'F' %}selected{% endif %}>Femme</option>
+  </select>
+  <select name="statut">
+    <option value="">Tous statuts</option>
+    <option value="active" {% if statut == 'active' %}selected{% endif %}>Actif</option>
+    <option value="inactive" {% if statut == 'inactive' %}selected{% endif %}>Inactif</option>
+  </select>
+  <button type="submit" class="bouton">Rechercher</button>
+  {% if q or ville or genre or statut %}
+    <a class="bouton bouton-discret" href="{{ url_for('fils_liste') }}">Réinitialiser</a>
+  {% endif %}
+  <a class="bouton bouton-discret" href="{{ url_for('fils_importer') }}">Importer depuis Excel</a>
+  <a class="bouton bouton-discret" href="{{ url_for('fils_export_csv') }}">Export Excel</a>
+  <a class="bouton bouton-discret" href="{{ url_for('fils_activites') }}">Activités &amp; pointage</a>
+  <a class="bouton bouton-discret" href="{{ url_for('fils_statistiques') }}">Statistiques</a>
+  <a class="bouton bouton-principal" href="{{ url_for('fils_nouveau') }}">+ Nouveau fils</a>
+</form>
+
+{% if fils %}
+<div class="tableau-enveloppe">
+<table class="tableau">
+  <thead>
+    <tr>
+      <th>Nom &amp; prénom</th><th>Ville</th><th>Téléphone</th><th>Genre</th>
+      <th>Statut</th><th>Présence récente</th><th class="col-actions">Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for f in fils %}
+    <tr>
+      <td><strong>{{ f.nom }}</strong> {{ f.prenom }}</td>
+      <td>{{ f.ville or '—' }}</td>
+      <td>{{ f.telephone or '—' }}</td>
+      <td>{{ 'Homme' if f.genre == 'M' else 'Femme' }}</td>
+      <td>
+        {% if f.statut == 'active' %}
+          <span class="etiquette etiquette-ok">Actif</span>
+        {% else %}
+          <span class="etiquette etiquette-erreur">Inactif</span>
+        {% endif %}
+      </td>
+      <td>
+        {% set derniere = dernieres.get(f.id) %}
+        {% if derniere %}
+          {{ 'Présent' if derniere.statut == 'P' else 'Absent' }}
+          ({{ derniere.activite_ref.date_activite | jj_mm_aaaa }})
+        {% else %}—{% endif %}
+      </td>
+      <td class="col-actions">
+        <a class="bouton bouton-petit" href="{{ url_for('fils_detail', fils_id=f.id) }}">Voir</a>
+        <a class="bouton bouton-petit" href="{{ url_for('fils_modifier', fils_id=f.id) }}">Modifier</a>
+        {% if peut_supprimer %}
+        <form method="post" action="{{ url_for('fils_supprimer', fils_id=f.id) }}"
+              onsubmit="return confirm('Supprimer définitivement {{ f.nom }} {{ f.prenom }} ?');">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="bouton bouton-petit bouton-danger">Supprimer</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% if pagination.pages > 1 %}
+<nav class="pagination">
+  {% if pagination.has_prev %}
+    <a class="bouton bouton-petit" href="{{ url_for('fils_liste', page=pagination.prev_num, q=q, ville=ville, genre=genre, statut=statut) }}">‹ Précédent</a>
+  {% endif %}
+  <span class="pagination-info">Page {{ pagination.page }} sur {{ pagination.pages }}</span>
+  {% if pagination.has_next %}
+    <a class="bouton bouton-petit" href="{{ url_for('fils_liste', page=pagination.next_num, q=q, ville=ville, genre=genre, statut=statut) }}">Suivant ›</a>
+  {% endif %}
+</nav>
+{% endif %}
+
+{% else %}
+<div class="vide">
+  {% if q or ville or genre or statut %}
+    <p>Aucun fils ne correspond à cette recherche.</p>
+    <a class="bouton" href="{{ url_for('fils_liste') }}">Voir tous les fils</a>
+  {% else %}
+    <p>Aucun fils enregistré pour le moment.</p>
+    <a class="bouton bouton-principal" href="{{ url_for('fils_nouveau') }}">Enregistrer le premier fils</a>
+    <a class="bouton bouton-discret" href="{{ url_for('fils_importer') }}">ou importer depuis Excel</a>
+  {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}

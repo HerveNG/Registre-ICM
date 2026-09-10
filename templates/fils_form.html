@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block titre %}{{ 'Modifier un fils' if fils else 'Nouveau fils' }} — ICM{% endblock %}
+
+{% macro val(nom, defaut='') -%}
+{%- if valeurs and valeurs.get(nom) is not none -%}{{ valeurs.get(nom) }}
+{%- else -%}{{ defaut }}
+{%- endif -%}
+{%- endmacro %}
+
+{% block contenu %}
+
+<div class="titre-page">
+  <h1>{{ 'Modifier le fils' if fils else 'Nouveau fils' }}</h1>
+  {% if fils %}<p class="discret">{{ fils.nom }} {{ fils.prenom }}</p>{% endif %}
+</div>
+
+<form method="post" class="formulaire">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <div class="grille">
+    <label class="obligatoire">Nom
+      <input type="text" name="nom" maxlength="120" required value="{{ val('nom') }}">
+    </label>
+    <label class="obligatoire">Prénom
+      <input type="text" name="prenom" maxlength="120" required value="{{ val('prenom') }}">
+    </label>
+    <label>Ville de résidence
+      <input type="text" name="ville" maxlength="150" value="{{ val('ville') }}">
+    </label>
+    <label>Téléphone
+      <input type="text" name="telephone" maxlength="50" value="{{ val('telephone') }}">
+    </label>
+    <label class="obligatoire">Genre
+      <select name="genre" required>
+        <option value="">— Choisir —</option>
+        <option value="M" {% if val('genre') == 'M' %}selected{% endif %}>Homme</option>
+        <option value="F" {% if val('genre') == 'F' %}selected{% endif %}>Femme</option>
+      </select>
+    </label>
+    <label>Statut
+      <select name="statut">
+        <option value="active" {% if val('statut', 'active') == 'active' %}selected{% endif %}>Actif</option>
+        <option value="inactive" {% if val('statut') == 'inactive' %}selected{% endif %}>Inactif</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="actions-formulaire">
+    <button type="submit" class="bouton bouton-principal bouton-large">Enregistrer</button>
+    <a class="bouton bouton-discret" href="{{ url_for('fils_liste') }}">Annuler</a>
+  </div>
+</form>
+
+{% endblock %}

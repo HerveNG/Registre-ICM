@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block titre %}Activités des fils — ICM{% endblock %}
+
+{% block contenu %}
+{% set peut_supprimer = session.get('role') in ('secretaire', 'pasteur') %}
+
+<div class="titre-page">
+  <h1>Activités &amp; pointage</h1>
+  <p class="discret">Créez une activité (date + type), puis faites l'appel.</p>
+</div>
+
+<div class="bloc-stat">
+  <h2>Nouvelle activité</h2>
+  <form method="post" class="grille" style="align-items:end;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label class="obligatoire">Date
+      <input type="date" name="date_activite" required>
+    </label>
+    <label class="obligatoire">Type d'activité
+      <select name="service_type_id" required>
+        <option value="">— Choisir —</option>
+        {% for t in types_activite %}
+          <option value="{{ t.id }}">{{ t.nom }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Libellé (facultatif)
+      <input type="text" name="nom" maxlength="150" placeholder="Ex. Réunion spéciale">
+    </label>
+    <button type="submit" class="bouton bouton-principal">Créer et pointer</button>
+  </form>
+</div>
+
+<div class="bloc-stat">
+  <h2>Activités récentes</h2>
+  {% if activites %}
+  <div class="tableau-enveloppe">
+    <table class="tableau">
+      <thead><tr><th>Date</th><th>Activité</th><th class="col-actions">Actions</th></tr></thead>
+      <tbody>
+        {% for a in activites %}
+        <tr>
+          <td>{{ a.date_activite | jj_mm_aaaa }}</td>
+          <td>{{ a.libelle }}</td>
+          <td class="col-actions">
+            <a class="bouton bouton-petit bouton-principal" href="{{ url_for('fils_pointage', activite_id=a.id) }}">📋 Pointage</a>
+            {% if peut_supprimer %}
+            <form method="post" action="{{ url_for('fils_activite_supprimer', activite_id=a.id) }}"
+                  onsubmit="return confirm('Supprimer définitivement cette activité ?');">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="bouton bouton-petit bouton-danger">🗑 Supprimer</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="discret">Aucune activité enregistrée pour le moment.</p>
+  {% endif %}
+</div>
+
+{% endblock %}

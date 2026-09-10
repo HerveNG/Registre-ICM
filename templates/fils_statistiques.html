@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block titre %}Statistiques des fils — ICM{% endblock %}
+
+{% block contenu %}
+
+<div class="titre-page">
+  <h1>Statistiques des fils</h1>
+  <p class="discret">
+    {% if debut and fin %}Du {{ debut | jj_mm_aaaa }} au {{ fin | jj_mm_aaaa }}
+    {% elif debut %}Depuis le {{ debut | jj_mm_aaaa }}
+    {% elif fin %}Jusqu'au {{ fin | jj_mm_aaaa }}
+    {% else %}Toutes périodes confondues{% endif %}
+  </p>
+</div>
+
+<form class="filtres-periode" method="get" action="{{ url_for('fils_statistiques') }}">
+  <select name="periode" onchange="document.getElementById('bloc-personnalise').hidden = this.value !== 'personnalise'; if (this.value !== 'personnalise') this.form.submit();">
+    <option value="aujourdhui" {% if periode == 'aujourdhui' %}selected{% endif %}>Aujourd'hui</option>
+    <option value="semaine" {% if periode == 'semaine' %}selected{% endif %}>Cette semaine</option>
+    <option value="mois" {% if periode == 'mois' %}selected{% endif %}>Ce mois</option>
+    <option value="trimestre" {% if periode == 'trimestre' %}selected{% endif %}>Ce trimestre</option>
+    <option value="annee" {% if periode == 'annee' %}selected{% endif %}>Cette année</option>
+    <option value="tout" {% if periode == 'tout' %}selected{% endif %}>Tout l'historique</option>
+    <option value="personnalise" {% if periode == 'personnalise' %}selected{% endif %}>Période personnalisée…</option>
+  </select>
+  <span id="bloc-personnalise" {% if periode != 'personnalise' %}hidden{% endif %}>
+    Du <input type="date" name="debut" value="{{ debut_brut }}" style="width:auto; display:inline-block;">
+    au <input type="date" name="fin" value="{{ fin_brut }}" style="width:auto; display:inline-block;">
+  </span>
+  <select name="genre" onchange="this.form.submit();">
+    <option value="">Tous genres</option>
+    <option value="M" {% if genre == 'M' %}selected{% endif %}>Hommes</option>
+    <option value="F" {% if genre == 'F' %}selected{% endif %}>Femmes</option>
+  </select>
+  <select name="ville" onchange="this.form.submit();">
+    <option value="">Toutes les villes</option>
+    {% for v in villes %}
+      <option value="{{ v }}" {% if ville == v %}selected{% endif %}>{{ v }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit" class="bouton bouton-petit">Appliquer</button>
+</form>
+
+<div class="cartes-tableau-bord">
+  <div class="carte-kpi"><span class="carte-kpi-libelle">Total fils</span><span class="carte-kpi-valeur">{{ total_fils }}</span></div>
+  <div class="carte-kpi"><span class="carte-kpi-libelle">👨 Hommes</span><span class="carte-kpi-valeur">{{ nb_hommes }}</span></div>
+  <div class="carte-kpi"><span class="carte-kpi-libelle">👩 Femmes</span><span class="carte-kpi-valeur">{{ nb_femmes }}</span></div>
+  <div class="carte-kpi"><span class="carte-kpi-libelle">Présents (période)</span><span class="carte-kpi-valeur">{{ nb_present }}</span></div>
+  <div class="carte-kpi"><span class="carte-kpi-libelle">Absents (période)</span><span class="carte-kpi-valeur">{{ nb_absent }}</span></div>
+  <div class="carte-kpi"><span class="carte-kpi-libelle">Taux de présence</span><span class="carte-kpi-valeur">{{ taux_presence }} %</span></div>
+  <div class="carte-kpi"><span class="carte-kpi-libelle">Taux d'absence</span><span class="carte-kpi-valeur">{{ taux_absence }} %</span></div>
+</div>
+
+{% if total_fils %}
+<div class="bloc-stat">
+  <h2>Répartition Hommes / Femmes</h2>
+  {% set pct_h = (nb_hommes / total_fils * 100) | round(1) %}
+  {% set pct_f = (nb_femmes / total_fils * 100) | round(1) %}
+  <div class="camembert-enveloppe">
+    <div class="camembert" style="background: conic-gradient(var(--encre) 0deg {{ pct_h / 100 * 360 }}deg, var(--or) {{ pct_h / 100 * 360 }}deg 360deg);"></div>
+    <ul class="camembert-legende">
+      <li><span class="camembert-pastille" style="background:var(--encre);"></span> Hommes — <strong>{{ nb_hommes }}</strong> ({{ pct_h }} %)</li>
+      <li><span class="camembert-pastille" style="background:var(--or);"></span> Femmes — <strong>{{ nb_femmes }}</strong> ({{ pct_f }} %)</li>
+    </ul>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

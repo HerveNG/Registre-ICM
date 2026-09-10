@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block titre %}Pointage — {{ activite.libelle }} — ICM{% endblock %}
+
+{% block contenu %}
+
+<div class="titre-page">
+  <h1>📋 Pointage</h1>
+  <p class="discret">{{ activite.libelle }} — {{ activite.date_activite | jj_mm_aaaa }}</p>
+</div>
+
+{% if fils_actifs %}
+<form method="post" class="formulaire">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <div class="tableau-enveloppe">
+    <table class="tableau tableau-pointage">
+      <thead><tr><th>Fils</th><th>Genre</th><th>Présent</th><th>Absent</th></tr></thead>
+      <tbody>
+        {% for f in fils_actifs %}
+        {% set actuel = statuts_actuels.get(f.id) %}
+        <tr>
+          <td>{{ f.nom }} {{ f.prenom }}</td>
+          <td>{{ 'M' if f.genre == 'M' else 'F' }}</td>
+          <td style="text-align:center;">
+            <input type="radio" name="statut_{{ f.id }}" value="P"
+                   {% if actuel == 'P' or not actuel %}checked{% endif %}
+                   aria-label="Présent : {{ f.nom }} {{ f.prenom }}">
+          </td>
+          <td style="text-align:center;">
+            <input type="radio" name="statut_{{ f.id }}" value="A"
+                   {% if actuel == 'A' %}checked{% endif %}
+                   aria-label="Absent : {{ f.nom }} {{ f.prenom }}">
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <p class="aide">Tout le monde est proposé « Présent » par défaut — décochez
+    seulement les absents. Un seul enregistrement pour toute la liste.</p>
+
+  <div class="actions-formulaire">
+    <button type="submit" class="bouton bouton-principal bouton-large">Enregistrer les présences</button>
+    <a class="bouton bouton-discret" href="{{ url_for('fils_activites') }}">Annuler</a>
+  </div>
+</form>
+{% else %}
+<div class="vide">
+  <p>Aucun fils actif à pointer — activez au moins un fils.</p>
+  <a class="bouton bouton-principal" href="{{ url_for('fils_nouveau') }}">Enregistrer un fils</a>
+</div>
+{% endif %}
+
+{% endblock %}
