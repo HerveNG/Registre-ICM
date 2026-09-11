@@ -99,6 +99,9 @@ mvp_registre_bapteme_mariage/
 │   │                                 droits du 10/09/2026 (§ 5) — le Visiteur peut écrire
 │   ├── migration_08_module_fils.sql
 │   │                               ← si la base existait AVANT le module Fils (§ 11 bis)
+│   ├── migration_09_reinitialisation_journal.sql
+│   │                               ← si la base existait AVANT la réinitialisation du
+│   │                                 journal réservée à un compte unique (§ 6)
 │   └── schema_sqlite.sql          ← documentation du schéma local
 │
 ├── app.py                         ← APPLICATION FLASK
@@ -135,8 +138,9 @@ mvp_registre_bapteme_mariage/
 > **Vous aviez déjà créé la base avant les photos, avant les rôles, avant
 > le journal d'audit, avant l'audit de sécurité du 25/08/2026 (§ 14), avant
 > le module Présences (§ 11), avant le classement Fils-ICM / Nouveaux, avant
-> la reclassification des droits (§ 5) du 10/09/2026, ou avant le module
-> Fils (§ 11 bis) ?**
+> la reclassification des droits (§ 5) du 10/09/2026, avant le module
+> Fils (§ 11 bis), ou avant la réinitialisation du journal réservée à un
+> compte unique (§ 6) ?**
 > Ne rejouez pas le script complet : exécutez, dans cet ordre,
 > `database/migration_01_photo.sql` puis `database/migration_02_roles.sql`
 > puis `database/migration_03_journal.sql` puis
@@ -144,7 +148,8 @@ mvp_registre_bapteme_mariage/
 > `database/migration_05_presences.sql` puis
 > `database/migration_06_categorisation_fils_icm_nouveaux.sql` puis
 > `database/migration_07_visiteur_ecriture.sql` puis
-> `database/migration_08_module_fils.sql` — chacun
+> `database/migration_08_module_fils.sql` puis
+> `database/migration_09_reinitialisation_journal.sql` — chacun
 > ajoute seulement ce qui manque, sans toucher à vos données. Une base créée
 > à partir du `schema_supabase.sql` actuel n'a besoin d'aucune de ces
 > migrations : tout est déjà dedans.
@@ -290,6 +295,33 @@ journal : il est alimenté automatiquement, jamais à la main.
 > journal ; sur la version en ligne, le trigger ne voit que la ligne
 > insérée et ne distingue pas cette origine — le journal reste complet
 > (qui, quoi, quand), seule cette étiquette n'a pas d'équivalent.
+
+### Réinitialisation du journal (compte unique)
+
+*Disponible uniquement sur la version en ligne (Supabase) — voir
+`database/schema_supabase.sql` § 15 / `database/migration_09_reinitialisation_journal.sql`.*
+
+Le journal reste immuable pour tout le monde (§ 14) : aucun compte ne peut
+modifier ou supprimer une entrée après coup, quel que soit son rôle. Une
+seule exception, volontairement étroite : le bouton **🗑 Réinitialiser le
+journal (tout effacer)**, en haut de la page Journal, n'apparaît que pour
+un unique compte désigné par son adresse e-mail (`lemoine_herve@outlook.fr`)
+et vide **définitivement** toutes les entrées existantes — action
+irréversible, sans confirmation supplémentaire au-delà de la boîte de
+dialogue du navigateur.
+
+Ce n'est pas une question de rôle (secrétaire/pasteur/visiteur), mais
+d'une personne précise : masquer le bouton pour les autres comptes n'est
+qu'un confort d'affichage, la vraie protection est dans la base — la
+fonction `reinitialiser_journal_audit()` (Postgres) revérifie l'adresse
+e-mail du compte connecté et refuse d'agir pour quiconque d'autre, même en
+appelant l'API directement. Pour changer le compte autorisé, un compte
+Supabase ayant accès au SQL Editor doit modifier l'adresse dans le corps
+de cette fonction.
+
+Pour ne pas rendre l'opération elle-même invisible dans le journal
+qu'elle vide, une unique ligne « Réinitialisation » est réécrite juste
+après la purge : qui, quand, et combien de lignes ont été effacées.
 
 ---
 
@@ -574,7 +606,7 @@ quotidien — c'est un durcissement invisible pour les utilisateurs.
 | Fonctions internes non exposées | Les fonctions utilisées uniquement en coulisse (calcul du journal, libellés) ne sont plus exécutables directement par un compte, même connecté |
 | Vue statistiques sous contrôle de rôle | `v_statistiques` respecte désormais les mêmes règles d'accès que le registre, au lieu d'hériter des droits élargis de son propriétaire technique |
 | Auto-promotion de rôle impossible | Un compte ne peut pas se donner lui-même un rôle plus élevé (ex. « visiteur » → « pasteur ») : bloqué à la fois par l'absence de droit d'écriture sur la table des rôles et par un déclencheur indépendant, testé en simulant volontairement une régression future (droit d'écriture ajouté par erreur) — le blocage tient quand même |
-| Journal d'audit rendu immuable | Une entrée du journal ne peut plus être modifiée ni supprimée après coup, par personne, une fois écrite |
+| Journal d'audit rendu immuable | Une entrée du journal ne peut plus être modifiée ni supprimée après coup, par personne, une fois écrite — à l'exception d'une réinitialisation complète, réservée à un unique compte désigné par son e-mail (voir § 6, « Réinitialisation du journal ») |
 
 Détail technique complet et raisonnement (y compris ce qui a été
 **volontairement laissé de côté**, et pourquoi) : voir l'en-tête de

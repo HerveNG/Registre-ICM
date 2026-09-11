@@ -428,8 +428,18 @@ h1.titre{margin:0 0 1rem;font-size:1.5rem;}
     <form class="barre-recherche" id="form-recherche-journal">
       <input type="search" id="recherche-journal" placeholder="Rechercher par nom de la fiche…">
       <button type="submit" class="bouton">Rechercher</button>
-      <button type="button" class="bouton bouton-discret" id="btn-reinit-journal">Réinitialiser</button>
+      <button type="button" class="bouton bouton-discret" id="btn-reinit-journal">Effacer la recherche</button>
     </form>
+
+    <!-- Réservé à un seul compte (peutReinitialiserJournal()) : voir
+         database/migration_09_reinitialisation_journal.sql. Masqué pour
+         tous les autres, et de toute façon refusé côté base si contourné. -->
+    <div class="barre-recherche" id="zone-reinitialiser-journal-complet" hidden>
+      <button type="button" class="bouton bouton-danger" id="btn-reinitialiser-journal-complet">
+        🗑 Réinitialiser le journal (tout effacer)
+      </button>
+      <span class="discret">Efface définitivement toutes les entrées actuelles du journal — action réservée, irréversible.</span>
+    </div>
 
     <div class="tableau-enveloppe">
       <table>
@@ -1453,9 +1463,10 @@ const etat = {
 // mêmes couleurs que la version Flask (etiquette-ok = vert, etiquette-erreur
 // = rouge, .etiquette seule = ambre, déjà utilisée pour "à compléter").
 const LIBELLES_ACTIONS_JOURNAL = {
-  creation:     { texte:"Création",     classe:"etiquette-ok" },
-  modification: { texte:"Modification", classe:"" },
-  suppression:  { texte:"Suppression",  classe:"etiquette-erreur" }
+  creation:         { texte:"Création",         classe:"etiquette-ok" },
+  modification:     { texte:"Modification",     classe:"" },
+  suppression:      { texte:"Suppression",      classe:"etiquette-erreur" },
+  reinitialisation: { texte:"Réinitialisation", classe:"etiquette-erreur" }
 };
 
 // role vaut 'secretaire', 'pasteur' ou 'visiteur' (table "profils" côté
@@ -1467,6 +1478,17 @@ const LIBELLES_ACTIONS_JOURNAL = {
 const LIBELLES_ROLES = { secretaire:"Secrétaire", pasteur:"Pasteur", visiteur:"Visiteur" };
 function peutEcrire(){ return etat.role === "secretaire" || etat.role === "pasteur" || etat.role === "visiteur"; }
 function peutSupprimer(){ return etat.role === "secretaire" || etat.role === "pasteur"; }
+
+// Réinitialisation complète du journal d'audit : pas une question de rôle
+// mais d'un compte précis (voir database/migration_09_reinitialisation_journal.sql,
+// § 15 de schema_supabase.sql). L'e-mail est vérifié à nouveau côté base
+// dans la fonction reinitialiser_journal_audit() — ce test ici ne fait
+// qu'afficher ou masquer le bouton, il ne protège rien à lui seul.
+const EMAIL_RESET_JOURNAL = "lemoine_herve@outlook.fr";
+function peutReinitialiserJournal(){
+  const email = (etat.session && etat.session.user && etat.session.user.email) || "";
+  return email.toLowerCase() === EMAIL_RESET_JOURNAL;
+}
 
 /* Stockage local : entouré de try/catch (navigation privée, fichier local…) */
 const stockage = {
@@ -1553,6 +1575,11 @@ function afficherVue(nom){
     const el = $(id);
     if (el) el.hidden = !connecte;
   });
+
+  // Réinitialisation complète du journal : réservée à un seul compte
+  // (peutReinitialiserJournal()), jamais à un rôle — voir plus haut.
+  const zoneReinitJournal = $("zone-reinitialiser-journal-complet");
+  if (zoneReinitJournal) zoneReinitJournal.hidden = !connecte || !peutReinitialiserJournal();
 
   effacerMessage();
 }
@@ -1957,7 +1984,7 @@ function dessinerJournal(){
 
   corps.innerHTML = etat.journal.lignes.map(entree=>{
     const action = LIBELLES_ACTIONS_JOURNAL[entree.action] || { texte:entree.action, classe:"" };
-    const carte = entree.action !== "suppression"
+    const carte = (entree.action !== "suppression" && entree.action !== "reinitialisation")
       ? `<button type="button" class="lien-carte-journal" data-action="voir-carte-journal"
           data-id="${echapper(entree.registre_id || "")}">${echapper(entree.nom_complet)}</button>`
       : echapper(entree.nom_complet);
@@ -1990,6 +2017,20 @@ function ouvrirJournal(q){
   etat.journal.page = 1;
   afficherVue("journal");
   chargerJournal();
+}
+
+/* Vide entièrement le journal, via la fonction RPC reinitialiser_journal_audit()
+   (security definer, § 15 de database/schema_supabase.sql) : c'est ELLE, pas
+   ce bouton, qui refuse l'opération à tout compte autre que celui autorisé —
+   peutReinitialiserJournal() ne fait que masquer le bouton pour les autres. */
+async function reinitialiserJournalComplet(){
+  if (!confirm("Réinitialiser définitivement le journal d'audit ? Toutes les "
+    + "entrées actuelles seront effacées, sans retour possible.")) return;
+  try{
+    const { donnees } = await api("rpc/reinitialiser_journal_audit", { method:"POST", body:{} });
+    message(`Journal d'audit réinitialisé (${donnees ?? 0} entrée(s) effacée(s)).`, "succes");
+    ouvrirJournal("");
+  }catch(e){ message(e.message, "erreur"); }
 }
 
 /* Affiche "Créée par … le … · Dernière modification par … le …" sous le
@@ -4685,6 +4726,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     chargerJournal();
   });
   $("btn-reinit-journal").addEventListener("click", ()=>ouvrirJournal(""));
+  $("btn-reinitialiser-journal-complet").addEventListener("click", reinitialiserJournalComplet);
   $("btn-precedent-journal").addEventListener("click", ()=>{ etat.journal.page--; chargerJournal(); });
   $("btn-suivant-journal").addEventListener("click",   ()=>{ etat.journal.page++; chargerJournal(); });
   $("corps-tableau-journal").addEventListener("click", async (e)=>{
