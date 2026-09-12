@@ -102,6 +102,9 @@ mvp_registre_bapteme_mariage/
 │   ├── migration_09_reinitialisation_journal.sql
 │   │                               ← si la base existait AVANT la réinitialisation du
 │   │                                 journal réservée à un compte unique (§ 6)
+│   ├── migration_10_prophete_famille.sql
+│   │                               ← si la base existait AVANT la rubrique Prophète/
+│   │                                 Famille du 14/09/2026 (§ 11)
 │   └── schema_sqlite.sql          ← documentation du schéma local
 │
 ├── app.py                         ← APPLICATION FLASK
@@ -139,8 +142,9 @@ mvp_registre_bapteme_mariage/
 > le journal d'audit, avant l'audit de sécurité du 25/08/2026 (§ 14), avant
 > le module Présences (§ 11), avant le classement Fils-ICM / Nouveaux, avant
 > la reclassification des droits (§ 5) du 10/09/2026, avant le module
-> Fils (§ 11 bis), ou avant la réinitialisation du journal réservée à un
-> compte unique (§ 6) ?**
+> Fils (§ 11 bis), avant la réinitialisation du journal réservée à un
+> compte unique (§ 6), ou avant la rubrique Prophète/Famille du 14/09/2026
+> (§ 11) ?**
 > Ne rejouez pas le script complet : exécutez, dans cet ordre,
 > `database/migration_01_photo.sql` puis `database/migration_02_roles.sql`
 > puis `database/migration_03_journal.sql` puis
@@ -149,7 +153,8 @@ mvp_registre_bapteme_mariage/
 > `database/migration_06_categorisation_fils_icm_nouveaux.sql` puis
 > `database/migration_07_visiteur_ecriture.sql` puis
 > `database/migration_08_module_fils.sql` puis
-> `database/migration_09_reinitialisation_journal.sql` — chacun
+> `database/migration_09_reinitialisation_journal.sql` puis
+> `database/migration_10_prophete_famille.sql` — chacun
 > ajoute seulement ce qui manque, sans toucher à vos données. Une base créée
 > à partir du `schema_supabase.sql` actuel n'a besoin d'aucune de ces
 > migrations : tout est déjà dedans.
@@ -431,22 +436,27 @@ l'en-tête (**📊 Présences**), pour suivre la fréquentation des cultes :
 
 - **Enregistrer une présence** : date (le jour de la semaine est détecté
   automatiquement), type de culte, effectifs par catégorie (compteurs +/-),
-  avec calcul des totaux Hommes / Femmes / Fils-ICM / Nouveaux et du total
-  général en temps réel avant même l'enregistrement. Classement depuis le
-  10/09/2026 : **Hommes** et **Femmes** sont segmentés Enfants/Adolescent·e·s/
-  Adultes ; **Fils-ICM** (le groupe de disciples) et **Nouveaux** (une
-  personne venue pour la première fois) sont segmentés Hommes/Femmes ×
+  avec calcul des totaux Fidèles (Hommes + Femmes) / Fils-ICM / Nouveaux
+  fidèles / Prophète-Famille et du total général en temps réel avant même
+  l'enregistrement. Classement depuis le 10/09/2026 : **Hommes** et
+  **Femmes** sont segmentés Enfants/Adolescent·e·s/Adultes, réunis dans un
+  même encadré « 🙏 Fidèles » à la saisie (les deux totaux restent distincts
+  en base) ; **Fils-ICM** (le groupe de disciples) et **Nouveaux fidèles**
+  (une personne venue pour la première fois) sont segmentés Hommes/Femmes ×
   Enfants/Adultes (sans tranche adolescent·e, moins pertinente pour ces
   deux groupes) — chaque personne présente n'est comptée qu'une seule fois,
   dans le groupe et la tranche qui la décrivent le mieux ce jour-là.
+  **Prophète/Famille** (depuis le 14/09/2026) est un simple compteur global,
+  sans détail par âge ni par sexe.
 - **Tableau de bord** : dernier culte enregistré, évolution par rapport au
   culte précédent de même type, derniers cultes.
 - **Historique** : recherche, filtre par type de culte et par période, tri,
   pagination, consultation/modification/suppression (avec confirmation).
 - **Statistiques** : filtres par période (aujourd'hui, semaine, mois,
   trimestre, année, personnalisée), répartition Hommes/Femmes/Fils-ICM/
-  Nouveaux, évolution, comparaison entre types de culte, analyse par jour de
-  la semaine — graphiques en CSS pur (camembert, barres), sans bibliothèque
+  Nouveaux fidèles/Prophète-Famille, évolution, comparaison entre types de
+  culte, analyse par jour de la semaine — graphiques en CSS pur (camembert,
+  barres), sans bibliothèque
   externe, cohérent avec la CSP du reste de l'application (§14).
 - **Paramètres** (secrétariat/pasteur) : types de culte et catégories
   entièrement configurables — nom, tranche d'âge, ordre d'affichage,

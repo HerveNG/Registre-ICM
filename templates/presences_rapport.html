@@ -131,7 +131,7 @@
 
   <h2>Détail par culte</h2>
   <table>
-    <thead><tr><th>Date</th><th>Jour</th><th>Type</th><th class="numerique">Hommes</th><th class="numerique">Femmes</th><th class="numerique">Fils-ICM</th><th class="numerique">Nouveaux</th><th class="numerique">Total</th></tr></thead>
+    <thead><tr><th>Date</th><th>Jour</th><th>Type</th><th class="numerique">Hommes</th><th class="numerique">Femmes</th><th class="numerique">Fils-ICM</th><th class="numerique">Nouveaux fidèles</th><th class="numerique">Prophète/Famille</th><th class="numerique">Total</th></tr></thead>
     <tbody>
       {% for r in enregistrements %}
       <tr>
@@ -139,6 +139,7 @@
         <td>{{ r.service_type.nom if r.service_type else '—' }}</td>
         <td class="numerique">{{ r.total_hommes }}</td><td class="numerique">{{ r.total_femmes }}</td>
         <td class="numerique">{{ r.total_fils_icm }}</td><td class="numerique">{{ r.total_nouveaux }}</td>
+        <td class="numerique">{{ r.total_prophete }}</td>
         <td class="numerique"><strong>{{ r.total_general }}</strong></td>
       </tr>
       {% endfor %}

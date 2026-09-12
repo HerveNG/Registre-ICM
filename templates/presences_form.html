@@ -48,25 +48,45 @@
     {% endif %}
   </fieldset>
 
-  {% set _libelles_groupes = {'hommes': ('Hommes', '👨'), 'femmes': ('Femmes', '👩'),
-                              'fils_icm': ('Fils-ICM', '🤝'), 'nouveaux': ('Nouveaux', '🆕'),
+  {% macro rendre_compteur(cat, groupe, prefixe='') %}
+  <div class="compteur">
+    <span class="compteur-nom">{{ prefixe }}{{ cat.nom }}{% if cat.libelle_age %}<small>{{ cat.libelle_age }}</small>{% endif %}</span>
+    <span class="compteur-controles">
+      <button type="button" class="compteur-bouton" data-delta="-1" data-cible="cat-{{ cat.id }}" aria-label="Diminuer">−</button>
+      <input type="number" min="0" step="1" name="cat_{{ cat.id }}" id="cat-{{ cat.id }}"
+             class="compteur-valeur compteur-groupe" data-groupe="{{ groupe }}"
+             value="{{ val('cat_' ~ cat.id, 0) }}">
+      <button type="button" class="compteur-bouton" data-delta="1" data-cible="cat-{{ cat.id }}" aria-label="Augmenter">+</button>
+    </span>
+  </div>
+  {% endmacro %}
+
+  {% set _libelles_groupes = {'fils_icm': ('Fils-ICM', '🤝'), 'nouveaux': ('Nouveaux fidèles', '🆕'),
+                              'prophete': ('Prophète/Famille', '🙌'),
                               'enfants': ('Enfants (historique)', '🧒')} %}
-  {% for groupe, categories_du_groupe in par_groupe.items() %}
+
+  <fieldset>
+    <legend>🙏 Fidèles</legend>
+    <div class="groupe-presence" data-groupe="hommes">
+      {% for cat in par_groupe.get('hommes', []) %}{{ rendre_compteur(cat, 'hommes', 'Hommes — ') }}
+      {% else %}<p class="discret">Aucune catégorie active pour ce groupe — voir <a href="{{ url_for('presences_parametres') }}">Paramètres</a>.</p>{% endfor %}
+    </div>
+    <div class="groupe-presence" data-groupe="femmes">
+      {% for cat in par_groupe.get('femmes', []) %}{{ rendre_compteur(cat, 'femmes', 'Femmes — ') }}
+      {% else %}<p class="discret">Aucune catégorie active pour ce groupe — voir <a href="{{ url_for('presences_parametres') }}">Paramètres</a>.</p>{% endfor %}
+    </div>
+    <div class="groupe-presence-total">
+      <span>Total Fidèles</span>
+      <span id="total-fideles">0</span>
+    </div>
+  </fieldset>
+
+  {% for groupe, categories_du_groupe in par_groupe.items() if groupe not in ('hommes', 'femmes') %}
   {% set libelle, emoji = _libelles_groupes.get(groupe, (groupe|capitalize, '')) %}
   <fieldset>
     <legend>{{ emoji }} {{ libelle }}</legend>
     <div class="groupe-presence" data-groupe="{{ groupe }}">
-      {% for cat in categories_du_groupe %}
-      <div class="compteur">
-        <span class="compteur-nom">{{ cat.nom }}{% if cat.libelle_age %}<small>{{ cat.libelle_age }}</small>{% endif %}</span>
-        <span class="compteur-controles">
-          <button type="button" class="compteur-bouton" data-delta="-1" data-cible="cat-{{ cat.id }}" aria-label="Diminuer">−</button>
-          <input type="number" min="0" step="1" name="cat_{{ cat.id }}" id="cat-{{ cat.id }}"
-                 class="compteur-valeur compteur-groupe" data-groupe="{{ groupe }}"
-                 value="{{ val('cat_' ~ cat.id, 0) }}">
-          <button type="button" class="compteur-bouton" data-delta="1" data-cible="cat-{{ cat.id }}" aria-label="Augmenter">+</button>
-        </span>
-      </div>
+      {% for cat in categories_du_groupe %}{{ rendre_compteur(cat, groupe) }}
       {% else %}
       <p class="discret">Aucune catégorie active pour ce groupe — voir <a href="{{ url_for('presences_parametres') }}">Paramètres</a>.</p>
       {% endfor %}
@@ -115,15 +135,22 @@
     document.querySelectorAll(".groupe-presence").forEach(function(bloc){
       groupes.push(bloc.dataset.groupe);
     });
+    var sommesParGroupe = {};
     groupes.forEach(function(groupe){
       var somme = 0;
       document.querySelectorAll('.compteur-groupe[data-groupe="' + groupe + '"]').forEach(function(champ){
         somme += parseInt(champ.value, 10) || 0;
       });
+      sommesParGroupe[groupe] = somme;
       var cible = document.getElementById("total-" + groupe);
       if (cible) cible.textContent = somme;
       totalGeneral += somme;
     });
+    // « Fidèles » regroupe hommes + femmes à l'affichage uniquement (voir le
+    // gabarit) — les totaux par sexe restent calculés séparément ci-dessus,
+    // sans être doublement comptés dans le total général.
+    var totalFideles = document.getElementById("total-fideles");
+    if (totalFideles) totalFideles.textContent = (sommesParGroupe.hommes || 0) + (sommesParGroupe.femmes || 0);
     document.getElementById("total-general").textContent = totalGeneral;
   }
 

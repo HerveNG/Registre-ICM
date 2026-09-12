@@ -718,7 +718,7 @@ create table if not exists public.attendance_category (
     -- dans la contrainte uniquement pour que les catégories désactivées
     -- d'une base créée avant ce changement restent valides et lisibles.
     groupe           text not null
-        check (groupe in ('hommes', 'femmes', 'fils_icm', 'nouveaux', 'enfants')),
+        check (groupe in ('hommes', 'femmes', 'fils_icm', 'nouveaux', 'prophete', 'enfants')),
     age_min          integer,
     age_max          integer,
     ordre_affichage  integer not null default 0,
@@ -726,7 +726,7 @@ create table if not exists public.attendance_category (
 );
 
 comment on table public.attendance_category is
-  'Catégories au sein d''un groupe (hommes/femmes/fils_icm/nouveaux — enfants : legacy) — configurable, jamais supprimée.';
+  'Catégories au sein d''un groupe (hommes/femmes/fils_icm/nouveaux/prophete — enfants : legacy) — configurable, jamais supprimée.';
 
 create table if not exists public.attendance_record (
     id               uuid primary key default gen_random_uuid(),
@@ -739,6 +739,7 @@ create table if not exists public.attendance_record (
     total_femmes     integer not null default 0,
     total_fils_icm   integer not null default 0,
     total_nouveaux   integer not null default 0,
+    total_prophete   integer not null default 0,
     -- Conservée pour les présences enregistrées avant la reclassification
     -- (enfants faisait alors partie du groupe) — jamais renseignée pour une
     -- nouvelle fiche, où les enfants sont comptés dans total_hommes/
@@ -760,6 +761,7 @@ create table if not exists public.attendance_record (
     constraint attendance_totaux_non_negatifs check (
         total_hommes >= 0 and total_femmes >= 0
         and total_fils_icm >= 0 and total_nouveaux >= 0
+        and total_prophete >= 0
         and total_enfants >= 0 and total_general >= 0
     ),
     constraint attendance_lieu_longueur_raisonnable
@@ -873,7 +875,8 @@ from (values
     ('Hommes — Enfants',      'nouveaux', 3, 17,   0),
     ('Hommes — Adultes',      'nouveaux', 18, null, 1),
     ('Femmes — Enfants',      'nouveaux', 3, 17,   2),
-    ('Femmes — Adultes',      'nouveaux', 18, null, 3)
+    ('Femmes — Adultes',      'nouveaux', 18, null, 3),
+    ('Prophète/Famille',      'prophete', null, null, 0)
 ) as v(nom, groupe, age_min, age_max, ordre)
 where not exists (select 1 from public.attendance_category);
 

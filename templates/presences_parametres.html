@@ -48,7 +48,8 @@
 </div>
 
 {% set _libelles_groupes = {'hommes': ('Hommes', '👨'), 'femmes': ('Femmes', '👩'),
-                            'fils_icm': ('Fils-ICM', '🤝'), 'nouveaux': ('Nouveaux', '🆕'),
+                            'fils_icm': ('Fils-ICM', '🤝'), 'nouveaux': ('Nouveaux fidèles', '🆕'),
+                            'prophete': ('Prophète/Famille', '🙌'),
                             'enfants': ('Enfants (groupe retiré — historique uniquement)', '🧒')} %}
 {% for groupe, categories_du_groupe in par_groupe.items() %}
 {% set libelle, emoji = _libelles_groupes.get(groupe, (groupe|capitalize, '')) %}
@@ -82,7 +83,7 @@
     </p>
   </form>
 
-  {% if groupe in ['hommes', 'femmes', 'fils_icm', 'nouveaux'] %}
+  {% if groupe in ['hommes', 'femmes', 'fils_icm', 'nouveaux', 'prophete'] %}
   <form method="post" class="grille" style="margin-top:1rem; align-items:end;">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="action" value="ajouter_categorie">

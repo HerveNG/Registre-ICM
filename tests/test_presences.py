@@ -72,8 +72,8 @@ def test_types_de_culte_et_categories_semes_par_defaut(icm_app):
         assert "Culte du mercredi" in noms_types
 
         categories = icm_app.AttendanceCategory.query.all()
-        assert len(categories) == 14
-        assert {c.groupe for c in categories} == {"hommes", "femmes", "fils_icm", "nouveaux"}
+        assert len(categories) == 15
+        assert {c.groupe for c in categories} == {"hommes", "femmes", "fils_icm", "nouveaux", "prophete"}
 
 
 # ------------------------------------------------------------------
@@ -90,13 +90,14 @@ def test_enregistrer_une_presence_calcule_les_totaux(client_secretaire, icm_app)
         assert record.total_femmes == 120
         assert record.total_fils_icm == 28
         assert record.total_nouveaux == 5
+        assert record.total_prophete == 0   # pas renseigné par _donnees_exemple
         assert record.total_enfants == 0   # legacy, jamais renseigné pour une fiche neuve
         assert record.total_general == 238
         assert record.created_by == "test_secretaire"
         assert record.updated_by is None
         assert record.jour_semaine == "Dimanche"
         # Une ligne AttendanceValue par catégorie active, même à 0.
-        assert len(record.valeurs) == 14
+        assert len(record.valeurs) == 15
 
 
 def test_effectif_negatif_refuse(client_secretaire, icm_app):
@@ -566,7 +567,8 @@ def test_export_csv_contient_les_colonnes_et_les_totaux(client_secretaire, icm_a
     contenu = reponse.data.decode("utf-8-sig")
     assert "Total Général" in contenu
     assert "Total Fils-ICM" in contenu
-    assert "Total Nouveaux" in contenu
+    assert "Total Nouveaux fidèles" in contenu
+    assert "Total Prophète/Famille" in contenu
     assert "238" in contenu
 
 

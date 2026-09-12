@@ -569,7 +569,7 @@ h1.titre{margin:0 0 1rem;font-size:1.5rem;}
       <table>
         <thead><tr>
           <th>Date</th><th>Jour</th><th>Type de culte</th>
-          <th>Hommes</th><th>Femmes</th><th>Fils-ICM</th><th>Nouveaux</th><th>Total</th><th>Actions</th>
+          <th>Hommes</th><th>Femmes</th><th>Fils-ICM</th><th>Nouveaux fidèles</th><th>Prophète/Famille</th><th>Total</th><th>Actions</th>
         </tr></thead>
         <tbody id="corps-tableau-presences"></tbody>
       </table>
@@ -2613,23 +2613,26 @@ function telechargerModeleImport(){
    +/-, camembert et barres en CSS pur — aucune bibliothèque de graphiques).
    ========================================================== */
 const GROUPE_HOMMES = "hommes", GROUPE_FEMMES = "femmes",
-      GROUPE_FILS_ICM = "fils_icm", GROUPE_NOUVEAUX = "nouveaux";
+      GROUPE_FILS_ICM = "fils_icm", GROUPE_NOUVEAUX = "nouveaux",
+      GROUPE_PROPHETE = "prophete";
 // "enfants" n'est plus un groupe proposé à la saisie/configuration depuis la
 // reclassification du 10/09/2026 (enfants/adolescents/adultes sont désormais
 // des catégories au sein de « hommes » et « femmes ») — conservé uniquement
 // pour l'affichage des présences enregistrées avant ce changement.
 const GROUPE_ENFANTS = "enfants";
-const GROUPES_P = [GROUPE_HOMMES, GROUPE_FEMMES, GROUPE_FILS_ICM, GROUPE_NOUVEAUX];
+const GROUPES_P = [GROUPE_HOMMES, GROUPE_FEMMES, GROUPE_FILS_ICM, GROUPE_NOUVEAUX, GROUPE_PROPHETE];
 const LIBELLES_GROUPES_P = {
-  hommes:"Hommes", femmes:"Femmes", fils_icm:"Fils-ICM", nouveaux:"Nouveaux",
+  hommes:"Hommes", femmes:"Femmes", fils_icm:"Fils-ICM", nouveaux:"Nouveaux fidèles",
+  prophete:"Prophète/Famille",
   enfants:"Enfants",   // legacy
 };
 const EMOJIS_GROUPES_P   = {
-  hommes:"👨", femmes:"👩", fils_icm:"🤝", nouveaux:"🆕",
+  hommes:"👨", femmes:"👩", fils_icm:"🤝", nouveaux:"🆕", prophete:"🙌",
   enfants:"🧒",   // legacy
 };
 const COULEURS_GROUPES_P = {
   hommes:"var(--encre)", femmes:"var(--or)", fils_icm:"var(--succes)", nouveaux:"var(--or-clair)",
+  prophete:"#6b4fa0",
   enfants:"var(--encre-douce)",   // legacy
 };
 const JOURS_SEMAINE_P = ["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
@@ -2727,18 +2730,20 @@ async function ouvrirPresencesDashboard(){
         <div class="stat"><b>${dernier.total_hommes}</b><span>👨 Hommes</span></div>
         <div class="stat"><b>${dernier.total_femmes}</b><span>👩 Femmes</span></div>
         <div class="stat"><b>${dernier.total_fils_icm}</b><span>🤝 Fils-ICM</span></div>
-        <div class="stat"><b>${dernier.total_nouveaux}</b><span>🆕 Nouveaux</span></div>
+        <div class="stat"><b>${dernier.total_nouveaux}</b><span>🆕 Nouveaux fidèles</span></div>
+        <div class="stat"><b>${dernier.total_prophete||0}</b><span>🙌 Prophète/Famille</span></div>
       </div>
       <div class="bloc-stat">
         <h2>Derniers cultes enregistrés</h2>
         <div class="tableau-enveloppe"><table>
-          <thead><tr><th>Date</th><th>Jour</th><th>Type</th><th>Hommes</th><th>Femmes</th><th>Fils-ICM</th><th>Nouveaux</th><th>Total</th></tr></thead>
+          <thead><tr><th>Date</th><th>Jour</th><th>Type</th><th>Hommes</th><th>Femmes</th><th>Fils-ICM</th><th>Nouveaux fidèles</th><th>Prophète/Famille</th><th>Total</th></tr></thead>
           <tbody>${lignes.map(r=>`
             <tr>
               <td><button type="button" class="lien-carte-journal" onclick="ouvrirPresencesDetail('${r.id}')">${dateFr(r.date_culte)}</button></td>
               <td>${jourSemainePresence(r.date_culte)}</td>
               <td>${echapper((r.service_type && r.service_type.nom) || "—")}</td>
               <td>${r.total_hommes}</td><td>${r.total_femmes}</td><td>${r.total_fils_icm}</td><td>${r.total_nouveaux}</td>
+              <td>${r.total_prophete||0}</td>
               <td><strong>${r.total_general}</strong></td>
             </tr>`).join("")}</tbody>
         </table></div>
@@ -2751,29 +2756,52 @@ async function ouvrirPresencesDashboard(){
    --------------------------------------------------------------- */
 function construireGroupesFormulairePresence(parGroupe, valeurs){
   valeurs = valeurs || {};
-  $("presence-groupes").innerHTML = Object.keys(parGroupe).map(groupe=>`
+  const rendreCompteur = (cat, groupe, prefixe)=>{
+    const age = cat.age_min == null && cat.age_max == null ? "" :
+      cat.age_max == null ? `${cat.age_min} ans et plus` :
+      cat.age_min == null ? `jusqu'à ${cat.age_max} ans` :
+      `${cat.age_min}–${cat.age_max} ans`;
+    const val = valeurs[cat.id] || 0;
+    return `<div class="compteur">
+      <span class="compteur-nom">${prefixe || ""}${echapper(cat.nom)}${age ? `<small>${echapper(age)}</small>` : ""}</span>
+      <span class="compteur-controles">
+        <button type="button" class="compteur-bouton" data-delta="-1" data-cible="cat-${cat.id}">−</button>
+        <input type="number" min="0" step="1" class="compteur-valeur compteur-groupe"
+          data-groupe="${groupe}" id="cat-${cat.id}" value="${val}">
+        <button type="button" class="compteur-bouton" data-delta="1" data-cible="cat-${cat.id}">+</button>
+      </span>
+    </div>`;
+  };
+
+  // « Fidèles » regroupe Hommes + Femmes dans un seul encadré à l'affichage
+  // (14/09/2026) — les deux groupes restent distincts en base (data-groupe
+  // conservé à "hommes"/"femmes" sur chaque compteur) : voir
+  // recalculerTotauxPresenceForm() pour le total combiné.
+  const fidelesHtml = `
+    <fieldset>
+      <legend>🙏 Fidèles</legend>
+      <div class="groupe-presence" data-groupe="hommes">
+        ${(parGroupe.hommes || []).length ? (parGroupe.hommes || []).map(cat=>rendreCompteur(cat, "hommes", "Hommes — ")).join("")
+          : `<p class="discret">Aucune catégorie active pour ce groupe — voir Paramètres.</p>`}
+      </div>
+      <div class="groupe-presence" data-groupe="femmes">
+        ${(parGroupe.femmes || []).length ? (parGroupe.femmes || []).map(cat=>rendreCompteur(cat, "femmes", "Femmes — ")).join("")
+          : `<p class="discret">Aucune catégorie active pour ce groupe — voir Paramètres.</p>`}
+      </div>
+      <div class="groupe-presence-total"><span>Total Fidèles</span><span id="total-fideles">0</span></div>
+    </fieldset>`;
+
+  const autresHtml = Object.keys(parGroupe).filter(g=>g!=="hommes" && g!=="femmes").map(groupe=>`
     <fieldset>
       <legend>${EMOJIS_GROUPES_P[groupe]} ${LIBELLES_GROUPES_P[groupe]}</legend>
       <div class="groupe-presence" data-groupe="${groupe}">
-        ${parGroupe[groupe].length ? parGroupe[groupe].map(cat=>{
-          const age = cat.age_min == null && cat.age_max == null ? "" :
-            cat.age_max == null ? `${cat.age_min} ans et plus` :
-            cat.age_min == null ? `jusqu'à ${cat.age_max} ans` :
-            `${cat.age_min}–${cat.age_max} ans`;
-          const val = valeurs[cat.id] || 0;
-          return `<div class="compteur">
-            <span class="compteur-nom">${echapper(cat.nom)}${age ? `<small>${echapper(age)}</small>` : ""}</span>
-            <span class="compteur-controles">
-              <button type="button" class="compteur-bouton" data-delta="-1" data-cible="cat-${cat.id}">−</button>
-              <input type="number" min="0" step="1" class="compteur-valeur compteur-groupe"
-                data-groupe="${groupe}" id="cat-${cat.id}" value="${val}">
-              <button type="button" class="compteur-bouton" data-delta="1" data-cible="cat-${cat.id}">+</button>
-            </span>
-          </div>`;
-        }).join("") : `<p class="discret">Aucune catégorie active pour ce groupe — voir Paramètres.</p>`}
+        ${parGroupe[groupe].length ? parGroupe[groupe].map(cat=>rendreCompteur(cat, groupe)).join("")
+          : `<p class="discret">Aucune catégorie active pour ce groupe — voir Paramètres.</p>`}
         <div class="groupe-presence-total"><span>Total ${LIBELLES_GROUPES_P[groupe]}</span><span id="total-${groupe}">0</span></div>
       </div>
     </fieldset>`).join("");
+
+  $("presence-groupes").innerHTML = fidelesHtml + autresHtml;
 
   $("presence-groupes").querySelectorAll(".compteur-bouton").forEach(bouton=>{
     bouton.addEventListener("click", ()=>{
@@ -2798,15 +2826,22 @@ function recalculerTotauxPresenceForm(){
   // groupe historique (enfants).
   let totalGeneral = 0;
   const groupes = Array.from(document.querySelectorAll(".groupe-presence")).map(el=>el.dataset.groupe);
+  const sommesParGroupe = {};
   groupes.forEach(groupe=>{
     let somme = 0;
     document.querySelectorAll(`.compteur-groupe[data-groupe="${groupe}"]`).forEach(champ=>{
       somme += parseInt(champ.value, 10) || 0;
     });
+    sommesParGroupe[groupe] = somme;
     const cible = $("total-" + groupe);
     if (cible) cible.textContent = somme;
     totalGeneral += somme;
   });
+  // « Fidèles » regroupe hommes + femmes à l'affichage uniquement (voir
+  // construireGroupesFormulairePresence) — pas de double comptage : ce total
+  // n'est pas ré-ajouté à totalGeneral, déjà incrémenté ci-dessus.
+  const totalFideles = $("total-fideles");
+  if (totalFideles) totalFideles.textContent = (sommesParGroupe.hommes || 0) + (sommesParGroupe.femmes || 0);
   $("presence-total-general").textContent = totalGeneral;
 }
 
@@ -2906,7 +2941,7 @@ async function soumettrePresenceFormulaire(evt){
     // reclassification peut encore afficher une catégorie désactivée de ce
     // groupe (voir categoriesParGroupe) — sans cette clé, son enregistrement
     // perdrait silencieusement cette valeur du total_general.
-    const totaux = { hommes:0, femmes:0, fils_icm:0, nouveaux:0, enfants:0 };
+    const totaux = { hommes:0, femmes:0, fils_icm:0, nouveaux:0, prophete:0, enfants:0 };
     const toutesCategories = [...etat.presences.categories];
     document.querySelectorAll("#presence-groupes .compteur-valeur").forEach(champ=>{
       const catId = champ.id.replace(/^cat-/, "");
@@ -2918,13 +2953,14 @@ async function soumettrePresenceFormulaire(evt){
       totaux[cat.groupe] = (totaux[cat.groupe] || 0) + (valeursParCategorie[catId] || 0);
     });
     const totalGeneral = totaux.hommes + totaux.femmes + totaux.fils_icm
-      + totaux.nouveaux + totaux.enfants;
+      + totaux.nouveaux + totaux.prophete + totaux.enfants;
 
     const donnees = {
       date_culte: dateCulte, service_type_id: serviceTypeId,
       lieu: lieu || null, notes: notes || null,
       total_hommes: totaux.hommes, total_femmes: totaux.femmes,
       total_fils_icm: totaux.fils_icm, total_nouveaux: totaux.nouveaux,
+      total_prophete: totaux.prophete,
       total_enfants: totaux.enfants, total_general: totalGeneral,
     };
 
@@ -3099,6 +3135,7 @@ function dessinerHistoriquePresences(lignes, total){
       <td>${dateFr(r.date_culte)}</td><td>${jourSemainePresence(r.date_culte)}</td>
       <td>${echapper((r.service_type && r.service_type.nom) || "—")}</td>
       <td>${r.total_hommes}</td><td>${r.total_femmes}</td><td>${r.total_fils_icm}</td><td>${r.total_nouveaux}</td>
+      <td>${r.total_prophete||0}</td>
       <td><strong>${r.total_general}</strong></td>
       <td class="col-actions">
         <button type="button" class="bouton bouton-petit" onclick="ouvrirPresencesDetail('${r.id}')">👁 Voir</button>
@@ -3142,7 +3179,8 @@ async function exporterPresencesCsv(){
 
     const entetes = ["Date","Jour","Type de culte","Lieu"]
       .concat(categories.map(c=>c.nom))
-      .concat(["Total Hommes","Total Femmes","Total Fils-ICM","Total Nouveaux","Total Général","Notes"]);
+      .concat(["Total Hommes","Total Femmes","Total Fils-ICM","Total Nouveaux fidèles",
+               "Total Prophète/Famille","Total Général","Notes"]);
     const csvLignes = [entetes.map(celluleCsv).join(";")];
     lignes.forEach(r=>{
       const v = valeursParRecord[r.id] || {};
@@ -3150,7 +3188,7 @@ async function exporterPresencesCsv(){
         (r.service_type && r.service_type.nom) || "", r.lieu || ""]
         .concat(categories.map(c=>v[c.id] || 0))
         .concat([r.total_hommes, r.total_femmes, r.total_fils_icm, r.total_nouveaux,
-                 r.total_general, r.notes || ""]);
+                 r.total_prophete||0, r.total_general, r.notes || ""]);
       csvLignes.push(ligne.map(celluleCsv).join(";"));
     });
 
@@ -3243,6 +3281,7 @@ async function calculerStatistiquesPeriodePresence(debut, fin){
     femmes: enregistrements.reduce((s,r)=>s+r.total_femmes,0),
     fils_icm: enregistrements.reduce((s,r)=>s+(r.total_fils_icm||0),0),
     nouveaux: enregistrements.reduce((s,r)=>s+(r.total_nouveaux||0),0),
+    prophete: enregistrements.reduce((s,r)=>s+(r.total_prophete||0),0),
     // Legacy : présent uniquement si la période couvre des fiches
     // enregistrées avant la reclassification (voir GROUPE_ENFANTS).
     enfants: enregistrements.reduce((s,r)=>s+(r.total_enfants||0),0),
@@ -3399,7 +3438,7 @@ function dessinerStatistiquesPresences(zone, stats, analyses){
       <div class="bloc-stat"><h2>🔎 Ce que disent les chiffres</h2>
         <ul style="margin:0;padding-left:1.2rem;display:grid;gap:.5rem;">
           ${analyses.map(a=>`<li>${a}</li>`).join("")}</ul></div>` : ""}
-    <div class="bloc-stat"><h2>Répartition Hommes / Femmes / Fils-ICM / Nouveaux</h2>${camembertHtml(repartition)}</div>
+    <div class="bloc-stat"><h2>Répartition Hommes / Femmes / Fils-ICM / Nouveaux fidèles / Prophète-Famille</h2>${camembertHtml(repartition)}</div>
     <div class="bloc-stat"><h2>Évolution des présences${evolution.length===20?` <small class="discret">(20 derniers cultes)</small>`:""}</h2>
       ${barresHtml(evolution.map(e=>({...e, dateFr: dateFr(e.date)})), "dateFr", "total", maxEvolution)}</div>
     <div class="bloc-stat"><h2>Comparaison des cultes</h2>
@@ -3440,7 +3479,8 @@ async function ouvrirPresencesComparaison(aDebut, aFin, bDebut, bFin){
     const indicateurs = [
       comparer("total","Présence totale"), comparer("moyenne","Moyenne par culte"),
       comparer("hommes","Hommes"), comparer("femmes","Femmes"),
-      comparer("fils_icm","Fils-ICM"), comparer("nouveaux","Nouveaux"),
+      comparer("fils_icm","Fils-ICM"), comparer("nouveaux","Nouveaux fidèles"),
+      comparer("prophete","Prophète/Famille"),
     ];
     zone.innerHTML = `
       <div class="bloc-stat"><div class="tableau-enveloppe"><table>
@@ -3526,10 +3566,11 @@ async function genererRapportPresences(periode, debutBrut, finBrut){
   </tbody></table>
   ${analyses.length ? `<h2>🔎 Ce que disent les chiffres</h2><ul class="analyses">${analyses.map(a=>`<li>${a}</li>`).join("")}</ul>` : ""}
   <h2>Détail par culte</h2>
-  <table><thead><tr><th>Date</th><th>Jour</th><th>Type</th><th class="num">Hommes</th><th class="num">Femmes</th><th class="num">Fils-ICM</th><th class="num">Nouveaux</th><th class="num">Total</th></tr></thead><tbody>
+  <table><thead><tr><th>Date</th><th>Jour</th><th>Type</th><th class="num">Hommes</th><th class="num">Femmes</th><th class="num">Fils-ICM</th><th class="num">Nouveaux fidèles</th><th class="num">Prophète/Famille</th><th class="num">Total</th></tr></thead><tbody>
     ${stats.enregistrements.map(r=>`<tr><td>${dateFr(r.date_culte)}</td><td>${jourSemainePresence(r.date_culte)}</td>
       <td>${echapper((r.service_type&&r.service_type.nom)||"—")}</td><td class="num">${r.total_hommes}</td>
       <td class="num">${r.total_femmes}</td><td class="num">${r.total_fils_icm}</td><td class="num">${r.total_nouveaux}</td>
+      <td class="num">${r.total_prophete||0}</td>
       <td class="num"><strong>${r.total_general}</strong></td></tr>`).join("")}
   </tbody></table>`}
 </div></body></html>`;

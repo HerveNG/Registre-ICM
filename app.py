@@ -619,8 +619,9 @@ JOURS_SEMAINE = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "D
 GROUPE_HOMMES = "hommes"
 GROUPE_FEMMES = "femmes"
 GROUPE_FILS_ICM = "fils_icm"     # groupe de disciples « Fils-ICM » (hommes et femmes)
-GROUPE_NOUVEAUX = "nouveaux"     # personnes venues pour la première fois à l'église
-GROUPES = [GROUPE_HOMMES, GROUPE_FEMMES, GROUPE_FILS_ICM, GROUPE_NOUVEAUX]
+GROUPE_NOUVEAUX = "nouveaux"     # personnes venues pour la première fois à l'église (« Nouveaux fidèles »)
+GROUPE_PROPHETE = "prophete"     # rubrique « Prophète/Famille » (14/09/2026) — comptage global, sans détail par âge/sexe
+GROUPES = [GROUPE_HOMMES, GROUPE_FEMMES, GROUPE_FILS_ICM, GROUPE_NOUVEAUX, GROUPE_PROPHETE]
 
 # "enfants" n'est plus un groupe proposé à la saisie ou à la configuration
 # depuis la reclassification du 10/09/2026 (enfants/adolescents/adultes sont
@@ -632,7 +633,8 @@ GROUPE_ENFANTS = "enfants"
 
 LIBELLES_GROUPES = {
     GROUPE_HOMMES: "Hommes", GROUPE_FEMMES: "Femmes",
-    GROUPE_FILS_ICM: "Fils-ICM", GROUPE_NOUVEAUX: "Nouveaux",
+    GROUPE_FILS_ICM: "Fils-ICM", GROUPE_NOUVEAUX: "Nouveaux fidèles",
+    GROUPE_PROPHETE: "Prophète/Famille",
     GROUPE_ENFANTS: "Enfants",   # legacy — voir ci-dessus
 }
 # Couleurs du camembert de répartition (presences_statistiques.html) — les
@@ -640,6 +642,7 @@ LIBELLES_GROUPES = {
 COULEURS_GROUPES = {
     GROUPE_HOMMES: "var(--encre)", GROUPE_FEMMES: "var(--or)",
     GROUPE_FILS_ICM: "var(--succes)", GROUPE_NOUVEAUX: "var(--or-clair)",
+    GROUPE_PROPHETE: "#6b4fa0",
     GROUPE_ENFANTS: "var(--encre-douce)",   # legacy
 }
 
@@ -668,8 +671,8 @@ class ServiceType(db.Model):
 
 
 class AttendanceCategory(db.Model):
-    """Catégorie au sein d'un des groupes (hommes/femmes/fils_icm/nouveaux
-    — « enfants » n'existe plus que sur d'anciennes catégories désactivées,
+    """Catégorie au sein d'un des groupes (hommes/femmes/fils_icm/nouveaux/
+    prophete — « enfants » n'existe plus que sur d'anciennes catégories désactivées,
     voir GROUPE_ENFANTS). age_min/age_max sont indicatifs — une aide à la
     saisie et à la configuration, pas une contrainte vérifiée contre une
     date de naissance individuelle : l'application compte des effectifs
@@ -678,7 +681,7 @@ class AttendanceCategory(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     nom = db.Column(db.String(100), nullable=False)
-    groupe = db.Column(db.String(10), nullable=False)   # hommes | femmes | fils_icm | nouveaux
+    groupe = db.Column(db.String(10), nullable=False)   # hommes | femmes | fils_icm | nouveaux | prophete
     age_min = db.Column(db.Integer)
     age_max = db.Column(db.Integer)
     ordre_affichage = db.Column(db.Integer, nullable=False, default=0)
@@ -713,6 +716,7 @@ class AttendanceRecord(db.Model):
     total_femmes = db.Column(db.Integer, nullable=False, default=0)
     total_fils_icm = db.Column(db.Integer, nullable=False, default=0)
     total_nouveaux = db.Column(db.Integer, nullable=False, default=0)
+    total_prophete = db.Column(db.Integer, nullable=False, default=0)
     # Colonne conservée pour les présences enregistrées avant la
     # reclassification (enfants faisait alors partie du groupe) — jamais
     # renseignée pour une nouvelle fiche, où les enfants sont comptés dans
@@ -1587,6 +1591,7 @@ def recalculer_totaux(record, valeurs_par_categorie, categories):
     record.total_femmes = totaux[GROUPE_FEMMES]
     record.total_fils_icm = totaux[GROUPE_FILS_ICM]
     record.total_nouveaux = totaux[GROUPE_NOUVEAUX]
+    record.total_prophete = totaux[GROUPE_PROPHETE]
     record.total_enfants = totaux[GROUPE_ENFANTS]
     record.total_general = sum(totaux.values())
 
@@ -1844,6 +1849,7 @@ def periode_precedente(periode, debut, fin):
 EMOJIS_GROUPES = {
     GROUPE_HOMMES: "👨", GROUPE_FEMMES: "👩",
     GROUPE_FILS_ICM: "🤝", GROUPE_NOUVEAUX: "🆕",
+    GROUPE_PROPHETE: "🙌",
     GROUPE_ENFANTS: "🧒",   # legacy
 }
 
@@ -1926,6 +1932,7 @@ def calculer_statistiques_periode(debut, fin):
         GROUPE_FEMMES: sum(r.total_femmes for r in enregistrements),
         GROUPE_FILS_ICM: sum(r.total_fils_icm for r in enregistrements),
         GROUPE_NOUVEAUX: sum(r.total_nouveaux for r in enregistrements),
+        GROUPE_PROPHETE: sum(r.total_prophete for r in enregistrements),
         # Legacy : présent uniquement si la période couvre des fiches
         # enregistrées avant la reclassification (voir GROUPE_ENFANTS).
         GROUPE_ENFANTS: sum(r.total_enfants for r in enregistrements),
@@ -2178,7 +2185,8 @@ def presences_comparaison():
         _comparer(GROUPE_HOMMES, "Hommes"),
         _comparer(GROUPE_FEMMES, "Femmes"),
         _comparer(GROUPE_FILS_ICM, "Fils-ICM"),
-        _comparer(GROUPE_NOUVEAUX, "Nouveaux"),
+        _comparer(GROUPE_NOUVEAUX, "Nouveaux fidèles"),
+        _comparer(GROUPE_PROPHETE, "Prophète/Famille"),
     ]
 
     return render_template(
@@ -2271,8 +2279,8 @@ def presences_export_csv():
     writer = csv.writer(tampon, delimiter=";")
     writer.writerow(
         ["Date", "Jour", "Type de culte", "Lieu"] + [c.nom for c in categories]
-        + ["Total Hommes", "Total Femmes", "Total Fils-ICM", "Total Nouveaux",
-           "Total Général", "Notes"]
+        + ["Total Hommes", "Total Femmes", "Total Fils-ICM", "Total Nouveaux fidèles",
+           "Total Prophète/Famille", "Total Général", "Notes"]
     )
     for r in enregistrements:
         valeurs_par_categorie = {v.category_id: v.effectif for v in r.valeurs}
@@ -2282,7 +2290,7 @@ def presences_export_csv():
         ]
         ligne += [valeurs_par_categorie.get(c.id, 0) for c in categories]
         ligne += [r.total_hommes, r.total_femmes, r.total_fils_icm, r.total_nouveaux,
-                  r.total_general, neutraliser_formule(r.notes) or ""]
+                  r.total_prophete, r.total_general, neutraliser_formule(r.notes) or ""]
         writer.writerow(ligne)
 
     nom_fichier = f"presences_icm_{date.today():%Y-%m-%d}.csv"
@@ -3215,6 +3223,7 @@ def initialiser_donnees_presences():
         (GROUPE_NOUVEAUX, "Hommes — Adultes", 18, None),
         (GROUPE_NOUVEAUX, "Femmes — Enfants", 3, 17),
         (GROUPE_NOUVEAUX, "Femmes — Adultes", 18, None),
+        (GROUPE_PROPHETE, "Prophète/Famille", None, None),
     ]
     ordres = defaultdict(int)
     for groupe, nom, age_min, age_max in categories_par_defaut:
@@ -3230,18 +3239,36 @@ def initialiser_donnees_presences():
 def migrer_colonnes_presences_manquantes():
     """db.create_all() ne modifie jamais une table déjà existante — seulement
     les tables manquantes. Une base SQLite locale créée avant l'ajout des
-    groupes Fils-ICM / Nouveaux (10/09/2026) a donc `attendance_record` sans
-    les colonnes total_fils_icm/total_nouveaux : on les ajoute ici une seule
-    fois si besoin, sans toucher aux données déjà présentes."""
+    groupes Fils-ICM / Nouveaux (10/09/2026) ou de Prophète/Famille
+    (14/09/2026) a donc `attendance_record` sans les colonnes correspondantes :
+    on les ajoute ici une seule fois si besoin, sans toucher aux données déjà
+    présentes."""
     inspecteur = sa_inspect(db.engine)
     if "attendance_record" not in inspecteur.get_table_names():
         return
     colonnes = {c["name"] for c in inspecteur.get_columns("attendance_record")}
-    manquantes = [c for c in ("total_fils_icm", "total_nouveaux") if c not in colonnes]
+    manquantes = [c for c in ("total_fils_icm", "total_nouveaux", "total_prophete")
+                  if c not in colonnes]
     for colonne in manquantes:
         db.session.execute(
             text(f"ALTER TABLE attendance_record ADD COLUMN {colonne} INTEGER NOT NULL DEFAULT 0"))
     if manquantes:
+        db.session.commit()
+
+
+def initialiser_categorie_prophete():
+    """initialiser_donnees_presences() ne s'exécute plus une fois des types de
+    culte déjà créés (voir sa docstring) — sur une base déjà en service, la
+    rubrique Prophète/Famille (14/09/2026) doit donc être semée séparément,
+    une seule fois, sans toucher au reste (même principe que
+    initialiser_donnees_fils ci-dessous)."""
+    if ServiceType.query.count() == 0:
+        return   # base neuve : initialiser_donnees_presences() s'en charge
+    if not AttendanceCategory.query.filter_by(groupe=GROUPE_PROPHETE).first():
+        db.session.add(AttendanceCategory(
+            nom="Prophète/Famille", groupe=GROUPE_PROPHETE,
+            age_min=None, age_max=None, ordre_affichage=0,
+        ))
         db.session.commit()
 
 
@@ -3262,6 +3289,7 @@ with app.app_context():
     db.create_all()
     migrer_colonnes_presences_manquantes()
     initialiser_donnees_presences()
+    initialiser_categorie_prophete()
     initialiser_donnees_fils()
     # Empêche deux fiches de partager le même numéro de registre au niveau
     # de la base elle-même — pas seulement par le contrôle applicatif

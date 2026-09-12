@@ -31,7 +31,8 @@
 {% set _libelles_groupes = {'hommes': ('Hommes', '👨', record.total_hommes),
                             'femmes': ('Femmes', '👩', record.total_femmes),
                             'fils_icm': ('Fils-ICM', '🤝', record.total_fils_icm),
-                            'nouveaux': ('Nouveaux', '🆕', record.total_nouveaux),
+                            'nouveaux': ('Nouveaux fidèles', '🆕', record.total_nouveaux),
+                            'prophete': ('Prophète/Famille', '🙌', record.total_prophete),
                             'enfants': ('Enfants (historique)', '🧒', record.total_enfants)} %}
 {% for groupe, valeurs_du_groupe in par_groupe.items() %}
 {% set libelle, emoji, total = _libelles_groupes.get(groupe, (groupe|capitalize, '', 0)) %}

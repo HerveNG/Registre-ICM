@@ -54,8 +54,12 @@
     <span class="carte-kpi-valeur">{{ dernier.total_fils_icm }}</span>
   </div>
   <div class="carte-kpi">
-    <span class="carte-kpi-libelle">🆕 Nouveaux</span>
+    <span class="carte-kpi-libelle">🆕 Nouveaux fidèles</span>
     <span class="carte-kpi-valeur">{{ dernier.total_nouveaux }}</span>
+  </div>
+  <div class="carte-kpi">
+    <span class="carte-kpi-libelle">🙌 Prophète/Famille</span>
+    <span class="carte-kpi-valeur">{{ dernier.total_prophete }}</span>
   </div>
 </div>
 
@@ -64,7 +68,7 @@
   <div class="tableau-enveloppe">
     <table class="tableau">
       <thead>
-        <tr><th>Date</th><th>Jour</th><th>Type</th><th>Hommes</th><th>Femmes</th><th>Fils-ICM</th><th>Nouveaux</th><th>Total</th></tr>
+        <tr><th>Date</th><th>Jour</th><th>Type</th><th>Hommes</th><th>Femmes</th><th>Fils-ICM</th><th>Nouveaux fidèles</th><th>Prophète/Famille</th><th>Total</th></tr>
       </thead>
       <tbody>
         {% for r in recents %}
@@ -76,6 +80,7 @@
           <td>{{ r.total_femmes }}</td>
           <td>{{ r.total_fils_icm }}</td>
           <td>{{ r.total_nouveaux }}</td>
+          <td>{{ r.total_prophete }}</td>
           <td><strong>{{ r.total_general }}</strong></td>
         </tr>
         {% endfor %}
