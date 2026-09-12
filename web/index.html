@@ -1665,7 +1665,11 @@ async function api(chemin, options={}, deuxiemeEssai=false){
   if (r.status === 401 && !deuxiemeEssai && await rafraichirSession())
     return api(chemin, options, true);
 
-  if (r.status === 401){ deconnexion("Session expirée, reconnectez-vous."); throw new Error("401"); }
+  if (r.status === 401){
+    const raison = "Session expirée, reconnectez-vous.";
+    deconnexion(raison);
+    throw new Error(raison);
+  }
 
   if (!r.ok){
     let detail = "";
