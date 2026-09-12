@@ -31,7 +31,7 @@ body{
 /* ---------------- En-tête ---------------- */
 .entete{background:var(--encre); color:#fff;}
 .entete-inner{
-  max-width:1180px; margin:0 auto; padding:.9rem 1.5rem;
+  max-width:1320px; margin:0 auto; padding:.9rem 1.5rem;
   display:flex; align-items:center; gap:1.5rem; flex-wrap:wrap;
 }
 .marque{display:flex; align-items:center; gap:.85rem; color:#fff; text-decoration:none;}
@@ -50,7 +50,10 @@ body{
   padding:.45rem .8rem; border-radius:6px;
 }
 .nav a:hover{background:rgba(255,255,255,.12);}
-.nav-sortie{opacity:.7;}
+.nav a.nav-sortie{
+  background:#f2c811; color:var(--encre); font-weight:600;
+}
+.nav a.nav-sortie:hover{background:#e0b800;}
 .nav-compte{
   color:#fff; font-size:.85rem; opacity:.85; padding:.45rem .3rem;
   display:flex; align-items:center; gap:.4rem;
@@ -61,7 +64,7 @@ body{
 }
 
 /* ---------------- Structure ---------------- */
-.conteneur{max-width:1180px; margin:0 auto; padding:1.8rem 1.5rem 3rem;}
+.conteneur{max-width:1320px; margin:0 auto; padding:1.8rem 1.5rem 3rem;}
 .pied{
   text-align:center; padding:1.5rem; font-size:.8rem; color:var(--encre-douce);
   border-top:1px solid var(--trait);
