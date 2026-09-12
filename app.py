@@ -3211,9 +3211,9 @@ def initialiser_donnees_presences():
         (GROUPE_FILS_ICM, "Hommes — Adultes", 18, None),
         (GROUPE_FILS_ICM, "Femmes — Enfants", 13, 17),
         (GROUPE_FILS_ICM, "Femmes — Adultes", 18, None),
-        (GROUPE_NOUVEAUX, "Hommes — Enfants", 0, 12),
+        (GROUPE_NOUVEAUX, "Hommes — Enfants", 3, 17),
         (GROUPE_NOUVEAUX, "Hommes — Adultes", 18, None),
-        (GROUPE_NOUVEAUX, "Femmes — Enfants", 0, 12),
+        (GROUPE_NOUVEAUX, "Femmes — Enfants", 3, 17),
         (GROUPE_NOUVEAUX, "Femmes — Adultes", 18, None),
     ]
     ordres = defaultdict(int)

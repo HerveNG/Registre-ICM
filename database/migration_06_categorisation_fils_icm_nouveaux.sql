@@ -96,9 +96,9 @@ from (values
     ('Hommes — Adultes', 'fils_icm', 18, null, 1),
     ('Femmes — Enfants', 'fils_icm', 13, 17,   2),
     ('Femmes — Adultes', 'fils_icm', 18, null, 3),
-    ('Hommes — Enfants', 'nouveaux', 0, 12,   0),
+    ('Hommes — Enfants', 'nouveaux', 3, 17,   0),
     ('Hommes — Adultes', 'nouveaux', 18, null, 1),
-    ('Femmes — Enfants', 'nouveaux', 0, 12,   2),
+    ('Femmes — Enfants', 'nouveaux', 3, 17,   2),
     ('Femmes — Adultes', 'nouveaux', 18, null, 3)
 ) as v(nom, groupe, age_min, age_max, ordre)
 where not exists (
