@@ -1076,7 +1076,11 @@ begin
 
     select count(*) into v_total from public.journal_audit;
 
-    delete from public.journal_audit;
+    -- "where true" : sans clause WHERE, Supabase bloque le DELETE (garde-fou
+    -- anti-suppression-accidentelle, actif même en security definer) avec
+    -- l'erreur "DELETE requires a WHERE clause" — cette clause satisfait le
+    -- garde-fou tout en supprimant réellement toutes les lignes.
+    delete from public.journal_audit where true;
 
     insert into public.journal_audit (utilisateur, action, registre_id, nom_complet, details)
     values (v_email, 'reinitialisation', null, 'Journal d''audit',
